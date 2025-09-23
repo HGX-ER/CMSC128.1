@@ -1,0 +1,17 @@
+/* Reset default body margin */
+body {
+  margin: 0;
+  background-color: #f8f9fa; /* Bootstrap light background */
+}
+
+/* Ensure the root container takes full height */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Optional: style the card nicely */
+.card {
+  border-radius: 15px;
+}
