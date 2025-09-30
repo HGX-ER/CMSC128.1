@@ -10,7 +10,7 @@
 `mkdir backend`\
 `cd backend`\
 `npm init -y` - initializes a new node.js project in the current folder
-`npm install express mysql2 cors body-parser` 
+`npm install express mysql2 cors body-parser`\
 - express for building web servers under Node.js
 - MySql client that connects to MySQL db
 - Cors: middleware that lets your backend accept requests from a different origin
