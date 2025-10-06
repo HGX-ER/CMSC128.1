@@ -4,6 +4,7 @@
 
 ### Under the React app
 `npm install` - (this is for downloading the node modules)\
+`npm install axios` - (this is for downloading rooting)
 `npm run dev` - (command for running the react app)
 
 ## How to Create Node.js backend
