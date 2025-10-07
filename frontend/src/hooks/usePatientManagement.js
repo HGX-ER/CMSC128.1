@@ -63,8 +63,8 @@ export function usePatientManagement() {
 
   const addPatient = useCallback(async () => {
     try {
-      const { data } = await api.post('/registration/encounters', {});
-      const queue = data.queue_number;
+      const { data } = await api.post('/registration/new', {});
+      const queue = data.queueNumber;
       const newP = {
         id: queue,
         name: '',

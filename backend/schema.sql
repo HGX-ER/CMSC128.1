@@ -11,17 +11,20 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS patients (
                                         id INT AUTO_INCREMENT PRIMARY KEY,
                                         mrn VARCHAR(32) UNIQUE,
-                                        first_name VARCHAR(50),
-                                        last_name VARCHAR(50),
+                                        full_name VARCHAR(100) NOT NULL,
                                         dob DATE,
                                         sex VARCHAR(10),
+                                        contact_number VARCHAR(32),
+                                        emergency_contact VARCHAR(64),
+                                        insurance_info VARCHAR(64),
+                                        address VARCHAR(128),
                                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS encounters (
                                           id INT AUTO_INCREMENT PRIMARY KEY,
                                           patient_id INT NOT NULL,
-                                          queue_number VARCHAR(12) UNIQUE,
+                                          queue_number VARCHAR(32) UNIQUE, -- ✅ changed from 12 → 32
                                           status ENUM('arrived','registered','triaged','roomed','provider_started','dispositioned','departed') NOT NULL DEFAULT 'arrived',
                                           priority_esi TINYINT,
                                           arrival_time DATETIME,
@@ -58,3 +61,4 @@ INSERT INTO users (username, password, role) VALUES
                                                  ('doc1','1234','doctor'),
                                                  ('manager1','1234','ed_manager')
 ON DUPLICATE KEY UPDATE password=VALUES(password), role=VALUES(role);
+
