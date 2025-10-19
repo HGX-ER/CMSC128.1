@@ -6,15 +6,13 @@ import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Eye, EyeOff, User, Shield, AlertCircle, Heart, Hash, Stethoscope, Camera, X, QrCode } from 'lucide-react';
-
-
+import { Eye, EyeOff, User, Shield, AlertCircle, Heart, Hash, Stethoscope, Camera, X, QrCode, Hospital } from 'lucide-react';
 
 const ROLE_INFO = {
   patient: {
     title: 'Patient Access',
     description: 'Track your ED visit progress',
-    color: 'bg-blue-100 text-blue-800',
+    color: 'bg-blue-100 text-[#004f61]',
     icon: User
   },
   doctor: {
@@ -44,7 +42,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('staff');
+  const [activeTab, setActiveTab] = useState('patient');
   const [showScanner, setShowScanner] = useState(false);
 
 
@@ -126,86 +124,103 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div
+      className="min-h-screen bg-cover bg-center flex items-center justify-center p-4"
+      style={{ backgroundImage: "url('https://xmple.com/wallpaper/white-gradient-blue-linear-3840x2160-c2-add8e6-ffffff-a-285-f-14.svg')" }}
+    >
       <div className="w-full max-w-md space-y-6">
         {/* Main Login Card */}
         <Card className="shadow-lg">
-          <CardHeader className="text-center space-y-2">
-            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Heart className="w-8 h-8 text-white" />
+          <CardHeader className="text-center flex flex-col items-center gap-">
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: '#96cfe0' }}
+            >
+              <Hospital className="w-8 h-8 text-white" />
             </div>
-            <CardTitle className="text-2xl">ED Management System</CardTitle>
-            <CardDescription>
-              Sign in to access the Emergency Department portal
-            </CardDescription>
+            <CardTitle className="text-4xl font-bold -mt-1">ERIS</CardTitle>
+            <p className="text-lg mt-0">Emergency Response Information System</p>
           </CardHeader>
           
           <CardContent className="space-y-4">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="staff" className="flex items-center gap-2">
-                  <Stethoscope className="w-4 h-4" />
-                  Healthcare Staff
-                </TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 mb-2">
                 <TabsTrigger value="patient" className="flex items-center gap-2">
                   <User className="w-4 h-4" />
                   Patient Portal
                 </TabsTrigger>
+                <TabsTrigger value="staff" className="flex items-center gap-2">
+                  <Stethoscope className="w-4 h-4" />
+                  Healthcare Staff
+                </TabsTrigger>
               </TabsList>
+
+                {activeTab === 'staff' && (
+                  <p className="text-sm text-gray-600 text-center mb-2">
+                    Sign in with your hospital account to access the staff dashboard.
+                  </p>
+                )}
 
               <TabsContent value="staff" className="space-y-4">
                 <form onSubmit={handleStaffSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <Input
-                        id="username"
-                        type="text"
-                        placeholder="Enter your username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
+                  {/* Username field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="username">Username</Label>
+                      <div className="relative flex items-center">
+                        {/* move icon right by giving it explicit px spacing */}
+                        <User
+                          className="absolute text-gray-400 w-4 h-4"
+                          style={{ left: '1rem', top: '50%', transform: 'translateY(-50%)' }}
+                        />
+                        <Input
+                          id="username"
+                          type="text"
+                          placeholder="Enter your username"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          style={{ paddingLeft: '2.75rem' }}
+                          required
+                        />
+                      </div>
                     </div>
-                  </div>
-                       <Label htmlFor="username">Password</Label>
-                  <div className="relative">
-                   
-                    {/* Pass icon */}
-                      <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
 
-                    {/* Input field */}
+                    {/* Password field */}
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative flex items-center">
+                      <Shield
+                        className="absolute text-gray-400 w-4 h-4"
+                        style={{ left: '1rem', top: '50%', transform: 'translateY(-50%)' }}
+                      />
                       <Input
                         id="password"
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Enter your password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="pl-12 pr-12 h-10"
+                        style={{ paddingLeft: '2.75rem', paddingRight: '2.5rem' }}
+                        className="h-10"
                         required
                       />
-
-                    {/* Eye toggle button */}
                       <button
                         type="button"
-                        variant="ghost"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5"
                       >
                         {showPassword ? (
-                          <EyeOff className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 w-5 h-5" />
+                          <EyeOff className="text-gray-400 hover:text-gray-600 w-5 h-5" />
                         ) : (
-                          <Eye className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 w-5 h-5" />
+                          <Eye className="text-gray-400 hover:text-gray-600 w-5 h-5" />
                         )}
                       </button>
                     </div>
 
-
                   <Button 
                     type="submit" 
-                    className="w-full" 
+                      style={{
+                        backgroundColor: '#47a1bd',
+                        color: '#fff'
+                      }}
+                    className="w-full text-base font-semibold" 
                     disabled={isLoading || !username || !password}
                   >
                     {isLoading ? 'Signing in...' : 'Sign In'}
@@ -215,21 +230,21 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
 
               <TabsContent value="patient" className="space-y-4">
                 {/* Info box */}
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="p-4 border rounded-lg" style={{ backgroundColor: '#d6eef5', borderColor: '#96cfe0' }}>
                   <div className="flex items-center gap-2 mb-2">
-                    <Hash className="w-4 h-4 text-blue-600" />
-                    <span className="font-medium text-blue-800">Patient Portal</span>
+                    <Hash className="w-4 h-4" style={{ color: '#96cfe0' }} />
+                    <span className="font-medium" style={{ color: '#004f61' }}>Patient Portal</span>
                   </div>
-                  <p className="text-sm text-blue-600">
+                  <p className="text-sm" style={{ color: '#004f61' }}>
                     You can scan your QR code or type your queue number manually to access your visit status.
                   </p>
                 </div>
 
                 {/* QR Scanner */}
                 {showScanner ? (
-                  <div className="p-4 border-2 border-blue-500 rounded-lg bg-white shadow-lg">
+                  <div className="p-4 border-2 rounded-lg bg-white shadow-lg" style={{ borderColor: '#96cfe0' }}>
                     <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium text-blue-700">Scan Your QR Code</h4>
+                      <h4 className="font-medium" style={{ color: '#004f61' }}>Scan Your QR Code</h4>
                       <Button
                         type="button"
                         variant="ghost"
@@ -242,7 +257,8 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                     </div>
                     
                     <div className="space-y-3">
-                      <div className="relative w-full aspect-square max-w-sm mx-auto overflow-hidden rounded-lg border-2 border-blue-300 bg-gray-900">
+                      <div className="relative w-full aspect-square max-w-sm mx-auto overflow-hidden rounded-lg border-2 bg-gray-900"
+                        style={{ borderColor: '#96cfe0' }}>
                         {cameraError ? (
                           <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-4">
                             <Camera className="w-12 h-12 mb-2 text-gray-400" />
@@ -261,11 +277,16 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                               className="w-full h-full object-cover"
                             />
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                              <div className="w-3/4 h-3/4 border-2 border-white rounded-lg relative">
-                                <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-blue-500 rounded-tl-lg"></div>
-                                <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
-                                <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
-                                <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-blue-500 rounded-br-lg"></div>
+                              <div className="w-3/4 h-3/4 border-2 rounded-lg relative"
+                                style={{ borderColor: 'white' }}>
+                                <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 rounded-tl-lg"
+                                  style={{ borderColor: '#96cfe0' }}></div>
+                                <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 rounded-tr-lg"
+                                  style={{ borderColor: '#96cfe0' }}></div>
+                                <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 rounded-bl-lg"
+                                  style={{ borderColor: '#96cfe0' }}></div>
+                                <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 rounded-br-lg"
+                                  style={{ borderColor: '#96cfe0' }}></div>
                               </div>
                             </div>
                           </>
@@ -282,7 +303,8 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                   <Button
                     type="button"
                     onClick={() => setShowScanner(true)}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700"
+                    className="w-full"
+                    style={{ backgroundColor: '#47a1bdff', hover: { backgroundColor: '#7ec2d7' } }}
                   >
                     <Camera className="w-4 h-4 mr-2" />
                     Scan QR Code
@@ -293,22 +315,28 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                 <form onSubmit={handlePatientSubmit} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="queueNumber">Or Enter Queue Number</Label>
-                    <div className="relative">
-                      <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <div className="relative flex items-center">
+                      <Hash
+                        className="absolute text-gray-400 w-4 h-4"
+                        style={{ left: '1rem', top: '50%', transform: 'translateY(-50%)' }}
+                      />
                       <Input
                         id="queueNumber"
                         type="text"
                         placeholder="Enter your queue number manually"
                         value={queueNumber}
                         onChange={(e) => setQueueNumber(e.target.value.toUpperCase())}
-                        className="pl-10 font-mono"
+                        style={{ paddingLeft: '2.75rem' }}
+                        className="font-mono"
+                        required
                       />
                     </div>
                   </div>
 
                   <Button 
                     type="submit" 
-                    className="w-full bg-blue-600 hover:bg-blue-700" 
+                    className="w-full" 
+                    style={{ backgroundColor: '#47a1bdff', hover: { backgroundColor: '#7ec2d7' } }} 
                     disabled={isLoading || !queueNumber}
                   >
                     {isLoading ? 'Checking...' : 'Access My Visit Status'}
@@ -355,8 +383,8 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
 
         {/* Footer */}
         <div className="text-center text-sm text-gray-500">
-          <p>Emergency Department Management System</p>
-          <p>Secure healthcare portal • {new Date().getFullYear()}</p>
+          <p>Emergency Response Information System</p>
+          <p>ERIS • {new Date().getFullYear()}</p>
         </div>
       </div>
     </div>
