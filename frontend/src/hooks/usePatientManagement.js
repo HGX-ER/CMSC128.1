@@ -176,7 +176,7 @@ export function usePatientManagement() {
 
   // Expose backend helpers if components want to call directly
   const completeRegistration = useCallback(async (queue_number, registrationData) => {
-    await api.post('/registration/complete', { queue_number, ...registrationData });
+    await api.put(`/registration/patient/${queue_number}`, registrationData);
   }, []);
 
   const submitTriage = useCallback(async (encounterId, { esi, complaint, vitals }) => {

@@ -1,28 +1,29 @@
+// backend/routes/registration.js
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
-/**
- * POST /api/registration/new
- * Create a new patient + encounter (queue generation)
- */
-router.post('/registration/new', async (req, res) => {
+// ============================================================
+// POST /api/registration/new
+// Create a new patient and encounter (Queue Generation)
+// ============================================================
+router.post("/registration/new", async (req, res) => {
     try {
         const [result] = await db.query(`
-            INSERT INTO patients (full_name, dob, sex)
-            VALUES ('', NULL, NULL)
-        `);
+      INSERT INTO patients (full_name, dob, sex)
+      VALUES ('', NULL, NULL)
+    `);
+
         const patientId = result.insertId;
 
+        // Generate a unique queue number (ED + timestamp + random digits)
         const now = new Date();
-
-        // ✅ Include seconds + random digits for uniqueness
         const datePart = now
             .toISOString()
             .slice(2, 19)
-            .replace(/[-T:]/g, '')    // Remove separators
-            .slice(0, 12);            // YYMMDDHHMMSS
-        const randomPart = Math.floor(100 + Math.random() * 900); // random 3 digits
+            .replace(/[-T:]/g, "")
+            .slice(0, 12);
+        const randomPart = Math.floor(100 + Math.random() * 900);
         const qn = `ED${datePart}${randomPart}`;
 
         await db.query(
@@ -35,52 +36,103 @@ router.post('/registration/new', async (req, res) => {
 
         res.json({ queueNumber: qn });
     } catch (err) {
-        console.error('Error creating registration:', err);
+        console.error("Error creating registration:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// ✅ Update patient registration info by queue number
-router.put('/registration/patient/:queueNumber', async (req, res) => {
+// ============================================================
+// PUT /api/registration/patient/:queueNumber
+// Update patient registration info via queue number
+// ============================================================
+router.put("/registration/patient/:queueNumber", async (req, res) => {
     try {
-        const queueNumber = req.params.queueNumber;
-        const { name, dateOfBirth, sex } = req.body;
+        const { queueNumber } = req.params;
+        const {
+            name,
+            dateOfBirth,
+            sex,
+            contactNumber,
+            emergencyContact,
+            insuranceInfo,
+            address,
+        } = req.body;
 
-        // Find encounter and linked patient
-        const [rows] = await db.query(
+        // Look up encounter by queue number
+        const [encounters] = await db.query(
             `SELECT patient_id FROM encounters WHERE queue_number = ? LIMIT 1`,
             [queueNumber]
         );
 
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Queue number not found' });
+        if (encounters.length === 0) {
+            return res.status(404).json({ error: "Queue number not found" });
         }
 
-        const patientId = rows[0].patient_id;
+        const patientId = encounters[0].patient_id;
 
-        // ✅ Update patient info
+        // Update patient record
         await db.query(
             `
                 UPDATE patients
-                SET full_name = ?, dob = ?, sex = ?
+                SET
+                    full_name = ?,
+                    dob = ?,
+                    sex = ?,
+                    contact_number = ?,
+                    emergency_contact = ?,
+                    insurance_info = ?,
+                    address = ?
                 WHERE id = ?
             `,
-            [name || '', dateOfBirth || null, sex || '', patientId]
+            [
+                name || "",
+                dateOfBirth || null,
+                sex || "",
+                contactNumber || null,
+                emergencyContact || null,
+                insuranceInfo || null,
+                address || null,
+                patientId,
+            ]
         );
 
-        // ✅ Optionally update encounter status to 'registered'
+        // Update encounter status
         await db.query(
-            `
-                UPDATE encounters
-                SET status = 'registered'
-                WHERE queue_number = ?
-            `,
+            `UPDATE encounters SET status = 'registered' WHERE queue_number = ?`,
             [queueNumber]
         );
 
-        res.json({ message: 'Patient registration updated successfully' });
+        // Optional: Log event into encounter_events table
+        await db.query(
+            `
+      INSERT INTO encounter_events (encounter_id, type, at, payload)
+      SELECT e.id, 'registered', NOW(), JSON_OBJECT(
+        'full_name', ?,
+        'dob', ?,
+        'sex', ?,
+        'contact_number', ?,
+        'emergency_contact', ?,
+        'insurance_info', ?,
+        'address', ?
+      )
+      FROM encounters e
+      WHERE e.queue_number = ?
+      `,
+            [
+                name,
+                dateOfBirth,
+                sex,
+                contactNumber,
+                emergencyContact,
+                insuranceInfo,
+                address,
+                queueNumber,
+            ]
+        );
+
+        res.json({ message: "Patient registration updated successfully" });
     } catch (err) {
-        console.error('Error saving registration:', err);
+        console.error("Error saving registration:", err);
         res.status(500).json({ error: err.message });
     }
 });

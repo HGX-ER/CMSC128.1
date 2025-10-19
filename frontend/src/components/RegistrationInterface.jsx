@@ -106,7 +106,8 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
 
 
 
-  const handleRegisterPatient = () => {
+  const handleRegisterPatient = async () => {
+  try {
     const patient = patients.find(p => p.id === registrationQueueNumber);
     if (!patient) {
       alert('Queue number not found. Please check the queue number.');
@@ -118,7 +119,7 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
       return;
     }
 
-    // Calculate age if not provided
+    // Compute age if not provided
     let calculatedAge = registrationData.age;
     if (!calculatedAge && registrationData.dateOfBirth) {
       const birthDate = new Date(registrationData.dateOfBirth);
@@ -130,21 +131,39 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
       }
     }
 
-    const updates = {
+    // ✅ Send the update to backend
+    const payload = {
       name: registrationData.name,
       dateOfBirth: registrationData.dateOfBirth,
-      age: calculatedAge || registrationData.age,
       sex: registrationData.sex,
-      chiefComplaint: registrationData.chiefComplaint,
       contactNumber: registrationData.contactNumber,
       emergencyContact: registrationData.emergencyContact,
       insuranceInfo: registrationData.insuranceInfo,
-      address: registrationData.address,
-      isRegistered: true
+      address: registrationData.address
     };
 
-    onUpdatePatient(patient.id, updates);
-    onMoveToStage(patient.id, 'waiting_doctor');
+    const response = await fetch(`http://localhost:5000/api/registration/patient/${registrationQueueNumber}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || "Failed to update patient");
+    }
+
+    console.log("✅ Registration saved to backend:", payload);
+
+    // ✅ Update frontend state
+    onUpdatePatient(patient.id, {
+      ...payload,
+      age: calculatedAge,
+      isRegistered: true
+    });
+    onMoveToStage(patient.id, "waiting_doctor");
+
+    alert("✅ Registration completed and saved to backend!");
 
     // Reset registration form
     setRegistrationQueueNumber('');
@@ -159,7 +178,12 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
       insuranceInfo: '',
       address: ''
     });
-  };
+  } catch (error) {
+    console.error("Error saving registration:", error);
+    alert("Error saving registration. Check backend logs.");
+  }
+};
+
 
   const findPatientByQueueNumber = (queueNumber) => {
     return patients.find(p => p.id === queueNumber);
