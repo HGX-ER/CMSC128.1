@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -6,7 +6,9 @@ import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Eye, EyeOff, User, Lock, AlertCircle, Heart, Hash, Stethoscope } from 'lucide-react';
+import { Eye, EyeOff, User, Shield, AlertCircle, Heart, Hash, Stethoscope, Camera, X, QrCode } from 'lucide-react';
+
+
 
 const ROLE_INFO = {
   patient: {
@@ -35,18 +37,6 @@ const ROLE_INFO = {
   }
 };
 
-const DEMO_CREDENTIALS = [
-  { username: 'dr.smith', password: 'doctor123', role: 'doctor' },
-  { username: 'nurse.jones', password: 'nurse123', role: 'nurse' },
-  { username: 'manager.wilson', password: 'manager123', role: 'ed_manager' }
-];
-
-const DEMO_QUEUE_NUMBERS = [
-  'ED20241223140001',
-  'ED20241223141002', 
-  'ED20241223142003'
-];
-
 export function LoginInterface({ onLogin, onQueueLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -54,8 +44,10 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showDemo, setShowDemo] = useState(false);
   const [activeTab, setActiveTab] = useState('staff');
+  const [showScanner, setShowScanner] = useState(false);
+
+
 
   const handleStaffSubmit = async (e) => {
     e.preventDefault();
@@ -74,6 +66,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
     }
   };
 
+
   const handlePatientSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -90,17 +83,47 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
       setIsLoading(false);
     }
   };
+  
 
-  const handleDemoLogin = (credentials) => {
-    setUsername(credentials.username);
-    setPassword(credentials.password);
-    setError('');
-  };
+  const videoRef = useRef(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [cameraError, setCameraError] = useState('');
 
-  const handleDemoQueueLogin = (queueNum) => {
-    setQueueNumber(queueNum);
-    setError('');
-  };
+  useEffect(() => {
+    let stream = null;
+
+    const startCamera = async () => {
+      if (showScanner && videoRef.current) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment' } 
+          });
+          videoRef.current.srcObject = stream;
+          setIsScanning(true);
+          setCameraError('');
+        } catch (err) {
+          console.error('Camera access error:', err);
+          setCameraError('Camera access denied or not available');
+          setIsScanning(false);
+        }
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [showScanner]);
+
+
+  const handleCloseScanner = () => {
+    setShowScanner(false);
+    setIsScanning(false);
+    setCameraError('');
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -135,7 +158,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                   <div className="space-y-2">
                     <Label htmlFor="username">Username</Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                       <Input
                         id="username"
                         type="text"
@@ -147,35 +170,38 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                       />
                     </div>
                   </div>
+                       <Label htmlFor="username">Password</Label>
+                  <div className="relative">
+                   
+                    {/* Pass icon */}
+                      <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
 
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    {/* Input field */}
                       <Input
                         id="password"
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Enter your password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 pr-10"
+                        className="pl-12 pr-12 h-10"
                         required
                       />
-                      <Button
+
+                    {/* Eye toggle button */}
+                      <button
                         type="button"
                         variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                         onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5"
                       >
                         {showPassword ? (
-                          <EyeOff className="h-4 w-4 text-gray-400" />
+                          <EyeOff className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 w-5 h-5" />
                         ) : (
-                          <Eye className="h-4 w-4 text-gray-400" />
+                          <Eye className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 w-5 h-5" />
                         )}
-                      </Button>
+                      </button>
                     </div>
-                  </div>
+
 
                   <Button 
                     type="submit" 
@@ -188,29 +214,94 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
               </TabsContent>
 
               <TabsContent value="patient" className="space-y-4">
+                {/* Info box */}
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
                     <Hash className="w-4 h-4 text-blue-600" />
-                    <span className="font-medium text-blue-800">Patient Login</span>
+                    <span className="font-medium text-blue-800">Patient Portal</span>
                   </div>
                   <p className="text-sm text-blue-600">
-                    Enter your queue number to track your ED visit progress automatically
+                    You can scan your QR code or type your queue number manually to access your visit status.
                   </p>
                 </div>
 
+                {/* QR Scanner */}
+                {showScanner ? (
+                  <div className="p-4 border-2 border-blue-500 rounded-lg bg-white shadow-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-blue-700">Scan Your QR Code</h4>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleCloseScanner}
+                        className="h-8 w-8 p-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="relative w-full aspect-square max-w-sm mx-auto overflow-hidden rounded-lg border-2 border-blue-300 bg-gray-900">
+                        {cameraError ? (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-4">
+                            <Camera className="w-12 h-12 mb-2 text-gray-400" />
+                            <p className="text-sm text-center">{cameraError}</p>
+                            <p className="text-xs text-gray-400 mt-2 text-center">
+                              Make sure that the photo is clear
+                            </p>
+                          </div>
+                        ) : (
+                          <>
+                            <video
+                              ref={videoRef}
+                              autoPlay
+                              playsInline
+                              muted
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="w-3/4 h-3/4 border-2 border-white rounded-lg relative">
+                                <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-blue-500 rounded-tl-lg"></div>
+                                <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
+                                <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
+                                <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-blue-500 rounded-br-lg"></div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="text-center text-sm text-gray-600">
+                        Position the QR code within the frame
+                      </div>
+
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={() => setShowScanner(true)}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    <Camera className="w-4 h-4 mr-2" />
+                    Scan QR Code
+                  </Button>
+                )}
+
+                {/* Manual input (optional) */}
                 <form onSubmit={handlePatientSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="queueNumber">Queue Number</Label>
+                    <Label htmlFor="queueNumber">Or Enter Queue Number</Label>
                     <div className="relative">
                       <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                       <Input
                         id="queueNumber"
                         type="text"
-                        placeholder="Enter your queue number (e.g., ED20241223140001)"
+                        placeholder="Enter your queue number manually"
                         value={queueNumber}
                         onChange={(e) => setQueueNumber(e.target.value.toUpperCase())}
                         className="pl-10 font-mono"
-                        required
                       />
                     </div>
                   </div>
@@ -224,6 +315,8 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                   </Button>
                 </form>
               </TabsContent>
+
+
             </Tabs>
 
             {error && (
@@ -233,18 +326,9 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
               </Alert>
             )}
 
-            <div className="text-center">
-              <Button
-                variant="link"
-                onClick={() => setShowDemo(!showDemo)}
-                className="text-sm text-gray-600 hover:text-gray-800"
-              >
-                View demo credentials
-              </Button>
-            </div>
           </CardContent>
         </Card>
-
+        
         {/* Role Information */}
         <Card className="shadow-lg">
           <CardHeader>
@@ -268,64 +352,6 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
             })}
           </CardContent>
         </Card>
-
-        {/* Demo Credentials */}
-        {showDemo && (
-          <Card className="shadow-lg border-blue-200 bg-blue-50">
-            <CardHeader>
-              <CardTitle className="text-lg text-blue-800">Demo Credentials</CardTitle>
-              <CardDescription className="text-blue-600">
-                Click any credential to auto-fill the login form
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h4 className="font-medium text-blue-800 mb-2">Staff Login</h4>
-                <div className="space-y-2">
-                  {DEMO_CREDENTIALS.map((cred, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 bg-white rounded-lg cursor-pointer hover:bg-blue-100 transition-colors border border-blue-200"
-                      onClick={() => {
-                        setActiveTab('staff');
-                        handleDemoLogin(cred);
-                      }}
-                    >
-                      <div>
-                        <div className="font-mono text-sm">{cred.username}</div>
-                        <div className="font-mono text-xs text-gray-500">{cred.password}</div>
-                      </div>
-                      <Badge className={ROLE_INFO[cred.role].color}>
-                        {cred.role.replace('_', ' ')}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-medium text-blue-800 mb-2">Patient Queue Numbers</h4>
-                <div className="space-y-2">
-                  {DEMO_QUEUE_NUMBERS.map((queueNum, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 bg-white rounded-lg cursor-pointer hover:bg-blue-100 transition-colors border border-blue-200"
-                      onClick={() => {
-                        setActiveTab('patient');
-                        handleDemoQueueLogin(queueNum);
-                      }}
-                    >
-                      <div className="font-mono text-sm">{queueNum}</div>
-                      <Badge className="bg-blue-100 text-blue-800">
-                        patient
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Footer */}
         <div className="text-center text-sm text-gray-500">

@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
+import { Textarea } from './ui/textarea';
+import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { StageHistory } from './StageHistory';
 import { SatisfactionModal } from './SatisfactionModal';
 import { HospitalAnnouncements } from './HospitalAnnouncements';
@@ -11,13 +13,68 @@ import { HealthTips } from './HealthTips';
 import { RelaxationExercises } from './RelaxationExercises';
 import { HospitalServices } from './HospitalServices';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.jsx';
-import { Clock, Timer, Heart, Activity, Stethoscope, UserCheck, CheckCircle, MapPin, Loader2, History, Newspaper, Brain, Lightbulb, Wind, Building } from 'lucide-react';
+import { Clock, Timer, Heart, Activity, Stethoscope, UserCheck, CheckCircle, MapPin, Loader2, History, Newspaper, Brain, Lightbulb, Wind, Building, Bell, MessageCircle, Send } from 'lucide-react';
 
 export function PatientInterface({ patients, currentPatientId, getTotalTime, getCurrentStageTime, onAddSatisfactionFeedback }) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [satisfactionModal, setSatisfactionModal] = useState(null);
+  const [realtimeComments, setRealtimeComments] = useState([]);
+  const [patientComment, setPatientComment] = useState('');
+  const [submittedComments, setSubmittedComments] = useState([]);
   
   const patient = patients.find(p => p.id === currentPatientId);
+
+  // Staff profile pictures and information
+  const staffProfiles = {
+    'dr.smith': { 
+      name: 'Dr. Sarah Smith',
+      photo: 'https://images.unsplash.com/photo-1719610894782-7b376085e200?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmZW1hbGUlMjBkb2N0b3IlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjA1ODg4OTh8MA&ixlib=rb-4.1.0&q=80&w=1080',
+      room: '201',
+      building: 'Main Hospital Building',
+      floor: '2nd Floor'
+    },
+    'dr.johnson': { 
+      name: 'Dr. Michael Johnson',
+      photo: 'https://images.unsplash.com/photo-1615177393114-bd2917a4f74a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtYWxlJTIwZG9jdG9yJTIwcG9ydHJhaXR8ZW58MXx8fHwxNzYwNjA5MDI5fDA&ixlib=rb-4.1.0&q=80&w=1080',
+      room: '203',
+      building: 'Main Hospital Building',
+      floor: '2nd Floor'
+    },
+    'dr.davis': { 
+      name: 'Dr. Emily Davis',
+      photo: 'https://images.unsplash.com/photo-1612523138351-4643808db8f3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkb2N0b3IlMjBwcm9mZXNzaW9uYWwlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjA2MDEwNDZ8MA&ixlib=rb-4.1.0&q=80&w=1080',
+      room: '205',
+      building: 'Pediatric Wing',
+      floor: '2nd Floor'
+    },
+    'dr.brown': { 
+      name: 'Dr. James Brown',
+      photo: 'https://images.unsplash.com/photo-1615177393114-bd2917a4f74a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtYWxlJTIwZG9jdG9yJTIwcG9ydHJhaXR8ZW58MXx8fHwxNzYwNjA5MDI5fDA&ixlib=rb-4.1.0&q=80&w=1080',
+      room: '207',
+      building: 'Trauma Center',
+      floor: '2nd Floor'
+    },
+    'nurse.williams': { 
+      name: 'Nurse Jennifer Williams',
+      photo: 'https://images.unsplash.com/photo-1758204054877-fb1c7ba85ea1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxudXJzZSUyMHByb2Zlc3Npb25hbCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2MDY2ODE5Nnww&ixlib=rb-4.1.0&q=80&w=1080'
+    },
+    'nurse.thompson': { 
+      name: 'Nurse Robert Thompson',
+      photo: 'https://images.unsplash.com/photo-1758204054877-fb1c7ba85ea1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxudXJzZSUyMHByb2Zlc3Npb25hbCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2MDY2ODE5Nnww&ixlib=rb-4.1.0&q=80&w=1080'
+    },
+    'nurse.davis': { 
+      name: 'Nurse Lisa Davis',
+      photo: 'https://images.unsplash.com/photo-1758204054877-fb1c7ba85ea1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxudXJzZSUyMHByb2Zlc3Npb25hbCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2MDY2ODE5Nnww&ixlib=rb-4.1.0&q=80&w=1080'
+    },
+    'nurse.wilson': { 
+      name: 'Nurse Mark Wilson',
+      photo: 'https://images.unsplash.com/photo-1758204054877-fb1c7ba85ea1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxudXJzZSUyMHByb2Zlc3Npb25hbCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2MDY2ODE5Nnww&ixlib=rb-4.1.0&q=80&w=1080'
+    },
+    'nurse.martinez': { 
+      name: 'Nurse Maria Martinez',
+      photo: 'https://images.unsplash.com/photo-1758204054877-fb1c7ba85ea1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxudXJzZSUyMHByb2Zlc3Npb25hbCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2MDY2ODE5Nnww&ixlib=rb-4.1.0&q=80&w=1080'
+    }
+  };
   
   // Update timer every minute
   useEffect(() => {
@@ -27,6 +84,84 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
 
     return () => clearInterval(timer);
   }, []);
+
+  // Real-time comment system based on current stage
+  useEffect(() => {
+    if (!patient) return;
+    
+    const getStageComments = (stage) => {
+      const comments = {
+        kiosk: [
+          { time: new Date(), message: "Thank you for checking in. Please have a seat in the waiting area." },
+          { time: new Date(), message: "Your information has been recorded successfully." }
+        ],
+        waiting_triage: [
+          { time: new Date(), message: "You're in the queue for triage assessment." },
+          { time: new Date(), message: "A triage nurse will call you shortly to assess your condition." }
+        ],
+        triage: [
+          { time: new Date(), message: "Triage nurse is assessing your vital signs and symptoms." },
+          { time: new Date(), message: "Your priority level is being determined based on your condition." }
+        ],
+        waiting_registration: [
+          { time: new Date(), message: "Please proceed to the registration desk when called." },
+          { time: new Date(), message: "Registration staff will collect your demographic information." }
+        ],
+        registration: [
+          { time: new Date(), message: "Registration staff is processing your information." },
+          { time: new Date(), message: "Your healthcare team is being assigned." }
+        ],
+        waiting_doctor: [
+          { time: new Date(), message: "You're in the queue to see the doctor." },
+          { time: new Date(), message: "The doctor will see you based on medical priority." },
+          { time: new Date(), message: "Please remain in the designated waiting area." }
+        ],
+        consultation: [
+          { time: new Date(), message: "The doctor is now seeing you." },
+          { time: new Date(), message: "Your examination and consultation is in progress." }
+        ],
+        waiting_admission: [
+          { time: new Date(), message: "Admission arrangements are being made." },
+          { time: new Date(), message: "Hospital bed availability is being checked." }
+        ],
+        waiting_observation: [
+          { time: new Date(), message: "Observation unit placement is being arranged." },
+          { time: new Date(), message: "You will be moved to the observation area shortly." }
+        ],
+        waiting_discharge: [
+          { time: new Date(), message: "Your discharge paperwork is being prepared." },
+          { time: new Date(), message: "Please wait while we finalize your discharge instructions." }
+        ],
+        admission_orders: [
+          { time: new Date(), message: "Admission paperwork is being processed." },
+          { time: new Date(), message: "Your hospital room is being prepared." }
+        ],
+        awaiting_non_icu: [
+          { time: new Date(), message: "Waiting for transfer to hospital ward." },
+          { time: new Date(), message: "Transport team has been notified." }
+        ],
+        awaiting_icu: [
+          { time: new Date(), message: "ICU bed is being prepared for you." },
+          { time: new Date(), message: "Critical care team has been notified." }
+        ],
+        discharge_documents: [
+          { time: new Date(), message: "Discharge documents are being finalized." },
+          { time: new Date(), message: "Pharmacy is preparing your medications." }
+        ],
+        awaiting_departure: [
+          { time: new Date(), message: "You're cleared to leave. Please wait for final instructions." },
+          { time: new Date(), message: "Thank you for your patience during your visit." }
+        ],
+        departed: [
+          { time: new Date(), message: "Visit completed. We hope you feel better soon!" },
+          { time: new Date(), message: "Thank you for choosing our Emergency Department." }
+        ]
+      };
+      return comments[stage] || [{ time: new Date(), message: "Your care is in progress." }];
+    };
+
+    setRealtimeComments(getStageComments(patient.currentStage));
+  }, [patient?.currentStage]);
 
   // Check for newly completed stages that need satisfaction feedback
   useEffect(() => {
@@ -58,6 +193,19 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       onAddSatisfactionFeedback(currentPatientId, satisfactionModal.stageIndex, feedback);
     }
     setSatisfactionModal(null);
+  };
+
+  const handleSubmitComment = () => {
+    if (patientComment.trim()) {
+      const newComment = {
+        time: new Date(),
+        message: patientComment,
+        stage: patient.currentStage,
+        isPatient: true
+      };
+      setSubmittedComments([...submittedComments, newComment]);
+      setPatientComment('');
+    }
   };
   
   if (!patient) {
@@ -119,18 +267,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   };
 
   const getStaffDisplayName = (username) => {
-    const staffNames = {
-      'dr.smith': 'Dr. Sarah Smith',
-      'dr.johnson': 'Dr. Michael Johnson',
-      'dr.davis': 'Dr. Emily Davis',
-      'dr.brown': 'Dr. James Brown',
-      'nurse.williams': 'Nurse Jennifer Williams',
-      'nurse.thompson': 'Nurse Robert Thompson',
-      'nurse.davis': 'Nurse Lisa Davis',
-      'nurse.wilson': 'Nurse Mark Wilson',
-      'nurse.martinez': 'Nurse Maria Martinez'
-    };
-    return staffNames[username] || username;
+    return staffProfiles[username]?.name || username;
   };
 
   const getPriorityBadgeColor = (esiLevel) => {
@@ -208,6 +345,64 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-blue-800 font-medium mb-1">Current Status:</p>
                 <p className="text-blue-700">{getStageDescription(patient.currentStage)}</p>
+              </div>
+
+              {/* Real-Time Updates & Patient Comments */}
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Bell className="w-4 h-4 text-green-700" />
+                  <p className="text-green-800 font-medium">Real-Time Updates & Communication:</p>
+                </div>
+                
+                {/* System Updates */}
+                <div className="space-y-2 mb-4">
+                  {realtimeComments.map((comment, index) => (
+                    <div key={index} className="flex items-start gap-2 bg-white p-2 rounded">
+                      <MessageCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm text-green-700">{comment.message}</p>
+                        <p className="text-xs text-gray-500">{comment.time.toLocaleTimeString()}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Patient Submitted Comments */}
+                {submittedComments.filter(c => c.stage === patient.currentStage).length > 0 && (
+                  <div className="space-y-2 mb-4">
+                    <p className="text-sm font-medium text-green-800">Your Comments:</p>
+                    {submittedComments.filter(c => c.stage === patient.currentStage).map((comment, index) => (
+                      <div key={index} className="flex items-start gap-2 bg-blue-50 p-2 rounded border border-blue-200">
+                        <MessageCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm text-blue-700 font-medium">You: {comment.message}</p>
+                          <p className="text-xs text-gray-500">{comment.time.toLocaleTimeString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Comment Input */}
+                <div className="space-y-2 pt-3 border-t border-green-300">
+                  <p className="text-xs text-green-700">Have questions or concerns about this stage? Let us know:</p>
+                  <div className="flex gap-2">
+                    <Textarea
+                      value={patientComment}
+                      onChange={(e) => setPatientComment(e.target.value)}
+                      placeholder="Type your comment or question here..."
+                      className="flex-1 min-h-[60px] text-sm"
+                    />
+                    <Button
+                      onClick={handleSubmitComment}
+                      disabled={!patientComment.trim()}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 self-end"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
               </div>
               
               {/* Progress Bar */}
@@ -295,8 +490,13 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
               <CardContent className="space-y-3">
                 {patient.assignedNurse && (
                   <div className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                    <UserCheck className="w-8 h-8 text-purple-600" />
-                    <div>
+                    <Avatar className="w-12 h-12">
+                      <AvatarImage src={staffProfiles[patient.assignedNurse]?.photo} alt={getStaffDisplayName(patient.assignedNurse)} />
+                      <AvatarFallback className="bg-purple-200 text-purple-800">
+                        {getStaffDisplayName(patient.assignedNurse).split(' ').map(n => n[0]).join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
                       <div className="font-medium text-purple-800">Assigned Nurse</div>
                       <div className="text-purple-700">{getStaffDisplayName(patient.assignedNurse)}</div>
                     </div>
@@ -304,12 +504,36 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
                 )}
                 
                 {patient.assignedDoctor && (
-                  <div className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                    <Stethoscope className="w-8 h-8 text-purple-600" />
-                    <div>
-                      <div className="font-medium text-purple-800">Assigned Doctor</div>
-                      <div className="text-purple-700">{getStaffDisplayName(patient.assignedDoctor)}</div>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={staffProfiles[patient.assignedDoctor]?.photo} alt={getStaffDisplayName(patient.assignedDoctor)} />
+                        <AvatarFallback className="bg-purple-200 text-purple-800">
+                          {getStaffDisplayName(patient.assignedDoctor).split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="font-medium text-purple-800">Assigned Doctor</div>
+                        <div className="text-purple-700">{getStaffDisplayName(patient.assignedDoctor)}</div>
+                      </div>
                     </div>
+                    
+                    {/* Doctor Location Info */}
+                    {staffProfiles[patient.assignedDoctor]?.room && (
+                      <div className="ml-15 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                        <div className="text-sm space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Building className="w-4 h-4 text-indigo-600" />
+                            <span className="font-medium text-indigo-800">Location:</span>
+                          </div>
+                          <div className="ml-6 text-indigo-700">
+                            <p>🏥 {staffProfiles[patient.assignedDoctor].building}</p>
+                            <p>📍 Room {staffProfiles[patient.assignedDoctor].room}</p>
+                            <p>🔢 {staffProfiles[patient.assignedDoctor].floor}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -324,34 +548,55 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
 
         {/* Entertainment and Information Tabs */}
         <Tabs defaultValue="tips" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="tips" className="flex items-center gap-1 text-xs">
+          {/* Horizontal tab bar */}
+          <TabsList className="flex w-full overflow-x-auto gap-1 rounded-lg bg-muted p-1 shadow-sm">
+            <TabsTrigger
+              value="tips"
+              className="flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-blue-600 transition-colors"
+            >
               <Lightbulb className="w-3 h-3" />
               <span className="hidden sm:inline">Health Tips</span>
               <span className="sm:hidden">Tips</span>
             </TabsTrigger>
-            <TabsTrigger value="news" className="flex items-center gap-1 text-xs">
+
+            <TabsTrigger
+              value="news"
+              className="flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-blue-600 transition-colors"
+            >
               <Newspaper className="w-3 h-3" />
               <span className="hidden sm:inline">News</span>
               <span className="sm:hidden">News</span>
             </TabsTrigger>
-            <TabsTrigger value="trivia" className="flex items-center gap-1 text-xs">
+
+            <TabsTrigger
+              value="trivia"
+              className="flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-blue-600 transition-colors"
+            >
               <Brain className="w-3 h-3" />
               <span className="hidden sm:inline">Trivia</span>
               <span className="sm:hidden">Quiz</span>
             </TabsTrigger>
-            <TabsTrigger value="relax" className="flex items-center gap-1 text-xs">
+
+            <TabsTrigger
+              value="relax"
+              className="flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-blue-600 transition-colors"
+            >
               <Wind className="w-3 h-3" />
               <span className="hidden sm:inline">Relax</span>
               <span className="sm:hidden">Calm</span>
             </TabsTrigger>
-            <TabsTrigger value="services" className="flex items-center gap-1 text-xs">
+
+            <TabsTrigger
+              value="services"
+              className="flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-blue-600 transition-colors"
+            >
               <Building className="w-3 h-3" />
               <span className="hidden sm:inline">Services</span>
               <span className="sm:hidden">Info</span>
             </TabsTrigger>
           </TabsList>
 
+          {/* Tab content */}
           <div className="mt-6">
             <TabsContent value="tips" className="mt-0">
               <HealthTips />

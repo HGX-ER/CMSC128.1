@@ -157,8 +157,8 @@ export function NurseInterface({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-blue-600" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Users style={{ width: '1.25rem', height: '1.25rem', color: '#2563eb', flexShrink: 0 }} />
               <div>
                 <div className="text-2xl font-bold">{activePatients.length}</div>
                 <div className="text-sm text-gray-600">Active Patients</div>
@@ -169,8 +169,8 @@ export function NurseInterface({
 
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-orange-600" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <UserPlus style={{ width: '1.25rem', height: '1.25rem', color: '#ea580c', flexShrink: 0 }} />
               <div>
                 <div className="text-2xl font-bold">{patientsNeedingDoctorAssignment.length}</div>
                 <div className="text-sm text-gray-600">Need Doctor Assignment</div>
@@ -181,8 +181,8 @@ export function NurseInterface({
 
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-green-600" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Clock style={{ width: '1.25rem', height: '1.25rem', color: '#16a34a', flexShrink: 0 }} />
               <div>
                 <div className="text-2xl font-bold">
                   {activePatients.filter(p => p.currentStage.startsWith('waiting')).length}
@@ -195,8 +195,8 @@ export function NurseInterface({
 
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Stethoscope className="w-5 h-5 text-purple-600" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Stethoscope style={{ width: '1.25rem', height: '1.25rem', color: '#9333ea', flexShrink: 0 }} />
               <div>
                 <div className="text-2xl font-bold">
                   {activePatients.filter(p => p.assignedDoctor).length}
@@ -209,19 +209,19 @@ export function NurseInterface({
       </div>
 
       <Tabs defaultValue="patient-list" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="patient-list">Patient Management</TabsTrigger>
-          <TabsTrigger value="doctor-workload">Doctor Workload</TabsTrigger>
-          <TabsTrigger value="doctor-assignment">Doctor Assignment</TabsTrigger>
-          <TabsTrigger value="time-adjustment">Time Management</TabsTrigger>
+        <TabsList style={{ display: 'flex', width: '100%', justifyContent: 'center', gap: '1rem', background: 'transparent', padding: '0.5rem 0', borderBottom: '2px solid #e5e7eb' }}>
+          <TabsTrigger value="patient-list" style={{ flex: '0 0 auto', padding: '0.75rem 1.5rem' }}>Patient Management</TabsTrigger>
+          <TabsTrigger value="doctor-workload" style={{ flex: '0 0 auto', padding: '0.75rem 1.5rem' }}>Doctor Workload</TabsTrigger>
+          <TabsTrigger value="doctor-assignment" style={{ flex: '0 0 auto', padding: '0.75rem 1.5rem' }}>Doctor Assignment</TabsTrigger>
+          <TabsTrigger value="time-adjustment" style={{ flex: '0 0 auto', padding: '0.75rem 1.5rem' }}>Time Management</TabsTrigger>
         </TabsList>
 
         {/* Patient List Tab */}
         <TabsContent value="patient-list" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
+              <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Users style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
                 Active Patients
               </CardTitle>
             </CardHeader>
@@ -275,8 +275,8 @@ export function NurseInterface({
                     </div>
 
                     {patient.assignedDoctor && (
-                      <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
-                        <Stethoscope className="w-4 h-4" />
+                      <div className="mt-2 text-sm text-gray-600" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Stethoscope style={{ width: '1rem', height: '1rem', flexShrink: 0 }} />
                         <span>
                           Assigned to: {AVAILABLE_DOCTORS.find(d => d.username === patient.assignedDoctor)?.name || patient.assignedDoctor}
                         </span>
@@ -353,8 +353,8 @@ export function NurseInterface({
         <TabsContent value="doctor-workload" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Stethoscope className="w-5 h-5" />
+              <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Stethoscope style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
                 Doctor Workload Overview
               </CardTitle>
             </CardHeader>
@@ -475,8 +475,8 @@ export function NurseInterface({
         <TabsContent value="doctor-assignment" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5" />
+              <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <UserPlus style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
                 Doctor Assignment
               </CardTitle>
             </CardHeader>
@@ -484,7 +484,7 @@ export function NurseInterface({
               <div className="space-y-6">
                 {patientsNeedingDoctorAssignment.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
+                    <CheckCircle style={{ width: '3rem', height: '3rem', margin: '0 auto 0.5rem', color: '#22c55e' }} />
                     <div>All patients have been assigned to doctors</div>
                   </div>
                 ) : (
@@ -610,16 +610,16 @@ export function NurseInterface({
         <TabsContent value="time-adjustment" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Timer className="w-5 h-5" />
+              <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Timer style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
                 Time Management
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                    <AlertTriangle style={{ width: '1.25rem', height: '1.25rem', color: '#2563eb', marginTop: '0.125rem', flexShrink: 0 }} />
                     <div>
                       <div className="font-medium text-blue-800">Time Adjustment Feature</div>
                       <div className="text-sm text-blue-700 mt-1">

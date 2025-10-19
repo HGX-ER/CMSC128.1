@@ -102,8 +102,8 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
       </div>
 
       <Tabs defaultValue="realtime" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="realtime">Real-time Data</TabsTrigger>
+        <TabsList className="flex w-full justify-between rounded-lg p-1 bg-gray-100">
+          <TabsTrigger value="realtime" >Real-time Data</TabsTrigger>
           <TabsTrigger value="analytics">Waiting Time Analytics</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
           <TabsTrigger value="census">Census</TabsTrigger>

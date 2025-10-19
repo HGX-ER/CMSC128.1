@@ -1,4 +1,5 @@
 import { Badge } from "./ui/badge";
+import { MapPin } from "lucide-react";
 
 const ESI_COLORS = {
   1: "bg-red-600 text-white",
@@ -8,7 +9,7 @@ const ESI_COLORS = {
   5: "bg-blue-500 text-white"
 };
 
-export function DoctorPatientCard({ patient, isSelected, onSelect, getTotalTime }) {
+export function DoctorPatientCard({ patient, isSelected, onSelect, getTotalTime, doctorRoom, doctorFloor }) {
   const getPatientAge = (patient) => {
     if (patient.age) return `${patient.age}y`;
     if (patient.dateOfBirth) {
@@ -55,6 +56,13 @@ export function DoctorPatientCard({ patient, isSelected, onSelect, getTotalTime 
         <div className="text-sm">
           <strong>Chief Complaint:</strong> {patient.chiefComplaint}
         </div>
+        
+        {doctorRoom && doctorFloor && (
+          <div className="flex items-center gap-2 text-xs text-purple-700 bg-purple-50 p-2 rounded">
+            <MapPin className="w-3 h-3" />
+            <span>Consultation at Room {doctorRoom}, {doctorFloor}</span>
+          </div>
+        )}
         
         <div className="flex justify-between items-center text-xs text-gray-500">
           <span>Arrived: {patient.arrivalTime.toLocaleString()}</span>

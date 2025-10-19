@@ -1,4 +1,3 @@
-import axios from "axios";
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -13,10 +12,11 @@ import { DEMO_USERS } from "../types/auth.js";
 import { 
   Hash,
   ClipboardList,
-  Printer,
   CheckCircle,
   Users,
-  Clock
+  Clock,
+  AlertTriangle,
+  ArrowRight
 } from 'lucide-react';
 
 const ESI_COLORS = {
@@ -37,11 +37,8 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
     chiefComplaint: "",
     assignedDoctor: ""
   });
-
-  // Queue generation state
-  const [generatedQueueNumber, setGeneratedQueueNumber] = useState('');
-  const [loading, setLoading] = useState(false); 
   
+
   // Registration state
   const [registrationQueueNumber, setRegistrationQueueNumber] = useState('');
   const [registrationData, setRegistrationData] = useState({
@@ -108,35 +105,16 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
   };
 
 
-  const handleGenerateQueueNumber = async () => {
-  try {
-    const queueNumber = await onAddPatient(); // call backend directly
-    setGeneratedQueueNumber(queueNumber);     // show result instantly
-    onMoveToStage(queueNumber, "waiting_triage"); // immediately move to triage
-  } catch (err) {
-    console.error("Error generating queue number:", err);
-    alert("Something went wrong while generating queue number.");
-  }
-};
 
-
-// --- reset button ---
-const resetGeneratedQueue = () => {
-  setGeneratedQueueNumber("");
-};
-  const handleRegisterPatient = async () => {
-    const patient = patients.find((p) => p.id === registrationQueueNumber);
+  const handleRegisterPatient = () => {
+    const patient = patients.find(p => p.id === registrationQueueNumber);
     if (!patient) {
-      alert("Queue number not found. Please check the queue number.");
+      alert('Queue number not found. Please check the queue number.');
       return;
     }
 
-    if (
-      !registrationData.name ||
-      !registrationData.dateOfBirth ||
-      !registrationData.sex
-    ) {
-      alert("Please fill in all required fields (Name, Date of Birth, Sex).");
+    if (!registrationData.name || !registrationData.dateOfBirth || !registrationData.sex) {
+      alert('Please fill in all required fields (Name, Date of Birth, Sex).');
       return;
     }
 
@@ -147,62 +125,41 @@ const resetGeneratedQueue = () => {
       const today = new Date();
       calculatedAge = (today.getFullYear() - birthDate.getFullYear()).toString();
       const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (
-        monthDiff < 0 ||
-        (monthDiff === 0 && today.getDate() < birthDate.getDate())
-      ) {
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
         calculatedAge = (parseInt(calculatedAge) - 1).toString();
       }
     }
 
-    try {
-      // ✅ Save patient registration info to backend
-      await axios.put(
-        `http://localhost:5000/api/registration/patient/${patient.id}`,
-        {
-          name: registrationData.name,
-          dateOfBirth: registrationData.dateOfBirth,
-          sex: registrationData.sex,
-          chiefComplaint: registrationData.chiefComplaint,
-          contactNumber: registrationData.contactNumber,
-          emergencyContact: registrationData.emergencyContact,
-          insuranceInfo: registrationData.insuranceInfo,
-          address: registrationData.address,
-        }
-      );
+    const updates = {
+      name: registrationData.name,
+      dateOfBirth: registrationData.dateOfBirth,
+      age: calculatedAge || registrationData.age,
+      sex: registrationData.sex,
+      chiefComplaint: registrationData.chiefComplaint,
+      contactNumber: registrationData.contactNumber,
+      emergencyContact: registrationData.emergencyContact,
+      insuranceInfo: registrationData.insuranceInfo,
+      address: registrationData.address,
+      isRegistered: true
+    };
 
-      // ✅ Update front-end state
-      onUpdatePatient(patient.id, {
-        ...registrationData,
-        age: calculatedAge,
-        isRegistered: true,
-      });
+    onUpdatePatient(patient.id, updates);
+    onMoveToStage(patient.id, 'waiting_doctor');
 
-      // ✅ Move to next stage
-      onMoveToStage(patient.id, "waiting_doctor");
-
-      // ✅ Notify success
-      alert(`✅ Patient ${registrationData.name} successfully registered!`);
-
-      // ✅ Reset registration form
-      setRegistrationQueueNumber("");
-      setRegistrationData({
-        name: "",
-        dateOfBirth: "",
-        age: "",
-        sex: "",
-        chiefComplaint: "",
-        contactNumber: "",
-        emergencyContact: "",
-        insuranceInfo: "",
-        address: "",
-      });
-    } catch (err) {
-      console.error("Error saving registration:", err);
-      alert("⚠️ Failed to save registration. Check backend logs for details.");
-    }
+    // Reset registration form
+    setRegistrationQueueNumber('');
+    setRegistrationData({
+      name: '',
+      dateOfBirth: '',
+      age: '',
+      sex: '',
+      chiefComplaint: '',
+      contactNumber: '',
+      emergencyContact: '',
+      insuranceInfo: '',
+      address: ''
+    });
   };
-
 
   const findPatientByQueueNumber = (queueNumber) => {
     return patients.find(p => p.id === queueNumber);
@@ -210,143 +167,186 @@ const resetGeneratedQueue = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 className="text-3xl">Registration Center</h1>
-        <div className="flex gap-4">
-          <Badge variant="outline" className="text-lg px-4 py-2">
-            <Users className="w-4 h-4 mr-2" />
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <Badge variant="outline" className="text-lg px-4 py-2" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Users style={{ width: '1rem', height: '1rem' }} />
             Waiting: {waitingPatients.length}
           </Badge>
-          <Badge variant="outline" className="text-lg px-4 py-2">
-            <Clock className="w-4 h-4 mr-2" />
+          <Badge variant="outline" className="text-lg px-4 py-2" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Clock style={{ width: '1rem', height: '1rem' }} />
             Active: {patients.filter(p => p.isActive).length}
           </Badge>
         </div>
       </div>
 
-      <Tabs defaultValue="queue-generation" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="queue-generation">Queue Generation</TabsTrigger>
+      <Tabs defaultValue="pending-logins" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="pending-logins">Pending Patient Logins</TabsTrigger>
           <TabsTrigger value="patient-registration">Patient Registration</TabsTrigger>
-          <TabsTrigger value="traditional-registration">Traditional Flow</TabsTrigger>
         </TabsList>
 
-{/* Queue Generation Tab */}
-<TabsContent value="queue-generation" className="mt-6">
-  <Card>
-    <CardHeader>
-      <CardTitle className="flex items-center gap-2">
-        <Hash className="w-5 h-5" />
-        Generate Queue Number
-      </CardTitle>
-    </CardHeader>
-    <CardContent>
-      <div className="space-y-6">
-        <div className="text-center p-8 bg-blue-50 rounded-lg border-2 border-dashed border-blue-200">
-          {!generatedQueueNumber ? (
-            // ========================
-            // When NO queue number yet
-            // ========================
-            <div className="space-y-4">
-              <div className="text-4xl mb-4">🎫</div>
-              <h3 className="text-xl font-semibold text-gray-800">
-                Ready to Generate Queue Number
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Click the button below to generate a new queue number for the patient
-              </p>
-
-              <Button
-              onClick={handleGenerateQueueNumber}
-              size="lg"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
-              >
-                <Hash className="w-5 h-5 mr-2" />
-                Generate Queue Number
-              </Button>
-            </div>
-          ) : (
-            // ========================
-            // When queue number is generated
-            // ========================
-            <div className="space-y-4">
-              <div className="text-4xl mb-4">✅</div>
-              <h3 className="text-xl font-semibold text-green-800">
-                Queue Number Generated!
-              </h3>
-              <div className="bg-white p-6 rounded-lg border shadow-sm max-w-md mx-auto">
-                <div className="text-center">
-                  <div className="text-sm text-gray-600 mb-2">Queue Number</div>
-                  <div className="text-3xl font-bold text-blue-600 mb-4">
-                    {generatedQueueNumber}
+        {/* Pending Patient Logins Tab */}
+        <TabsContent value="pending-logins" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Users style={{ width: '1.25rem', height: '1.25rem' }} />
+                Patients Who Have Logged In
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <AlertTriangle style={{ width: '1rem', height: '1rem', color: '#2563eb' }} />
+                    <span className="font-medium text-blue-800">Patient Login Queue</span>
                   </div>
-                  <div className="text-sm text-gray-500 mb-4">
-                    Generated at {new Date().toLocaleTimeString()}
-                  </div>
-                  <Button variant="outline" size="sm" className="mr-2">
-                    <Printer className="w-4 h-4 mr-2" />
-                    Print Ticket
-                  </Button>
+                  <p className="text-sm text-blue-600">
+                    These patients have logged in through the patient portal and are waiting to be registered. Click on a patient to complete their registration.
+                  </p>
                 </div>
-              </div>
 
-              {/* ✅ UPDATED "Generate Another" BUTTON */}
-              <div className="mt-6">
-                <Button
-                  onClick={resetGeneratedQueue}
-                  variant="outline"
-                  className="mr-4"
-                  disabled={loading}
-                >
-                  Generate Another
-                </Button>
-                <p className="text-sm text-gray-600 mt-2">
-                  Patient can now proceed to triage. Use the Patient Registration tab to complete full registration.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+                {/* Quick Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="bg-blue-50">
+                    <CardContent className="p-4 text-center">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {patients.filter(p => p.isActive && !p.isRegistered).length}
+                      </div>
+                      <div className="text-sm text-gray-600">Awaiting Registration</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-green-50">
+                    <CardContent className="p-4 text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        {patients.filter(p => p.isActive && p.isRegistered).length}
+                      </div>
+                      <div className="text-sm text-gray-600">Registered Today</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-purple-50">
+                    <CardContent className="p-4 text-center">
+                      <div className="text-2xl font-bold text-purple-600">
+                        {patients.filter(p => p.isActive).length}
+                      </div>
+                      <div className="text-sm text-gray-600">Total Active</div>
+                    </CardContent>
+                  </Card>
+                </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-blue-50">
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {patients.filter(p => p.isActive && !p.isRegistered).length}
+                {/* Pending Patient Logins List */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Patients Awaiting Registration</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {patients.filter(p => p.isActive && !p.isRegistered).length === 0 ? (
+                      <div className="text-center py-8">
+                        <CheckCircle style={{ 
+                          width: '3rem', 
+                          height: '3rem', 
+                          color: '#22c55e',
+                          margin: '0 auto 0.5rem'
+                        }} />
+                        <div className="text-gray-500">No patients pending registration</div>
+                        <p className="text-sm text-gray-400 mt-2">
+                          Patients who log in via the patient portal will appear here
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {patients
+                          .filter(p => p.isActive && !p.isRegistered)
+                          .sort((a, b) => a.arrivalTime - b.arrivalTime)
+                          .map((patient, index) => (
+                            <div 
+                              key={patient.id}
+                              className={`p-4 border-2 rounded-lg transition-all hover:shadow-md cursor-pointer ${
+                                registrationQueueNumber === patient.id 
+                                  ? 'border-blue-500 bg-blue-50' 
+                                  : 'border-yellow-300 bg-yellow-50 hover:bg-yellow-100'
+                              }`}
+                              onClick={() => {
+                                setRegistrationQueueNumber(patient.id);
+                                setRegistrationData(prev => ({
+                                  ...prev,
+                                  name: patient.name || '',
+                                  age: patient.age || '',
+                                  dateOfBirth: patient.dateOfBirth || '',
+                                  sex: patient.sex || '',
+                                  chiefComplaint: patient.chiefComplaint || ''
+                                }));
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                  <Badge className="bg-orange-100 text-orange-800 border-orange-200 px-3 py-1">
+                                    #{index + 1}
+                                  </Badge>
+                                  <div>
+                                    <div className="font-mono text-lg font-semibold">{patient.id}</div>
+                                    {patient.esiLevel && (
+                                      <Badge className={ESI_COLORS[patient.esiLevel]}>
+                                        ESI {patient.esiLevel}
+                                      </Badge>
+                                    )}
+                                    <div className="text-sm text-gray-600 mt-1">
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                        <Clock style={{ width: '0.875rem', height: '0.875rem' }} />
+                                        Logged in: {patient.arrivalTime.toLocaleTimeString()}
+                                      </div>
+                                    </div>
+                                    <div className="text-sm text-gray-600">
+                                      Current Stage: <Badge variant="outline">{patient.currentStage}</Badge>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+                                  <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
+                                    Waiting {getTotalTime(patient)}m
+                                  </Badge>
+                                  <Button 
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setRegistrationQueueNumber(patient.id);
+                                      setRegistrationData(prev => ({
+                                        ...prev,
+                                        name: patient.name || '',
+                                        age: patient.age || '',
+                                        dateOfBirth: patient.dateOfBirth || '',
+                                        sex: patient.sex || '',
+                                        chiefComplaint: patient.chiefComplaint || ''
+                                      }));
+                                      // Auto-switch to registration tab
+                                      document.querySelector('[value="patient-registration"]')?.click();
+                                    }}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                                  >
+                                    <ArrowRight style={{ width: '1rem', height: '1rem', marginRight: '0.25rem' }} />
+                                    Register Now
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-              <div className="text-sm text-gray-600">Awaiting Registration</div>
             </CardContent>
           </Card>
-          <Card className="bg-green-50">
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {patients.filter(p => p.isActive && p.isRegistered).length}
-              </div>
-              <div className="text-sm text-gray-600">Registered Today</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-purple-50">
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {patients.filter(p => p.isActive).length}
-              </div>
-              <div className="text-sm text-gray-600">Total Active</div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-</TabsContent>
-
+        </TabsContent>
 
         {/* Patient Registration Tab */}
         <TabsContent value="patient-registration" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ClipboardList className="w-5 h-5" />
+              <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ClipboardList style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
                 Complete Patient Registration
               </CardTitle>
             </CardHeader>
@@ -521,50 +521,6 @@ const resetGeneratedQueue = () => {
                     Complete Registration
                   </Button>
                 </div>
-
-                {/* Patients Awaiting Registration */}
-                <Card className="mt-6">
-                  <CardHeader>
-                    <CardTitle>Patients Awaiting Registration</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {patients.filter(p => p.isActive && !p.isRegistered).length === 0 ? (
-                      <div className="text-center py-6 text-gray-500">
-                        No patients awaiting registration
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {patients
-                          .filter(p => p.isActive && !p.isRegistered)
-                          .map((patient) => (
-                            <div 
-                              key={patient.id}
-                              className="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg"
-                            >
-                              <div className="flex items-center gap-3">
-                                <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                                  {patient.id}
-                                </Badge>
-                                <div>
-                                  <div className="font-medium">Queue #{patient.id}</div>
-                                  <div className="text-sm text-gray-600">
-                                    Current Stage: {patient.currentStage}
-                                  </div>
-                                </div>
-                              </div>
-                              <Button 
-                                size="sm"
-                                onClick={() => setRegistrationQueueNumber(patient.id)}
-                                className="bg-blue-600 hover:bg-blue-700 text-white"
-                              >
-                                Register
-                              </Button>
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
               </div>
             </CardContent>
           </Card>

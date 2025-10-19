@@ -53,6 +53,26 @@ export function TriageInterface({ patients, onUpdatePatient, onMoveToStage, getT
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* ESI Reference */}
+        <Card>
+          <CardHeader>
+            <CardTitle>ESI Reference Guide</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap md:flex-nowrap justify-center items-start gap-4 overflow-x-auto">
+              {Object.entries(ESI_DESCRIPTIONS).map(([level, description]) => (
+                <div key={level} className="text-center min-w-[120px]">
+                  <Badge className={`${ESI_COLORS[level]} mb-2`}>
+                    ESI {level}
+                  </Badge>
+                  <p className="text-sm">{description}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Patient List */}
         <Card>
           <CardHeader>
@@ -140,25 +160,6 @@ export function TriageInterface({ patients, onUpdatePatient, onMoveToStage, getT
           </CardContent>
         </Card>
       </div>
-
-      {/* ESI Reference */}
-      <Card>
-        <CardHeader>
-          <CardTitle>ESI Reference Guide</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {Object.entries(ESI_DESCRIPTIONS).map(([level, description]) => (
-              <div key={level} className="text-center">
-                <Badge className={`${ESI_COLORS[level]} mb-2`}>
-                  ESI {level}
-                </Badge>
-                <p className="text-sm">{description}</p>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

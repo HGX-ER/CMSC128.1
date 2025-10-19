@@ -6,7 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { DoctorPatientCard } from "./DoctorPatientCard";
+import { Stethoscope, Activity } from "lucide-react";
 
 const ESI_COLORS = {
   1: "bg-red-600 text-white",
@@ -23,12 +25,32 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
   const [diagnosis, setDiagnosis] = useState("");
   const [consultationStartTime, setConsultationStartTime] = useState(null);
 
+  // Doctor room and floor information
+  const doctorInfo = {
+    'dr.smith': { room: '201', floor: '2nd Floor', specialty: 'Emergency Medicine' },
+    'dr.johnson': { room: '203', floor: '2nd Floor', specialty: 'Internal Medicine' },
+    'dr.davis': { room: '205', floor: '2nd Floor', specialty: 'Pediatric Emergency' },
+    'dr.brown': { room: '207', floor: '2nd Floor', specialty: 'Trauma Surgery' }
+  };
+
+  const currentDoctorInfo = doctorInfo[currentDoctorUsername] || { 
+    room: '200', 
+    floor: '2nd Floor', 
+    specialty: 'Emergency Medicine' 
+  };
+
   // Only show patients assigned to this doctor
   const waitingPatients = patients.filter(p => 
     p.currentStage === 'waiting_doctor' && p.assignedDoctor === currentDoctorUsername
   );
   const consultingPatients = patients.filter(p => 
     p.currentStage === 'consultation' && p.assignedDoctor === currentDoctorUsername
+  );
+  const completedPatients = patients.filter(p => 
+    p.assignedDoctor === currentDoctorUsername && 
+    p.disposition && 
+    p.diagnosis &&
+    !['waiting_doctor', 'consultation'].includes(p.currentStage)
   );
   const selectedPatientData = patients.find(p => p.id === selectedPatient);
 
@@ -83,8 +105,12 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
 
   return (
     <div className="p-6 space-y-6">
+      {/* Header with Doctor Info */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl">Doctor Interface</h1>
+        <div>
+          <h1 className="text-3xl">Hey Doc! 👋</h1>
+          <p className="text-gray-600 mt-1">Here's your workspace for today</p>
+        </div>
         <div className="flex gap-4">
           <Badge variant="outline" className="text-lg px-4 py-2">
             Waiting: {waitingPatients.length}
@@ -92,18 +118,63 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
           <Badge variant="outline" className="text-lg px-4 py-2 bg-yellow-100">
             In Consultation: {consultingPatients.length}
           </Badge>
+          <Badge variant="outline" className="text-lg px-4 py-2 bg-green-100">
+            Completed: {completedPatients.length}
+          </Badge>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Casual Location Card */}
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white text-xl">
+                📍
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">You're working from</p>
+                <p className="font-semibold text-lg text-blue-900">Room {currentDoctorInfo.room}, {currentDoctorInfo.floor}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <Badge className="bg-blue-500 text-white text-sm px-3 py-1">
+                {currentDoctorInfo.specialty}
+              </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Navigation Tabs */}
+      <Tabs defaultValue="consultation" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="consultation" className="flex items-center gap-2">
+            <Stethoscope className="w-4 h-4" />
+            Patient Consultation
+          </TabsTrigger>
+          <TabsTrigger value="status" className="flex items-center gap-2">
+            <Activity className="w-4 h-4" />
+            Patient Status
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Patient Consultation Tab */}
+        <TabsContent value="consultation" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Waiting Patients */}
         <Card>
           <CardHeader>
-            <CardTitle>My Assigned Patients</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              ⏰ Patients Waiting for You
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {waitingPatients.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No patients assigned to you</p>
+              <div className="text-center py-8">
+                <p className="text-gray-500">✨ All caught up!</p>
+                <p className="text-sm text-gray-400 mt-1">No patients waiting right now</p>
+              </div>
             ) : (
               waitingPatients
                 .sort((a, b) => (a.esiLevel || 5) - (b.esiLevel || 5)) // Sort by ESI priority
@@ -114,6 +185,8 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
                     isSelected={selectedPatient === patient.id}
                     onSelect={() => handleSelectPatient(patient.id)}
                     getTotalTime={getTotalTime}
+                    doctorRoom={currentDoctorInfo.room}
+                    doctorFloor={currentDoctorInfo.floor}
                   />
                 ))
             )}
@@ -123,7 +196,9 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
         {/* Patient Profile & Actions */}
         <Card>
           <CardHeader>
-            <CardTitle>Patient Profile & Actions</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              👤 Patient Details
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {selectedPatientData ? (
@@ -168,6 +243,23 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
                 </div>
 
                 {/* Action Buttons */}
+                {/* Room Information */}
+                <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-purple-800">Consultation Location:</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Badge className="bg-purple-100 text-purple-800">
+                        Room {currentDoctorInfo.room}
+                      </Badge>
+                      <Badge className="bg-purple-100 text-purple-800">
+                        {currentDoctorInfo.floor}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
                 {selectedPatientData.currentStage === 'waiting_doctor' ? (
                   <Button onClick={handleStartConsult} className="w-full" size="lg">
                     🩺 START CONSULTATION
@@ -207,47 +299,134 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
             )}
           </CardContent>
         </Card>
-      </div>
+        
+          </div>
 
-      {/* Currently Consulting */}
-      {consultingPatients.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>My Current Consultations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {consultingPatients.map((patient) => (
-                <div key={patient.id} className="p-4 border rounded-lg bg-yellow-50">
-                  <div className="space-y-2">
-                    <div className="font-medium">{patient.name}</div>
-                    <div className="text-sm text-gray-600">
-                      {getPatientAge(patient)} • {patient.sex}
-                    </div>
-                    <Badge className="bg-yellow-500 text-white">
-                      In Consultation
-                    </Badge>
+          {/* Information Note */}
+          <Card className="border-blue-200 bg-blue-50 mt-6">
+            <CardContent className="p-4">
+              <p className="text-sm text-blue-800">
+                💡 <strong>Quick Tip:</strong> Patients are assigned to you by the nursing staff during registration. 
+                If your queue looks empty, grab a coffee and check with the registration desk! ☕
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Patient Status Tab */}
+        <TabsContent value="status" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Active Consultations */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  🩺 Active Consultations
+                  <Badge variant="outline" className="ml-auto">
+                    {consultingPatients.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {consultingPatients.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No active consultations</p>
+                    <p className="text-sm text-gray-400 mt-1">Patients in consultation will appear here</p>
                   </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                ) : (
+                  <div className="space-y-4">
+                    {consultingPatients.map((patient) => (
+                      <div key={patient.id} className="p-4 border rounded-lg bg-yellow-50 hover:bg-yellow-100 transition-colors">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="font-medium text-lg">{patient.name}</div>
+                            <Badge className="bg-yellow-500 text-white">
+                              In Progress
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {getPatientAge(patient)} • {patient.sex}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            <p><strong>ID:</strong> {patient.id}</p>
+                            <p><strong>Chief Complaint:</strong> {patient.chiefComplaint}</p>
+                          </div>
+                          {patient.esiLevel && (
+                            <Badge className={ESI_COLORS[patient.esiLevel]}>
+                              ESI {patient.esiLevel}
+                            </Badge>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedPatient(patient.id);
+                              setConsultationOpen(true);
+                            }}
+                            className="w-full mt-2"
+                          >
+                            Continue Consultation →
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-      {/* Information Note */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardContent className="p-4">
-          <p className="text-sm text-blue-800">
-            <strong>Note:</strong> You can only see patients that have been assigned to you by the nursing staff during registration. 
-            If you don't see any patients, please check with the registration desk.
-          </p>
-        </CardContent>
-      </Card>
+            {/* Completed Today */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  ✅ Completed Today
+                  <Badge variant="outline" className="ml-auto">
+                    {completedPatients.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {completedPatients.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No completed consultations yet</p>
+                    <p className="text-sm text-gray-400 mt-1">They'll show up here once you're done</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                    {completedPatients.map((patient) => (
+                      <div key={patient.id} className="p-3 border border-green-200 rounded-lg bg-green-50">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="font-medium text-green-900">{patient.name}</div>
+                            <Badge className="bg-green-600 text-white text-xs">
+                              Done
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-green-700">
+                            {getPatientAge(patient)} • {patient.sex}
+                          </div>
+                          <div className="text-xs text-green-600 bg-white p-2 rounded border border-green-200">
+                            <p><strong>Diagnosis:</strong> {patient.diagnosis}</p>
+                            <p className="mt-1"><strong>Disposition:</strong> {patient.disposition}</p>
+                          </div>
+                          {patient.esiLevel && (
+                            <Badge className={ESI_COLORS[patient.esiLevel]}>
+                              ESI {patient.esiLevel}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
 
-      {/* Consultation Dialog */}
+      {/* Consultation Dialog - Landscape Container */}
       <Dialog open={consultationOpen} onOpenChange={setConsultationOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto w-[95vw]">
           <DialogHeader>
             <DialogTitle className="text-xl">🩺 Patient Consultation</DialogTitle>
             <DialogDescription>

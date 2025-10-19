@@ -35,4 +35,5 @@ app.use('/api', require('./routes/triage'));
 app.use('/api', require('./routes/board'));
 app.use('/api', require('./routes/patient'));
 
+
 app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));
