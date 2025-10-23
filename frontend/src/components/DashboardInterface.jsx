@@ -23,7 +23,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'
 export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
   const now = new Date();
   const dayShift = now.getHours() >= 8 && now.getHours() < 20;
-  const currentShift = dayShift ? '0801H-2000H' : '2001H-0800H';
+  const currentShift = dayShift ? '0700H-1500H' : '0700H-1500H';
 
   const analytics = useMemo(() => {
     const activePatients = patients.filter(p => p.isActive && p.currentStage !== 'departed');
@@ -95,10 +95,35 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl">ED Analytics Dashboard</h1>
         <Badge variant="outline" className="text-lg px-4 py-2">
           Current Shift: {currentShift}
         </Badge>
+
+        <div className="flex items-center gap-3">
+          <Badge className="bg-blue-100 text-blue-800 border border-blue-300 text-lg px-4 py-2">
+            {(() => {
+              const [start, end] = currentShift.split("-");
+              const formatTime = (t) => {
+                const hours = parseInt(t.slice(0, 2), 10);
+                const minutes = t.slice(2, 4);
+                const suffix = hours >= 12 ? "PM" : "AM";
+                const formattedHour = hours % 12 || 12;
+                return `${formattedHour}:${minutes} ${suffix}`;
+              };
+              return `${formatTime(start)} – ${formatTime(end)}`;
+            })()}
+          </Badge>
+
+          <Badge
+            className={`text-lg px-4 py-2 ${
+              currentShift === "0700H-1500H"
+                ? "bg-yellow-100 text-yellow-800 border border-yellow-300"
+                : "bg-indigo-100 text-indigo-800 border border-indigo-300"
+            }`}
+          >
+            {currentShift === "0700H-1500H" ? "Day Shift" : "Night Shift"}
+          </Badge>
+        </div>
       </div>
 
       <Tabs defaultValue="realtime" className="w-full">

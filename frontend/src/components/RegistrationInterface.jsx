@@ -192,15 +192,10 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
   return (
     <div className="p-6 space-y-6">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 className="text-3xl">Registration Center</h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <Badge variant="outline" className="text-lg px-4 py-2" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
             <Users style={{ width: '1rem', height: '1rem' }} />
             Waiting: {waitingPatients.length}
-          </Badge>
-          <Badge variant="outline" className="text-lg px-4 py-2" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Clock style={{ width: '1rem', height: '1rem' }} />
-            Active: {patients.filter(p => p.isActive).length}
           </Badge>
         </div>
       </div>
@@ -455,25 +450,22 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Sex *</Label>
-                      <RadioGroup 
-                        value={registrationData.sex} 
-                        onValueChange={(value) => setRegistrationData(prev => ({ ...prev, sex: value }))}
-                        className="flex gap-6"
+                      <Label htmlFor="sex">Sex *</Label>
+                      <Select
+                        value={registrationData.sex}
+                        onValueChange={(value) =>
+                          setRegistrationData((prev) => ({ ...prev, sex: value }))
+                        }
                       >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Male" id="male" />
-                          <Label htmlFor="male">Male</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Female" id="female" />
-                          <Label htmlFor="female">Female</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Other" id="other" />
-                          <Label htmlFor="other">Other</Label>
-                        </div>
-                      </RadioGroup>
+                        <SelectTrigger id="sex" className="w-full">
+                          <SelectValue placeholder="Select Sex" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Male">Male</SelectItem>
+                          <SelectItem value="Female">Female</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 

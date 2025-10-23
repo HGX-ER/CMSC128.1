@@ -210,7 +210,12 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   
   if (!patient) {
     return (
-      <div className="min-h-screen bg-blue-50 p-4 flex items-center justify-center">
+      <div
+        className="min-h-screen p-4 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('https://xmple.com/wallpaper/white-gradient-blue-linear-3840x2160-c2-add8e6-ffffff-a-285-f-14.svg')"
+        }}
+      >
         <Card className="w-full max-w-md shadow-lg">
           <CardContent className="p-8 text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
@@ -309,11 +314,11 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   const StageIcon = getStageIcon(patient.currentStage);
 
   return (
-    <div className="min-h-screen bg-blue-50 p-4">
+    <div className="min-h-screen bg-[#47a1bd1a] p-4">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-4xl mb-2">Emergency Department</h1>
+          <h1 className="text-4xl font-bold mb-4">Emergency Department</h1>
           <p className="text-xl text-gray-600">Visit Tracker - {patient.name || 'Patient'}</p>
         </div>
 
@@ -546,78 +551,84 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
           )}
         </div>
 
-        {/* Entertainment and Information Tabs */}
         <Tabs defaultValue="tips" className="w-full">
           {/* Horizontal tab bar */}
           <TabsList className="flex w-full overflow-x-auto gap-1 rounded-lg bg-muted p-1 shadow-sm">
+            
             <TabsTrigger
               value="tips"
-              className="flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-blue-600 transition-colors"
+              className="
+                flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap
+                data-[state=active]:bg-white data-[state=active]:text-[#47a1bd]
+                hover:bg-[#47a1bd] hover:text-white cursor-pointer transition-colors duration-200 rounded-md py-2 hover:shadow-md
+              "
             >
               <Lightbulb className="w-3 h-3" />
-              <span className="hidden sm:inline">Health Tips</span>
+              <span className="hidden sm:inline">Daily Health</span>
               <span className="sm:hidden">Tips</span>
             </TabsTrigger>
 
             <TabsTrigger
               value="news"
-              className="flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-blue-600 transition-colors"
+              className="
+                flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap
+                data-[state=active]:bg-white data-[state=active]:text-[#47a1bd]
+                hover:bg-[#47a1bd] hover:text-white cursor-pointer transition-colors duration-200 rounded-md py-2 hover:shadow-md
+              "
             >
-              <Newspaper className="w-3 h-3" />
-              <span className="hidden sm:inline">News</span>
-              <span className="sm:hidden">News</span>
+              <Bell className="w-3 h-3" />
+              <span className="hidden sm:inline">Hospital News &</span>
+              <span className="sm:hidden">Updates</span>
             </TabsTrigger>
 
             <TabsTrigger
               value="trivia"
-              className="flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-blue-600 transition-colors"
+              className="
+                flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap
+                data-[state=active]:bg-white data-[state=active]:text-[#47a1bd]
+                hover:bg-[#47a1bd] hover:text-white cursor-pointer transition-colors duration-200 rounded-md py-2 hover:shadow-md
+              "
             >
               <Brain className="w-3 h-3" />
-              <span className="hidden sm:inline">Trivia</span>
-              <span className="sm:hidden">Quiz</span>
+              <span className="hidden sm:inline">Medical Knowledge</span>
+              <span className="sm:hidden">Trivia</span>
             </TabsTrigger>
 
             <TabsTrigger
               value="relax"
-              className="flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-blue-600 transition-colors"
+              className="
+                flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap
+                data-[state=active]:bg-white data-[state=active]:text-[#47a1bd]
+                hover:bg-[#47a1bd] hover:text-white cursor-pointer transition-colors duration-200 rounded-md py-2 hover:shadow-md
+              "
             >
               <Wind className="w-3 h-3" />
-              <span className="hidden sm:inline">Relax</span>
-              <span className="sm:hidden">Calm</span>
+              <span className="hidden sm:inline">Relaxation</span>
+              <span className="sm:hidden">Exercises</span>
             </TabsTrigger>
 
             <TabsTrigger
               value="services"
-              className="flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:text-blue-600 transition-colors"
+              className="
+                flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap
+                data-[state=active]:bg-white data-[state=active]:text-[#47a1bd]
+                hover:bg-[#47a1bd] hover:text-white cursor-pointer transition-colors duration-200 rounded-md py-2 hover:shadow-md
+              "
             >
-              <Building className="w-3 h-3" />
-              <span className="hidden sm:inline">Services</span>
-              <span className="sm:hidden">Info</span>
+              <Lightbulb className="w-3 h-3" />
+              <span className="hidden sm:inline">Hospital Services &</span>
+              <span className="sm:hidden">Amenities</span>
             </TabsTrigger>
+
           </TabsList>
 
-          {/* Tab content */}
-          <div className="mt-6">
-            <TabsContent value="tips" className="mt-0">
-              <HealthTips />
-            </TabsContent>
-
-            <TabsContent value="news" className="mt-0">
-              <HospitalAnnouncements />
-            </TabsContent>
-
-            <TabsContent value="trivia" className="mt-0">
-              <MedicalTrivia />
-            </TabsContent>
-
-            <TabsContent value="relax" className="mt-0">
-              <RelaxationExercises />
-            </TabsContent>
-
-            <TabsContent value="services" className="mt-0">
-              <HospitalServices />
-            </TabsContent>
-          </div>
+          {/* Tab contents */}
+          <TabsContent value="tips"><HealthTips /></TabsContent>
+          <TabsContent value="news"><HospitalAnnouncements /></TabsContent>
+          <TabsContent value="trivia"><MedicalTrivia /></TabsContent>
+          <TabsContent value="relax"><RelaxationExercises /></TabsContent>
+          <TabsContent value="announcements"><HospitalAnnouncements /></TabsContent>
+          <TabsContent value="services"><HospitalServices /></TabsContent>
         </Tabs>
 
         {/* Important Information */}

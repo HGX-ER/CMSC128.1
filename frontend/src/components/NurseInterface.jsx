@@ -51,13 +51,30 @@ export function NurseInterface({
   onMoveToStage, 
   getTotalTime, 
   getCurrentStageTime,
-  onAdjustStageTime 
+  onAdjustStageTime,
+  nurseName // <-- pass the logged-in nurse's name as a prop
 }) {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedDoctor, setSelectedDoctor] = useState('');
   const [adjustTimeDialogOpen, setAdjustTimeDialogOpen] = useState(false);
   const [timeAdjustment, setTimeAdjustment] = useState({ hours: 0, minutes: 0 });
 
+  // --- Add random motivational quotes for nurses ---
+  const NURSE_QUOTES = [
+    "Caring is the essence of nursing.",
+    "You make a difference every day.",
+    "A little compassion goes a long way.",
+    "Healing hands, caring heart.",
+    "Every patient matters, every time.",
+    "Your dedication saves lives.",
+    "Kindness is contagious—keep spreading it.",
+    "Nursing: the art of compassion in action."
+  ];
+
+  // Pick a random quote on render
+  const randomQuote = NURSE_QUOTES[Math.floor(Math.random() * NURSE_QUOTES.length)];
+
+  // --- Existing patient logic continues here ---
   const activePatients = patients.filter(p => p.isActive);
   const patientsNeedingDoctorAssignment = activePatients.filter(p => 
     !p.assignedDoctor && 
@@ -153,6 +170,11 @@ export function NurseInterface({
 
   return (
     <div className="p-6 space-y-6">
+      {/* Greeting & Motivation */}
+      <div className="mb-6 text-center">
+        <h2 className="text-2xl font-bold text-blue-600">Hello, Nurse {nurseName} 👋</h2>
+        <p className="text-sm text-gray-700 mt-1">{randomQuote}</p>
+      </div>
       {/* Header Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>

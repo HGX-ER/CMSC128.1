@@ -9,8 +9,8 @@ const healthTips = [
     id: '1',
     title: 'Stay Hydrated for Better Health',
     content: 'Drinking adequate water helps maintain body temperature, transport nutrients, and remove waste. Aim for 8 glasses daily, but increase intake during illness, exercise, or hot weather. Signs of good hydration include pale yellow urine and feeling energetic.',
-    category: 'general',
-    difficulty: 'easy',
+    category: 'General',
+    difficulty: 'Easy',
     timeToRead: 1,
     featured: true
   },
@@ -18,8 +18,8 @@ const healthTips = [
     id: '2',
     title: 'Simple Breathing Exercise for Stress',
     content: 'Try the 4-7-8 technique: Inhale for 4 counts, hold for 7, exhale for 8. This activates your parasympathetic nervous system, reducing stress and anxiety. Practice 3-4 cycles when feeling overwhelmed or before sleep.',
-    category: 'mental-health',
-    difficulty: 'easy',
+    category: 'Mental-Health',
+    difficulty: 'Easy',
     timeToRead: 2,
     featured: true
   },
@@ -27,8 +27,8 @@ const healthTips = [
     id: '3',
     title: 'Boost Your Immune System Naturally',
     content: 'Get 7-9 hours of sleep, eat colorful fruits and vegetables, exercise regularly, manage stress, and wash hands frequently. Vitamin C from citrus fruits, zinc from nuts, and probiotics from yogurt can strengthen your immune response.',
-    category: 'prevention',
-    difficulty: 'moderate',
+    category: 'Prevention',
+    difficulty: 'Moderate',
     timeToRead: 2,
     featured: false
   },
@@ -36,8 +36,8 @@ const healthTips = [
     id: '4',
     title: 'Heart-Healthy Eating Made Simple',
     content: 'Focus on whole grains, lean proteins, fruits, vegetables, and healthy fats like olive oil and avocados. Limit processed foods, excess sodium, and added sugars. Small changes like choosing grilled over fried foods make a big difference.',
-    category: 'nutrition',
-    difficulty: 'moderate',
+    category: 'Nutrition',
+    difficulty: 'Moderate',
     timeToRead: 2,
     featured: false
   },
@@ -45,8 +45,8 @@ const healthTips = [
     id: '5',
     title: 'Desk Exercises to Combat Sitting',
     content: 'Every hour, do neck rolls, shoulder shrugs, seated spinal twists, and ankle circles. Stand and march in place for 30 seconds. These micro-movements improve circulation, reduce muscle tension, and boost energy levels throughout the day.',
-    category: 'exercise',
-    difficulty: 'easy',
+    category: 'Exercise',
+    difficulty: 'Easy',
     timeToRead: 1,
     featured: false
   },
@@ -54,8 +54,8 @@ const healthTips = [
     id: '6',
     title: 'Quality Sleep Hygiene Tips',
     content: 'Keep a consistent sleep schedule, create a cool, dark bedroom, avoid screens 1 hour before bed, and limit caffeine after 2 PM. A relaxing bedtime routine signals your body it\'s time to rest. Good sleep supports immunity and mental health.',
-    category: 'general',
-    difficulty: 'moderate',
+    category: 'General',
+    difficulty: 'Moderate',
     timeToRead: 2,
     featured: true
   },
@@ -63,8 +63,8 @@ const healthTips = [
     id: '7',
     title: 'Managing Anxiety in Medical Settings',
     content: 'Practice deep breathing, bring a support person if allowed, ask questions about procedures, and communicate your concerns to healthcare providers. Visualization techniques and focusing on positive outcomes can help reduce medical anxiety.',
-    category: 'mental-health',
-    difficulty: 'moderate',
+    category: 'Mental-Health',
+    difficulty: 'Moderate',
     timeToRead: 2,
     featured: false
   },
@@ -72,8 +72,8 @@ const healthTips = [
     id: '8',
     title: 'Warning Signs to Never Ignore',
     content: 'Seek immediate medical attention for chest pain, difficulty breathing, sudden severe headache, confusion, high fever, severe abdominal pain, or signs of stroke (face drooping, arm weakness, speech difficulty). When in doubt, get checked.',
-    category: 'prevention',
-    difficulty: 'advanced',
+    category: 'Prevention',
+    difficulty: 'Advanced',
     timeToRead: 2,
     featured: true
   }
@@ -106,20 +106,20 @@ export function HealthTips() {
 
   const getCategoryColor = (category) => {
     switch (category) {
-      case 'nutrition': return 'bg-green-100 text-green-800';
-      case 'exercise': return 'bg-blue-100 text-blue-800';
-      case 'mental-health': return 'bg-purple-100 text-purple-800';
-      case 'prevention': return 'bg-red-100 text-red-800';
+      case 'Nutrition': return 'bg-green-100 text-green-800';
+      case 'Exercise': return 'bg-blue-100 text-blue-800';
+      case 'Mental-Health': return 'bg-purple-100 text-purple-800';
+      case 'Prevention': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getCategoryIcon = (category) => {
     switch (category) {
-      case 'nutrition': return '🥗';
-      case 'exercise': return '💪';
-      case 'mental-health': return '🧠';
-      case 'prevention': return '🛡️';
+      case 'Nutrition': return '🥗';
+      case 'Exercise': return '💪';
+      case 'Mental-health': return '🧠';
+      case 'Prevention': return '🛡️';
       default: return '💡';
     }
   };

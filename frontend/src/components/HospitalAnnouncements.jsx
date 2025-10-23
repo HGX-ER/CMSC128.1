@@ -7,58 +7,58 @@ const mockAnnouncements = [
     id: '1',
     title: 'New Visitor Guidelines',
     content: 'Starting today, we allow up to 2 visitors per patient in the ED. Please check in at the front desk and follow our safety protocols.',
-    type: 'update',
+    type: 'Update',
     timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    priority: 'medium'
+    priority: 'Medium'
   },
   {
     id: '2',
     title: 'Pharmacy Services Available',
     content: 'Our 24/7 pharmacy is located on the ground floor, next to the main lobby. Pick up your prescriptions before leaving.',
-    type: 'service',
+    type: 'Service',
     timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-    priority: 'low'
+    priority: 'Low'
   },
   {
     id: '3',
     title: 'Free WiFi Available',
     content: 'Connect to "HospitalGuest" network. No password required. Streaming services are available in waiting areas.',
-    type: 'service',
+    type: 'Service',
     timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
-    priority: 'low'
+    priority: 'Low'
   },
   {
     id: '4',
     title: 'Cafeteria Hours Extended',
     content: 'Our cafeteria now serves fresh meals 24/7. Healthy options and family-friendly meals available.',
-    type: 'update',
+    type: 'Update',
     timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000), // 12 hours ago
-    priority: 'low'
+    priority: 'Low'
   },
   {
     id: '5',
     title: 'Patient Comfort Initiative',
     content: 'We\'ve added charging stations, reading materials, and comfortable seating to all waiting areas.',
-    type: 'general',
+    type: 'General',
     timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-    priority: 'medium'
+    priority: 'Medium'
   }
 ];
 
 export function HospitalAnnouncements() {
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'High': return 'bg-red-100 text-red-800 border-red-200';
+      case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       default: return 'bg-blue-100 text-blue-800 border-blue-200';
     }
   };
 
   const getTypeIcon = (type) => {
     switch (type) {
-      case 'emergency': return '🚨';
-      case 'service': return '🏥';
-      case 'update': return '📢';
+      case 'Emergency': return '🚨';
+      case 'Service': return '🏥';
+      case 'Update': return '📢';
       default: return '📋';
     }
   };
@@ -71,7 +71,7 @@ export function HospitalAnnouncements() {
 
     if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
     if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-    return 'Just now';
+    return 'Just Now';
   };
 
   return (

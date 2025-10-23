@@ -3,6 +3,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { FaUserInjured, FaExclamationTriangle } from "react-icons/fa";
 
 const ESI_COLORS = {
   1: "bg-red-600 text-white",
@@ -46,7 +47,6 @@ export function TriageInterface({ patients, onUpdatePatient, onMoveToStage, getT
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl">Triage Station</h1>
         <Badge variant="outline" className="text-lg px-4 py-2">
           Waiting: {waitingPatients.length}
         </Badge>
@@ -57,7 +57,7 @@ export function TriageInterface({ patients, onUpdatePatient, onMoveToStage, getT
         {/* ESI Reference */}
         <Card>
           <CardHeader>
-            <CardTitle>ESI Reference Guide</CardTitle>
+            <CardTitle className="text-center text-lg font-bold">ESI REFERENCE GUIDE</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap md:flex-nowrap justify-center items-start gap-4 overflow-x-auto">
@@ -76,7 +76,7 @@ export function TriageInterface({ patients, onUpdatePatient, onMoveToStage, getT
         {/* Patient List */}
         <Card>
           <CardHeader>
-            <CardTitle>Patients Waiting for Triage</CardTitle>
+            <CardTitle className="text-left text-lg font-bold">Patients Waiting for Triage</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {waitingPatients.length === 0 ? (
@@ -114,7 +114,7 @@ export function TriageInterface({ patients, onUpdatePatient, onMoveToStage, getT
         {/* ESI Classification */}
         <Card>
           <CardHeader>
-            <CardTitle>Emergency Severity Index (ESI)</CardTitle>
+            <CardTitle className="text-left text-lg font-bold">Emergency Severity Index (ESI)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {selectedPatient ? (
@@ -154,7 +154,7 @@ export function TriageInterface({ patients, onUpdatePatient, onMoveToStage, getT
               </>
             ) : (
               <div className="text-center py-8 text-gray-500">
-                Select a patient to assign ESI level
+                Select a patient above to assign ESI level
               </div>
             )}
           </CardContent>

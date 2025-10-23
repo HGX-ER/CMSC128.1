@@ -39,6 +39,17 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
     specialty: 'Emergency Medicine' 
   };
 
+  const motivationalPhrases = [
+    "Healing starts with you – make today count! 💙",
+    "Every patient is a chance to change a life. 🌟",
+    "Your skill and compassion save lives – keep going! 🩺",
+    "A calm mind and caring heart create miracles every day.",
+    "Today is another opportunity to make a difference!"
+  ];
+
+  // Pick one randomly on each render
+  const randomMotivation = motivationalPhrases[Math.floor(Math.random() * motivationalPhrases.length)];
+
   // Only show patients assigned to this doctor
   const waitingPatients = patients.filter(p => 
     p.currentStage === 'waiting_doctor' && p.assignedDoctor === currentDoctorUsername
@@ -108,8 +119,8 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
       {/* Header with Doctor Info */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl">Hey Doc! 👋</h1>
-          <p className="text-gray-600 mt-1">Here's your workspace for today</p>
+          <h1 className="text-3xl">Hey, Doc! 👋</h1>
+          <p className="text-gray-600 mt-1">{randomMotivation}</p>
         </div>
         <div className="flex gap-4">
           <Badge variant="outline" className="text-lg px-4 py-2">

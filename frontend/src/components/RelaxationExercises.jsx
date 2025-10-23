@@ -19,8 +19,8 @@ const exercises = [
       'Exhale through your mouth for 8 counts',
       'Repeat this cycle 4 times'
     ],
-    type: 'breathing',
-    difficulty: 'beginner'
+    type: 'Breathing',
+    difficulty: 'Beginner'
   },
   {
     id: '2',
@@ -35,8 +35,8 @@ const exercises = [
       'Finish with facial muscles',
       'Notice the difference between tension and relaxation'
     ],
-    type: 'muscle',
-    difficulty: 'intermediate'
+    type: 'Muscle',
+    difficulty: 'Intermediate'
   },
   {
     id: '3',
@@ -51,8 +51,8 @@ const exercises = [
       'Hold empty for 4 counts',
       'Repeat for several cycles'
     ],
-    type: 'breathing',
-    difficulty: 'beginner'
+    type: 'Breathing',
+    difficulty: 'Beginner'
   },
   {
     id: '4',
@@ -67,8 +67,8 @@ const exercises = [
       'Notice 1 thing you can taste',
       'Take deep, slow breaths throughout'
     ],
-    type: 'mindfulness',
-    difficulty: 'beginner'
+    type: 'Mindfulness',
+    difficulty: 'Beginner'
   },
   {
     id: '5',
@@ -83,8 +83,8 @@ const exercises = [
       'Notice any sensations without judgment',
       'End at your toes, feeling completely relaxed'
     ],
-    type: 'mindfulness',
-    difficulty: 'intermediate'
+    type: 'Mindfulness',
+    difficulty: 'Intermediate'
   }
 ];
 
@@ -138,27 +138,27 @@ export function RelaxationExercises() {
 
   const getTypeIcon = (type) => {
     switch (type) {
-      case 'breathing': return Wind;
-      case 'muscle': return Heart;
-      case 'mindfulness': return Brain;
+      case 'Breathing': return Wind;
+      case 'Muscle': return Heart;
+      case 'Mindfulness': return Brain;
       default: return Waves;
     }
   };
 
   const getTypeColor = (type) => {
     switch (type) {
-      case 'breathing': return 'bg-blue-100 text-blue-800';
-      case 'muscle': return 'bg-green-100 text-green-800';
-      case 'mindfulness': return 'bg-purple-100 text-purple-800';
+      case 'Breathing': return 'bg-blue-100 text-blue-800';
+      case 'Muscle': return 'bg-green-100 text-green-800';
+      case 'Mindfulness': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getDifficultyColor = (difficulty) => {
     switch (difficulty) {
-      case 'beginner': return 'bg-green-100 text-green-800';
-      case 'intermediate': return 'bg-yellow-100 text-yellow-800';
-      case 'advanced': return 'bg-red-100 text-red-800';
+      case 'Beginner': return 'bg-green-100 text-green-800';
+      case 'Intermediate': return 'bg-yellow-100 text-yellow-800';
+      case 'Advanced': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };

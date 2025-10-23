@@ -3040,3 +3040,19 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   visibility: hidden;
   display: none !important;
 }
+
+/* Remove html5-qrcode bottom white bar */
+#qr-reader__dashboard_section_csr,
+#qr-reader__dashboard_section_swaplink,
+#qr-reader__camera_permission_button,
+#qr-reader__camera_selection,
+#qr-reader__dashboard {
+  display: none !important;
+}
+
+/* Ensure camera preview fills container cleanly */
+#qr-reader video {
+  object-fit: cover !important;
+  width: 100% !important;
+  height: 100% !important;
+}
