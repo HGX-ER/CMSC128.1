@@ -116,7 +116,6 @@ export function ManagerInterface({
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl">ED Manager Dashboard</h1>
         <Badge variant="outline" className="text-lg px-4 py-2">
           Active Patients: {activePatients.length}
         </Badge>

@@ -49,7 +49,7 @@ app.get("/api/health", async (req, res) => {
 /* ===== Routes ===== */
 app.use("/api", require("./routes/auth"));
 app.use("/api", require("./routes/registration"));
-app.use("/api", require("./routes/triage"));
+app.use("/api/triage", require("./routes/triage"));
 app.use("/api", require("./routes/board"));
 app.use("/api", require("./routes/patient"));
 

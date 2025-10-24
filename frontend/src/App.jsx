@@ -21,6 +21,7 @@ import {
   Settings, 
   BarChart3,
   Monitor,
+  Hospital,
   LogOut,
   User
 } from 'lucide-react';
@@ -107,9 +108,9 @@ export default function App() {
         {/* Header */}
         <div className="bg-white shadow-sm border-b">
           <div className="flex items-center justify-between px-6 py-4">
-            <div className="flex items-center gap-2">
-              <User className="h-5 w-5 text-blue-600" />
-              <h2 className="text-xl font-semibold">Patient Portal</h2>
+            <div className="flex items-center gap-2" style={{ color: "#004f61" }}>
+              <User className="h-5 w-5" />
+              <h2 className="text-xl font-bold">Patient Portal</h2>
             </div>
             
             <div className="flex items-center gap-4">
@@ -144,7 +145,7 @@ export default function App() {
   if (auth.user?.role === 'patient' && availableRoles.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md sm:max-w-lg md:max-w-xl shadow-lg">
           <CardContent className="p-8 text-center">
             <User className="h-16 w-16 mx-auto text-gray-400 mb-4" />
             <h2 className="text-xl font-semibold mb-2">Patient Access</h2>
@@ -167,48 +168,64 @@ export default function App() {
 
   if (!currentRole) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-4xl">
-          <CardContent className="p-8">
-            <div className="text-center mb-8">
-              <h1 className="text-4xl mb-4">Emergency Department Management System</h1>
-              <p className="text-xl text-gray-600">Welcome, {auth.user?.name}</p>
-              <p className="text-lg text-gray-500 mt-2">Select a function to access</p>
+      <div
+        className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center"
+        style={{
+          backgroundImage:
+            "url('https://xmple.com/wallpaper/white-gradient-blue-linear-3840x2160-c2-add8e6-ffffff-a-285-f-14.svg')",
+        }}
+      >
+        <Card className="w-full max-w-md sm:max-w-lg md:max-w-xl shadow-lg">
+          <CardContent className="p-6">
+            <div className="flex flex-col items-center mb-8 text-center">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center mb-3"
+                style={{ backgroundColor: "#96cfe0" }}
+              >
+                <Hospital className="w-8 h-8 text-white" />
+              </div>
+
+              <h1 className="text-4xl font-bold" style={{ color: "#004f61" }}>
+                ERIS
+              </h1>
+              <p className="text-lg mt-2 text-gray-600">
+                Emergency Response Information System
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex flex-col items-center w-full max-w-sm mx-auto">
               {availableRoles.map((role) => {
                 const config = ROLE_CONFIGS[role];
                 const Icon = config.icon;
                 return (
-                  <Button
-                    key={role}
-                    onClick={() => setCurrentRole(role)}
-                    className={`${config.color} h-32 flex flex-col items-center justify-center text-white shadow-lg transition-all duration-200 hover:scale-105`}
-                  >
-                    <Icon className="h-12 w-12 mb-3" />
-                    <div className="text-lg font-semibold">{config.title}</div>
-                    <div className="text-sm opacity-90 mt-1 text-center px-2">
-                      {config.description}
-                    </div>
-                  </Button>
+                  <div key={role} className="w-full mb-4">        
+                    <Button
+                      onClick={() => setCurrentRole(role)}
+                      className={`${config.color} w-full sm:w-56 md:w-60 lg:w-64 h-28 flex flex-col items-center justify-center text-white shadow-lg transition-transform duration-200 hover:scale-105`}
+                    >
+                      <Icon className="h-12 w-12 mb-0" />      
+                      <div className="text-lg font-semibold mt-2">{config.title}</div>  
+                      <div className="text-sm opacity-90 mt-0.5 text-center px-2">
+                        {config.description}
+                      </div>
+                    </Button>
+                  </div>
                 );
               })}
             </div>
 
-            <div className="mt-8 flex items-center justify-between">
-              <div className="flex items-center gap-6 text-sm text-gray-600">
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-between text-sm text-gray-600 gap-4">
+              <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  <span>Active Patients: {patientManagement.patients.filter(p => p.isActive).length}</span>
+                  <span>
+                    Active Patients:{" "}
+                    {patientManagement.patients.filter((p) => p.isActive).length}
+                  </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">
-                    {new Date().toLocaleString()}
-                  </Badge>
-                </div>
+                <Badge variant="outline">{new Date().toLocaleString()}</Badge>
               </div>
-              
+
               <Button
                 variant="outline"
                 onClick={auth.logout}
@@ -315,19 +332,16 @@ export default function App() {
                 const config = ROLE_CONFIGS[currentRole];
                 const Icon = config.icon;
                 return (
-                  <>
+                  <div className="flex items-center gap-2" style={{ color: "#004f61" }}>
                     <Icon className="h-5 w-5" />
-                    <h2 className="text-xl font-semibold">{config.title}</h2>
-                  </>
+                    <h2 className="text-xl font-bold">{config.title}</h2>
+                  </div>
                 );
               })()}
             </div>
           </div>
           
           <div className="flex items-center gap-4">
-            <Badge variant="outline" className="px-3 py-1">
-              {auth.user?.name} ({auth.user?.role.replace('_', ' ')})
-            </Badge>
             <Badge variant="outline" className="px-3 py-1">
               Active Patients: {patientManagement.patients.filter(p => p.isActive).length}
             </Badge>

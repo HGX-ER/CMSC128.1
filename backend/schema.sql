@@ -6,7 +6,7 @@ CREATE TABLE users (
                        id INT AUTO_INCREMENT PRIMARY KEY,
                        username VARCHAR(50) NOT NULL UNIQUE,
                        password VARCHAR(255) NOT NULL,
-                       role ENUM('nurse','doctor','ed_manager') NOT NULL
+                       role ENUM('nurse', 'doctor', 'ed_manager') NOT NULL
 );
 
 CREATE TABLE patients (
@@ -30,12 +30,13 @@ CREATE TABLE encounters (
                                 'arrived',
                                 'registered',
                                 'triaged',
-                                'roomed',
-                                'provider_started',
+                                'waiting_doctor',
+                                'consultation',
                                 'dispositioned',
                                 'departed'
                                 ) NOT NULL DEFAULT 'arrived',
                             priority_esi TINYINT,
+                            assigned_doctor VARCHAR(64),
                             arrival_time DATETIME,
                             triage_time DATETIME,
                             room_time DATETIME,
@@ -54,7 +55,7 @@ CREATE INDEX idx_patient_id ON encounters (patient_id);
 CREATE TABLE observations (
                               id INT AUTO_INCREMENT PRIMARY KEY,
                               encounter_id INT NOT NULL,
-                              type ENUM('complaint','temp','hr','rr','bp_sys','bp_dia','spo2') NOT NULL,
+                              type ENUM('complaint', 'temp', 'hr', 'rr', 'bp_sys', 'bp_dia', 'spo2') NOT NULL,
                               value VARCHAR(64),
                               unit VARCHAR(16),
                               recorded_at DATETIME,
@@ -94,18 +95,14 @@ ON DUPLICATE KEY UPDATE
                      password = VALUES(password),
                      role = VALUES(role);
 
-INSERT INTO patients (full_name, dob, sex)
+INSERT INTO patients (full_name, dob, sex, contact_number, emergency_contact, insurance_info, address)
 VALUES
-    ('Test Patient', '1998-05-05', 'Male'),
-    ('Juan Dela Cruz', '2001-01-15', 'Male'),
-    ('Maria Santos', '1999-07-20', 'Female');
+    ('Juan Dela Cruz', '2001-01-15', 'Male', '09171234567', 'Maria Cruz', 'PhilHealth', 'Manila'),
+    ('Maria Santos', '1999-07-20', 'Female', '09181234567', 'Jose Santos', 'Maxicare', 'Quezon City'),
+    ('Pedro Gomez', '1988-03-10', 'Male', '09191234567', 'Anna Gomez', 'Intellicare', 'Pasig');
 
-SET @p1 = 1;
-SET @p2 = 2;
-SET @p3 = 3;
-
-INSERT INTO encounters (patient_id, queue_number, status, arrival_time)
+INSERT INTO encounters (patient_id, queue_number, status, priority_esi, assigned_doctor, arrival_time)
 VALUES
-    (@p1, 'EDTEST001', 'arrived', NOW()),
-    (@p2, 'EDTEST002', 'registered', NOW()),
-    (@p3, 'EDTEST003', 'triaged', NOW());
+    (1, 'ED001', 'waiting_doctor', 4, NULL, NOW()),
+    (2, 'ED002', 'registered', 3, NULL, NOW()),
+    (3, 'ED003', 'arrived', NULL, NULL, NOW());

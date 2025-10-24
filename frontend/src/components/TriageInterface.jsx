@@ -1,161 +1,168 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { FaUserInjured, FaExclamationTriangle } from "react-icons/fa";
 
 const ESI_COLORS = {
   1: "bg-red-600 text-white",
-  2: "bg-orange-500 text-white", 
-  3: "bg-yellow-500 text-black",
+  2: "bg-orange-500 text-white",
+  3: "bg-yellow-400 text-black",
   4: "bg-green-500 text-white",
-  5: "bg-blue-500 text-white"
+  5: "bg-blue-500 text-white",
 };
 
-const ESI_DESCRIPTIONS = {
-  1: "Resuscitation - Life threatening",
-  2: "Emergent - High risk",
-  3: "Urgent - Moderate risk", 
-  4: "Less Urgent - Low risk",
-  5: "Non-urgent - Very low risk"
-};
-
-export function TriageInterface({ patients, onUpdatePatient, onMoveToStage, getTotalTime }) {
+export function TriageInterface({ onBack }) {
+  const [waitingPatients, setWaitingPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
-  const [selectedESI, setSelectedESI] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const waitingPatients = patients.filter(p => 
-    p.currentStage === 'waiting_triage' || p.currentStage === 'kiosk'
-  );
+  // 🧩 Fetch all patients waiting for triage
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch("http://localhost:5000/api/triage");
+        if (!res.ok) throw new Error("Failed to fetch triage patients");
+        const data = await res.json();
+        setWaitingPatients(data);
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load triage patients");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleSelectPatient = (patientId) => {
-    setSelectedPatient(patientId);
-    setSelectedESI("");
-  };
+    fetchPatients();
 
-  const handleAssignESI = () => {
-    if (selectedPatient && selectedESI) {
-      const esiLevel = parseInt(selectedESI);
-      onUpdatePatient(selectedPatient, { esiLevel });
-      onMoveToStage(selectedPatient, 'waiting_registration');
-      setSelectedPatient(null);
-      setSelectedESI("");
-    }
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(fetchPatients, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSelect = (patient) => {
+    setSelectedPatient(patient);
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <Badge variant="outline" className="text-lg px-4 py-2">
-          Waiting: {waitingPatients.length}
-        </Badge>
-      </div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <Button variant="outline" onClick={onBack}>
+            ← Back
+          </Button>
+          <h1 className="text-2xl font-semibold flex items-center gap-2">
+            <FaUserInjured className="text-blue-600" />
+            Triage Station
+          </h1>
+          <div />
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* ESI Reference */}
+        {/* ESI Reference Guide */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-center text-lg font-bold">ESI REFERENCE GUIDE</CardTitle>
+          <CardHeader className="text-center">
+            <CardTitle className="font-bold text-lg">ESI REFERENCE GUIDE</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap md:flex-nowrap justify-center items-start gap-4 overflow-x-auto">
-              {Object.entries(ESI_DESCRIPTIONS).map(([level, description]) => (
-                <div key={level} className="text-center min-w-[120px]">
-                  <Badge className={`${ESI_COLORS[level]} mb-2`}>
-                    ESI {level}
-                  </Badge>
-                  <p className="text-sm">{description}</p>
-                </div>
-              ))}
-            </div>
+          <CardContent className="flex justify-center flex-wrap gap-4 text-sm">
+            <Badge className="bg-red-600 text-white">ESI 1</Badge>
+            <span>Resuscitation - Life threatening</span>
+            <Badge className="bg-orange-500 text-white">ESI 2</Badge>
+            <span>Emergent - High risk</span>
+            <Badge className="bg-yellow-400 text-black">ESI 3</Badge>
+            <span>Urgent - Moderate risk</span>
+            <Badge className="bg-green-500 text-white">ESI 4</Badge>
+            <span>Less Urgent - Low risk</span>
+            <Badge className="bg-blue-500 text-white">ESI 5</Badge>
+            <span>Non-urgent - Very low risk</span>
           </CardContent>
         </Card>
 
-        {/* Patient List */}
+        {/* Patients waiting for triage */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-left text-lg font-bold">Patients Waiting for Triage</CardTitle>
+            <CardTitle>Patients Waiting for Triage</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {waitingPatients.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No patients waiting for triage</p>
+          <CardContent>
+            {loading ? (
+              <p className="text-gray-500">Loading patients...</p>
+            ) : error ? (
+              <p className="text-red-500">{error}</p>
+            ) : waitingPatients.length === 0 ? (
+              <p className="text-gray-500">No patients waiting for triage</p>
             ) : (
-              waitingPatients.map((patient) => (
-                <div
-                  key={patient.id}
-                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                    selectedPatient === patient.id 
-                      ? 'border-blue-500 bg-blue-50' 
-                      : 'hover:bg-gray-50'
-                  }`}
-                  onClick={() => handleSelectPatient(patient.id)}
-                >
-                  <div className="flex justify-between items-center">
+              <ul className="space-y-2">
+                {waitingPatients.map((p) => (
+                  <li
+                    key={p.encounter_id}
+                    className={`flex items-center justify-between p-3 rounded-md border cursor-pointer hover:bg-blue-50 ${
+                      selectedPatient?.encounter_id === p.encounter_id
+                        ? "border-blue-400 bg-blue-50"
+                        : "border-gray-200"
+                    }`}
+                    onClick={() => handleSelect(p)}
+                  >
                     <div>
-                      <div className="font-mono text-lg">{patient.id}</div>
-                      <div className="text-sm text-gray-500">
-                        Arrived: {patient.arrivalTime.toLocaleTimeString()}
-                      </div>
+                      <p className="font-medium text-gray-800">{p.full_name}</p>
+                      <p className="text-sm text-gray-500">
+                        Queue: {p.queue_number} • Status: {p.status}
+                      </p>
                     </div>
-                    <div className="text-right">
-                      <Badge variant="outline">
-                        {getTotalTime(patient)}m
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              ))
+                    <Badge className="bg-gray-200 text-gray-700">
+                      DOB: {new Date(p.dob).toLocaleDateString()}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
             )}
           </CardContent>
         </Card>
 
-        {/* ESI Classification */}
+        {/* ESI Assignment Section */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-left text-lg font-bold">Emergency Severity Index (ESI)</CardTitle>
+            <CardTitle>Emergency Severity Index (ESI)</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             {selectedPatient ? (
-              <>
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <p>Selected Patient: <span className="font-mono">{selectedPatient}</span></p>
+              <div className="space-y-3">
+                <p className="text-gray-700">
+                  <strong>Selected:</strong> {selectedPatient.full_name} ({selectedPatient.queue_number})
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {[1, 2, 3, 4, 5].map((level) => (
+                    <Button
+                      key={level}
+                      className={`${ESI_COLORS[level]} font-semibold`}
+                      onClick={async () => {
+                        try {
+                          await fetch(
+                            `http://localhost:5000/api/triage/encounters/${selectedPatient.encounter_id}/triage`,
+                            {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ esi: level }),
+                            }
+                          );
+                          alert(`ESI ${level} assigned to ${selectedPatient.full_name}`);
+                          setSelectedPatient(null);
+                        } catch (err) {
+                          console.error(err);
+                          alert("Failed to assign ESI");
+                        }
+                      }}
+                    >
+                      ESI {level}
+                    </Button>
+                  ))}
                 </div>
-
-                <div className="space-y-3">
-                  <label>Select ESI Level:</label>
-                  <Select value={selectedESI} onValueChange={setSelectedESI}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose ESI Level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(ESI_DESCRIPTIONS).map(([level, description]) => (
-                        <SelectItem key={level} value={level}>
-                          <div className="flex items-center gap-2">
-                            <Badge className={ESI_COLORS[level]}>
-                              ESI {level}
-                            </Badge>
-                            <span>{description}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button 
-                  onClick={handleAssignESI}
-                  disabled={!selectedESI}
-                  className="w-full"
-                >
-                  Assign ESI Level & Send to Registration
-                </Button>
-              </>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                Select a patient above to assign ESI level
               </div>
+            ) : (
+              <p className="text-gray-500">
+                Select a patient above to assign ESI level
+              </p>
             )}
           </CardContent>
         </Card>

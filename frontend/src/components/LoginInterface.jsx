@@ -130,12 +130,12 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
         <Card className="shadow-lg">
           <CardHeader className="text-center flex flex-col items-center gap-">
             <div
-              className="w-16 h-16 rounded-full flex items-center justify-center"
+              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
               style={{ backgroundColor: "#96cfe0" }}
             >
               <Hospital className="w-8 h-8 text-white" />
             </div>
-            <CardTitle className="text-4xl font-bold -mt-1">ERIS</CardTitle>
+            <CardTitle className="text-4xl font-bold" style={{ color: "#004f61" }}>ERIS</CardTitle>
             <p className="text-lg mt-0">
               Emergency Response Information System
             </p>
