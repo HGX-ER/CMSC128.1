@@ -46,12 +46,17 @@ app.get("/api/health", async (req, res) => {
     }
 });
 
+const doctorsRoute = require("./routes/doctors");
+app.use("/api", doctorsRoute);
+
 /* ===== Routes ===== */
 app.use("/api", require("./routes/auth"));
 app.use("/api", require("./routes/registration"));
 app.use("/api/triage", require("./routes/triage"));
 app.use("/api", require("./routes/board"));
 app.use("/api", require("./routes/patient"));
+const getDoctorRoutes = require("./routes/getdoctor");
+app.use("/api/getdoctor", getDoctorRoutes);
 
 /* ===== Error handler ===== */
 app.use((err, req, res, next) => {

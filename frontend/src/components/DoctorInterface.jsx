@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -12,114 +12,193 @@ import { Stethoscope, Activity } from "lucide-react";
 
 const ESI_COLORS = {
   1: "bg-red-600 text-white",
-  2: "bg-orange-500 text-white", 
+  2: "bg-orange-500 text-white",
   3: "bg-yellow-500 text-black",
   4: "bg-green-500 text-white",
-  5: "bg-blue-500 text-white"
+  5: "bg-blue-500 text-white",
 };
 
-export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getTotalTime, currentDoctorUsername }) {
+function ageFromDOB(dob) {
+  if (!dob) return "Unknown";
+  const d = new Date(dob);
+  const today = new Date();
+  let a = today.getFullYear() - d.getFullYear();
+  const m = today.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) a--;
+  return `${a}y`;
+}
+
+export function DoctorInterface({
+  patients: _unused,             // we fetch our own
+  onUpdatePatient,               // optional callback to parent
+  onMoveToStage,                 // optional callback to parent
+  getTotalTime,                  // optional util
+  currentDoctorUsername,         // e.g., "dr.sarahsmith" or similar from DB
+}) {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [consultationOpen, setConsultationOpen] = useState(false);
-  const [disposition, setDisposition] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
+  const [disposition, setDisposition] = useState("");
   const [consultationStartTime, setConsultationStartTime] = useState(null);
 
-  // Doctor room and floor information
-  const doctorInfo = {
-    'dr.smith': { room: '201', floor: '2nd Floor', specialty: 'Emergency Medicine' },
-    'dr.johnson': { room: '203', floor: '2nd Floor', specialty: 'Internal Medicine' },
-    'dr.davis': { room: '205', floor: '2nd Floor', specialty: 'Pediatric Emergency' },
-    'dr.brown': { room: '207', floor: '2nd Floor', specialty: 'Trauma Surgery' }
-  };
+  const [doctor, setDoctor] = useState({
+    full_name: "",
+    specialty: "Emergency Medicine",
+    room: "200",
+    floor: "2nd Floor",
+  });
+  const [doctorPatients, setDoctorPatients] = useState([]);
 
-  const currentDoctorInfo = doctorInfo[currentDoctorUsername] || { 
-    room: '200', 
-    floor: '2nd Floor', 
-    specialty: 'Emergency Medicine' 
-  };
+  // Fetch doctor profile + patients, with auto-refresh
+  useEffect(() => {
+    let stop = false;
+
+    async function load() {
+      try {
+        const prof = await fetch(
+          `http://localhost:5000/api/doctor/${encodeURIComponent(currentDoctorUsername)}`
+        ).then((r) => (r.ok ? r.json() : null));
+        if (!stop && prof) setDoctor(prof);
+      } catch (e) {
+        console.warn("doctor profile load failed:", e);
+      }
+
+      try {
+        const list = await fetch(
+          `http://localhost:5000/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
+        ).then((r) => (r.ok ? r.json() : []));
+        const normalized = (list || []).map((p) => ({
+          ...p,
+          arrivalTime: p.arrivalTime ? new Date(p.arrivalTime) : (p.arrival_time ? new Date(p.arrival_time) : null),
+          currentStage: (p.currentStage || p.stage || p.status || "").toString().toLowerCase().replace(/[\s-]+/g, "_"),
+        }));
+        if (!stop) setDoctorPatients(normalized);
+      } catch (e) {
+        console.warn("doctor patient list load failed:", e);
+      }
+    }
+
+    load();
+    const t = setInterval(load, 5000);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, [currentDoctorUsername]);
+
+  // Groups for UI
+  const waitingPatients = useMemo(
+    () => doctorPatients.filter((p) => p.currentStage === "waiting_doctor"),
+    [doctorPatients]
+  );
+  const consultingPatients = useMemo(
+    () => doctorPatients.filter((p) => p.currentStage === "consultation"),
+    [doctorPatients]
+  );
+  const completedPatients = useMemo(
+    () =>
+      doctorPatients.filter(
+        (p) =>
+          p.disposition &&
+          !["waiting_doctor", "consultation"].includes(p.currentStage)
+      ),
+    [doctorPatients]
+  );
+
+  const selectedPatientData = useMemo(
+    () => doctorPatients.find((p) => p.id === selectedPatient),
+    [doctorPatients, selectedPatient]
+  );
 
   const motivationalPhrases = [
     "Healing starts with you – make today count! 💙",
     "Every patient is a chance to change a life. 🌟",
     "Your skill and compassion save lives – keep going! 🩺",
     "A calm mind and caring heart create miracles every day.",
-    "Today is another opportunity to make a difference!"
+    "Today is another opportunity to make a difference!",
   ];
+  const randomMotivation =
+    motivationalPhrases[Math.floor(Math.random() * motivationalPhrases.length)];
 
-  // Pick one randomly on each render
-  const randomMotivation = motivationalPhrases[Math.floor(Math.random() * motivationalPhrases.length)];
+  // Actions
+  const handleSelectPatient = (id) => setSelectedPatient(id);
 
-  // Only show patients assigned to this doctor
-  const waitingPatients = patients.filter(p => 
-    p.currentStage === 'waiting_doctor' && p.assignedDoctor === currentDoctorUsername
-  );
-  const consultingPatients = patients.filter(p => 
-    p.currentStage === 'consultation' && p.assignedDoctor === currentDoctorUsername
-  );
-  const completedPatients = patients.filter(p => 
-    p.assignedDoctor === currentDoctorUsername && 
-    p.disposition && 
-    p.diagnosis &&
-    !['waiting_doctor', 'consultation'].includes(p.currentStage)
-  );
-  const selectedPatientData = patients.find(p => p.id === selectedPatient);
+  const startConsult = async () => {
+    if (!selectedPatient) return;
+    try {
+      const res = await fetch(
+        `http://localhost:5000/api/doctor/encounters/${selectedPatient}/start`,
+        { method: "POST", headers: { "Content-Type": "application/json" } }
+      );
+      if (!res.ok) throw new Error("start failed");
 
-  const handleSelectPatient = (patientId) => {
-    setSelectedPatient(patientId);
-  };
+      // optimistically flip stage locally
+      setDoctorPatients((prev) =>
+        prev.map((p) =>
+          p.id === selectedPatient ? { ...p, currentStage: "consultation" } : p
+        )
+      );
 
-  const handleStartConsult = () => {
-    if (selectedPatient) {
-      onMoveToStage(selectedPatient, 'consultation');
       setConsultationOpen(true);
       setConsultationStartTime(new Date());
-      setDisposition("");
-      setDiagnosis("");
+    } catch (e) {
+      console.error(e);
+      alert("Failed to start consultation.");
     }
   };
 
-  const handleEndConsult = () => {
-    if (selectedPatient && disposition && diagnosis) {
-      onUpdatePatient(selectedPatient, { 
-        disposition: disposition,
-        diagnosis: diagnosis 
-      });
-      
-      // Move to appropriate stage based on disposition
-      let nextStage = 'waiting_discharge';
-      if (disposition === 'Admission Non-ICU') {
-        nextStage = 'waiting_admission';
-      } else if (disposition === 'Admission ICU') {
-        nextStage = 'waiting_admission';
-      } else if (disposition === 'Observation') {
-        nextStage = 'waiting_observation';
-      }
-      
-      onMoveToStage(selectedPatient, nextStage);
+  const completeConsult = async () => {
+    if (!selectedPatient || !diagnosis || !disposition) return;
+    try {
+      const res = await fetch(
+        `http://localhost:5000/api/doctor/encounters/${selectedPatient}/complete`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ diagnosis, disposition }),
+        }
+      );
+      if (!res.ok) throw new Error("complete failed");
+
+      onUpdatePatient?.(selectedPatient, { diagnosis, disposition });
+
+      // Refresh immediately
+      const list = await fetch(
+        `http://localhost:5000/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
+      ).then((r) => (r.ok ? r.json() : []));
+      const normalized = (list || []).map((p) => ({
+        ...p,
+        arrivalTime: p.arrivalTime ? new Date(p.arrivalTime) : (p.arrival_time ? new Date(p.arrival_time) : null),
+        currentStage: (p.currentStage || p.stage || p.status || "").toString().toLowerCase().replace(/[\s-]+/g, "_"),
+      }));
+      setDoctorPatients(normalized);
+
       setConsultationOpen(false);
       setSelectedPatient(null);
       setDiagnosis("");
       setDisposition("");
       setConsultationStartTime(null);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to complete consultation.");
     }
   };
 
-  const getPatientAge = (patient) => {
-    if (patient.age) return `${patient.age}y`;
-    if (patient.dateOfBirth) {
-      const age = new Date().getFullYear() - new Date(patient.dateOfBirth).getFullYear();
-      return `${age}y`;
-    }
-    return 'Unknown';
-  };
+  const getTotalTimeOrFallback = (p) =>
+    typeof getTotalTime === "function"
+      ? getTotalTime(p)
+      : p.arrivalTime
+      ? Math.max(0, Math.round((Date.now() - p.arrivalTime.getTime()) / 60000))
+      : 0;
 
   return (
     <div className="p-6 space-y-6">
       {/* Header with Doctor Info */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl">Hey, Doc! 👋</h1>
+          <h1 className="text-3xl">
+            Hey, {doctor.full_name ? `Dr. ${doctor.full_name.split(" ").slice(-1)[0]}` : "Doc"}! 👋
+          </h1>
           <p className="text-gray-600 mt-1">{randomMotivation}</p>
         </div>
         <div className="flex gap-4">
@@ -145,12 +224,14 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
               </div>
               <div>
                 <p className="text-sm text-gray-600">You're working from</p>
-                <p className="font-semibold text-lg text-blue-900">Room {currentDoctorInfo.room}, {currentDoctorInfo.floor}</p>
+                <p className="font-semibold text-lg text-blue-900">
+                  Room {doctor.room || "200"}, {doctor.floor || "2nd Floor"}
+                </p>
               </div>
             </div>
             <div className="text-right">
               <Badge className="bg-blue-500 text-white text-sm px-3 py-1">
-                {currentDoctorInfo.specialty}
+                {doctor.specialty || "Emergency Medicine"}
               </Badge>
             </div>
           </div>
@@ -173,152 +254,147 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
         {/* Patient Consultation Tab */}
         <TabsContent value="consultation" className="mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Waiting Patients */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              ⏰ Patients Waiting for You
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {waitingPatients.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">✨ All caught up!</p>
-                <p className="text-sm text-gray-400 mt-1">No patients waiting right now</p>
-              </div>
-            ) : (
-              waitingPatients
-                .sort((a, b) => (a.esiLevel || 5) - (b.esiLevel || 5)) // Sort by ESI priority
-                .map((patient) => (
-                  <DoctorPatientCard
-                    key={patient.id}
-                    patient={patient}
-                    isSelected={selectedPatient === patient.id}
-                    onSelect={() => handleSelectPatient(patient.id)}
-                    getTotalTime={getTotalTime}
-                    doctorRoom={currentDoctorInfo.room}
-                    doctorFloor={currentDoctorInfo.floor}
-                  />
-                ))
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Patient Profile & Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              👤 Patient Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {selectedPatientData ? (
-              <div className="space-y-4">
-                {/* Patient Details */}
-                <div className="p-4 bg-blue-50 rounded-lg space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-lg font-medium">{selectedPatientData.name}</h3>
-                      <p className="text-sm text-gray-600">
-                        {getPatientAge(selectedPatientData)} • {selectedPatientData.sex}
-                      </p>
-                      <p className="text-xs text-gray-500 font-mono">ID: {selectedPatientData.id}</p>
-                    </div>
-                    {selectedPatientData.esiLevel && (
-                      <Badge className={ESI_COLORS[selectedPatientData.esiLevel]}>
-                        ESI {selectedPatientData.esiLevel}
-                      </Badge>
-                    )}
+            {/* Waiting Patients */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  ⏰ Patients Waiting for You
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {waitingPatients.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">✨ All caught up!</p>
+                    <p className="text-sm text-gray-400 mt-1">No patients waiting right now</p>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <div>
-                      <span className="text-sm font-medium">Chief Complaint:</span>
-                      <p className="text-sm text-gray-700">{selectedPatientData.chiefComplaint}</p>
-                    </div>
-                    
-                    <div>
-                      <span className="text-sm font-medium">Date of Birth:</span>
-                      <p className="text-sm text-gray-700">{selectedPatientData.dateOfBirth || 'Not provided'}</p>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 text-xs text-gray-600">
-                      <div>
-                        <span className="font-medium">Arrival:</span> {selectedPatientData.arrivalTime.toLocaleString()}
+                ) : (
+                  waitingPatients
+                    .sort((a, b) => (a.esiLevel || 5) - (b.esiLevel || 5))
+                    .map((patient) => (
+                      <DoctorPatientCard
+                        key={patient.id}
+                        patient={patient}
+                        isSelected={selectedPatient === patient.id}
+                        onSelect={() => handleSelectPatient(patient.id)}
+                        getTotalTime={getTotalTimeOrFallback}
+                        doctorRoom={doctor.room || "200"}
+                        doctorFloor={doctor.floor || "2nd Floor"}
+                      />
+                    ))
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Patient Profile & Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">👤 Patient Details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {selectedPatientData ? (
+                  <div className="space-y-4">
+                    {/* Patient Details */}
+                    <div className="p-4 bg-blue-50 rounded-lg space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="text-lg font-medium">
+                            {selectedPatientData.name || selectedPatientData.full_name}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {ageFromDOB(selectedPatientData.dateOfBirth)} • {selectedPatientData.sex}
+                          </p>
+                          <p className="text-xs text-gray-500 font-mono">
+                            ID: {selectedPatientData.id}
+                          </p>
+                        </div>
+                        {selectedPatientData.esiLevel && (
+                          <Badge className={ESI_COLORS[selectedPatientData.esiLevel]}>
+                            ESI {selectedPatientData.esiLevel}
+                          </Badge>
+                        )}
                       </div>
-                      <div>
-                        <span className="font-medium">Total Time:</span> {getTotalTime(selectedPatientData)}m
+
+                      <div className="grid grid-cols-2 gap-4 text-xs text-gray-600">
+                        <div>
+                          <span className="font-medium">Arrival:</span>{" "}
+                          {selectedPatientData.arrivalTime
+                            ? selectedPatientData.arrivalTime.toLocaleString()
+                            : "—"}
+                        </div>
+                        <div>
+                          <span className="font-medium">Total Time:</span>{" "}
+                          {getTotalTimeOrFallback(selectedPatientData)}m
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Action Buttons */}
-                {/* Room Information */}
-                <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-purple-800">Consultation Location:</span>
+                    {/* Room Information */}
+                    <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-purple-800">
+                            Consultation Location:
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Badge className="bg-purple-100 text-purple-800">
+                            Room {doctor.room || "200"}
+                          </Badge>
+                          <Badge className="bg-purple-100 text-purple-800">
+                            {doctor.floor || "2nd Floor"}
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Badge className="bg-purple-100 text-purple-800">
-                        Room {currentDoctorInfo.room}
-                      </Badge>
-                      <Badge className="bg-purple-100 text-purple-800">
-                        {currentDoctorInfo.floor}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
 
-                {selectedPatientData.currentStage === 'waiting_doctor' ? (
-                  <Button onClick={handleStartConsult} className="w-full" size="lg">
-                    🩺 START CONSULTATION
-                  </Button>
-                ) : selectedPatientData.currentStage === 'consultation' ? (
-                  <div className="space-y-3">
-                    <Badge className="bg-yellow-500 text-white w-full justify-center py-2">
-                      Consultation in Progress
-                    </Badge>
-                    <Button 
-                      onClick={() => setConsultationOpen(true)} 
-                      variant="outline" 
-                      className="w-full"
-                    >
-                      Continue Consultation
-                    </Button>
-                    {consultationStartTime && (
-                      <p className="text-sm text-gray-600 text-center">
-                        Started: {consultationStartTime.toLocaleTimeString()}
-                      </p>
+                    {selectedPatientData.currentStage === "waiting_doctor" ? (
+                      <Button onClick={startConsult} className="w-full" size="lg">
+                        🩺 START CONSULTATION
+                      </Button>
+                    ) : selectedPatientData.currentStage === "consultation" ? (
+                      <div className="space-y-3">
+                        <Badge className="bg-yellow-500 text-white w-full justify-center py-2">
+                          Consultation in Progress
+                        </Badge>
+                        <Button
+                          onClick={() => setConsultationOpen(true)}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          Continue Consultation
+                        </Button>
+                        {consultationStartTime && (
+                          <p className="text-sm text-gray-600 text-center">
+                            Started: {consultationStartTime.toLocaleTimeString()}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <Badge variant="secondary">
+                          Patient Status: {selectedPatientData.currentStage?.replace("_", " ")}
+                        </Badge>
+                        <p className="text-sm text-gray-500 mt-2">Not available for consultation</p>
+                      </div>
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-4">
-                    <Badge variant="secondary">
-                      Patient Status: {selectedPatientData.currentStage.replace('_', ' ')}
-                    </Badge>
-                    <p className="text-sm text-gray-500 mt-2">Not available for consultation</p>
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Select a patient to view their profile</p>
+                    <p className="text-sm mt-2">Click on any patient card to see their details</p>
                   </div>
                 )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>Select a patient to view their profile</p>
-                <p className="text-sm mt-2">Click on any patient card to see their details</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        
+              </CardContent>
+            </Card>
           </div>
 
           {/* Information Note */}
           <Card className="border-blue-200 bg-blue-50 mt-6">
             <CardContent className="p-4">
               <p className="text-sm text-blue-800">
-                💡 <strong>Quick Tip:</strong> Patients are assigned to you by the nursing staff during registration. 
-                If your queue looks empty, grab a coffee and check with the registration desk! ☕
+                💡 <strong>Quick Tip:</strong> Patients are assigned to you by the nursing staff
+                during registration. If your queue looks empty, grab a coffee and check with the
+                registration desk! ☕
               </p>
             </CardContent>
           </Card>
@@ -341,36 +417,38 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
                 {consultingPatients.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-gray-500">No active consultations</p>
-                    <p className="text-sm text-gray-400 mt-1">Patients in consultation will appear here</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Patients in consultation will appear here
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {consultingPatients.map((patient) => (
-                      <div key={patient.id} className="p-4 border rounded-lg bg-yellow-50 hover:bg-yellow-100 transition-colors">
+                    {consultingPatients.map((p) => (
+                      <div
+                        key={p.id}
+                        className="p-4 border rounded-lg bg-yellow-50 hover:bg-yellow-100 transition-colors"
+                      >
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <div className="font-medium text-lg">{patient.name}</div>
-                            <Badge className="bg-yellow-500 text-white">
-                              In Progress
-                            </Badge>
+                            <div className="font-medium text-lg">{p.name || p.full_name}</div>
+                            <Badge className="bg-yellow-500 text-white">In Progress</Badge>
                           </div>
                           <div className="text-sm text-gray-600">
-                            {getPatientAge(patient)} • {patient.sex}
+                            {ageFromDOB(p.dateOfBirth)} • {p.sex}
                           </div>
                           <div className="text-xs text-gray-500">
-                            <p><strong>ID:</strong> {patient.id}</p>
-                            <p><strong>Chief Complaint:</strong> {patient.chiefComplaint}</p>
+                            <p>
+                              <strong>Queue:</strong> {p.queue_number || p.id}
+                            </p>
                           </div>
-                          {patient.esiLevel && (
-                            <Badge className={ESI_COLORS[patient.esiLevel]}>
-                              ESI {patient.esiLevel}
-                            </Badge>
+                          {p.esiLevel && (
+                            <Badge className={ESI_COLORS[p.esiLevel]}>ESI {p.esiLevel}</Badge>
                           )}
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              setSelectedPatient(patient.id);
+                              setSelectedPatient(p.id);
                               setConsultationOpen(true);
                             }}
                             className="w-full mt-2"
@@ -399,30 +477,29 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
                 {completedPatients.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-gray-500">No completed consultations yet</p>
-                    <p className="text-sm text-gray-400 mt-1">They'll show up here once you're done</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      They'll show up here once you're done
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                    {completedPatients.map((patient) => (
-                      <div key={patient.id} className="p-3 border border-green-200 rounded-lg bg-green-50">
+                    {completedPatients.map((p) => (
+                      <div key={p.id} className="p-3 border border-green-200 rounded-lg bg-green-50">
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <div className="font-medium text-green-900">{patient.name}</div>
-                            <Badge className="bg-green-600 text-white text-xs">
-                              Done
-                            </Badge>
+                            <div className="font-medium text-green-900">{p.name || p.full_name}</div>
+                            <Badge className="bg-green-600 text-white text-xs">Done</Badge>
                           </div>
                           <div className="text-sm text-green-700">
-                            {getPatientAge(patient)} • {patient.sex}
+                            {ageFromDOB(p.dateOfBirth)} • {p.sex}
                           </div>
                           <div className="text-xs text-green-600 bg-white p-2 rounded border border-green-200">
-                            <p><strong>Diagnosis:</strong> {patient.diagnosis}</p>
-                            <p className="mt-1"><strong>Disposition:</strong> {patient.disposition}</p>
+                            <p>
+                              <strong>Disposition:</strong> {p.disposition}
+                            </p>
                           </div>
-                          {patient.esiLevel && (
-                            <Badge className={ESI_COLORS[patient.esiLevel]}>
-                              ESI {patient.esiLevel}
-                            </Badge>
+                          {p.esiLevel && (
+                            <Badge className={ESI_COLORS[p.esiLevel]}>ESI {p.esiLevel}</Badge>
                           )}
                         </div>
                       </div>
@@ -435,26 +512,33 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
         </TabsContent>
       </Tabs>
 
-      {/* Consultation Dialog - Landscape Container */}
+      {/* Consultation Dialog */}
       <Dialog open={consultationOpen} onOpenChange={setConsultationOpen}>
         <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto w-[95vw]">
           <DialogHeader>
             <DialogTitle className="text-xl">🩺 Patient Consultation</DialogTitle>
             <DialogDescription>
-              Complete the patient consultation by providing a diagnosis and determining the appropriate disposition for their care.
+              Complete the patient consultation by providing a diagnosis and determining the
+              appropriate disposition for their care.
             </DialogDescription>
           </DialogHeader>
+
           {selectedPatientData && (
             <div className="space-y-6">
               {/* Patient Summary */}
               <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <h3 className="text-lg font-medium text-blue-900">{selectedPatientData.name}</h3>
+                    <h3 className="text-lg font-medium text-blue-900">
+                      {selectedPatientData.name || selectedPatientData.full_name}
+                    </h3>
                     <p className="text-sm text-blue-700">
-                      {getPatientAge(selectedPatientData)} • {selectedPatientData.sex} • DOB: {selectedPatientData.dateOfBirth}
+                      {ageFromDOB(selectedPatientData.dateOfBirth)} • {selectedPatientData.sex} • DOB:{" "}
+                      {selectedPatientData.dateOfBirth || "—"}
                     </p>
-                    <p className="text-xs text-blue-600 font-mono">Patient ID: {selectedPatientData.id}</p>
+                    <p className="text-xs text-blue-600 font-mono">
+                      Patient ID: {selectedPatientData.id}
+                    </p>
                   </div>
                   {selectedPatientData.esiLevel && (
                     <Badge className={ESI_COLORS[selectedPatientData.esiLevel]}>
@@ -462,24 +546,24 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
                     </Badge>
                   )}
                 </div>
-                
-                <div className="bg-white p-3 rounded border border-blue-100">
-                  <span className="text-sm font-medium text-blue-900">Chief Complaint:</span>
-                  <p className="text-sm text-gray-700 mt-1">{selectedPatientData.chiefComplaint}</p>
-                </div>
-                
+
                 <div className="grid grid-cols-3 gap-4 mt-3 text-xs text-blue-700">
                   <div>
-                    <span className="font-medium">Arrival:</span><br />
-                    {selectedPatientData.arrivalTime.toLocaleString()}
+                    <span className="font-medium">Arrival:</span>
+                    <br />
+                    {selectedPatientData.arrivalTime
+                      ? selectedPatientData.arrivalTime.toLocaleString()
+                      : "—"}
                   </div>
                   <div>
-                    <span className="font-medium">Total Time:</span><br />
-                    {getTotalTime(selectedPatientData)} minutes
+                    <span className="font-medium">Total Time:</span>
+                    <br />
+                    {getTotalTimeOrFallback(selectedPatientData)} minutes
                   </div>
                   <div>
-                    <span className="font-medium">Consultation Start:</span><br />
-                    {consultationStartTime?.toLocaleTimeString() || 'Just started'}
+                    <span className="font-medium">Consultation Start:</span>
+                    <br />
+                    {consultationStartTime?.toLocaleTimeString() || "Just started"}
                   </div>
                 </div>
               </div>
@@ -487,7 +571,9 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
               {/* Consultation Form */}
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="diagnosis" className="text-base font-medium">Clinical Diagnosis *</Label>
+                  <Label htmlFor="diagnosis" className="text-base font-medium">
+                    Clinical Diagnosis *
+                  </Label>
                   <Textarea
                     id="diagnosis"
                     value={diagnosis}
@@ -496,11 +582,15 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
                     rows={4}
                     className="mt-2"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Include primary diagnosis and any relevant differential diagnoses</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Include primary diagnosis and any relevant differential diagnoses
+                  </p>
                 </div>
 
                 <div>
-                  <Label htmlFor="disposition" className="text-base font-medium">Patient Disposition *</Label>
+                  <Label htmlFor="disposition" className="text-base font-medium">
+                    Patient Disposition *
+                  </Label>
                   <Select value={disposition} onValueChange={setDisposition}>
                     <SelectTrigger className="mt-2">
                       <SelectValue placeholder="Select patient disposition..." />
@@ -518,22 +608,18 @@ export function DoctorInterface({ patients, onUpdatePatient, onMoveToStage, getT
 
               {/* Action Buttons */}
               <div className="flex gap-4 pt-4 border-t">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setConsultationOpen(false)}
-                  className="flex-1"
-                >
+                <Button variant="outline" onClick={() => setConsultationOpen(false)} className="flex-1">
                   💾 Save & Continue Later
                 </Button>
-                <Button 
-                  onClick={handleEndConsult}
+                <Button
+                  onClick={completeConsult}
                   disabled={!disposition || !diagnosis}
                   className="flex-1 bg-green-600 hover:bg-green-700"
                 >
                   ✅ Complete Consultation
                 </Button>
               </div>
-              
+
               {(!disposition || !diagnosis) && (
                 <p className="text-sm text-amber-600 text-center bg-amber-50 p-2 rounded">
                   ⚠️ Please complete both diagnosis and disposition to finish the consultation
