@@ -1,4 +1,5 @@
-import { useState } from "react";
+// frontend/src/components/ManagerInterface.jsx
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -7,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { AlertTriangle, Clock } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
 
+// Label map used in the Manager UI
 const STAGE_LABELS = {
   kiosk: 'At Kiosk',
   waiting_triage: 'Waiting for Triage',
@@ -28,12 +30,13 @@ const STAGE_LABELS = {
 
 const ESI_COLORS = {
   1: "bg-red-600 text-white",
-  2: "bg-orange-500 text-white", 
+  2: "bg-orange-500 text-white",
   3: "bg-yellow-500 text-black",
   4: "bg-green-500 text-white",
   5: "bg-blue-500 text-white"
 };
 
+// minutes threshold to flag
 const TIME_THRESHOLDS = {
   waiting_triage: 15,
   registration: 30,
@@ -46,72 +49,129 @@ const TIME_THRESHOLDS = {
   awaiting_departure: 30
 };
 
-export function ManagerInterface({ 
-  patients, 
-  onUpdatePatient, 
-  onMoveToStage, 
-  onRemovePatient, 
-  getTotalTime,
-  getStageTime 
-}) {
+// Small helper to safely Date-ify ISO/null
+const asDate = (iso) => (iso ? new Date(iso) : null);
+
+// Heuristic: try to derive a reasonable "stage start" from available columns
+function pickStageStart(p) {
+  const stage = p.currentStage;
+  // choose the most relevant timestamp available for that stage
+  switch (stage) {
+    case "triage":
+      return asDate(p.triageTime) || asDate(p.arrivalTime);
+    case "registration":
+      // you might add registration start if you later store it;
+      return asDate(p.triageTime) || asDate(p.arrivalTime);
+    case "waiting_doctor":
+      return asDate(p.roomTime) || asDate(p.triageTime) || asDate(p.arrivalTime);
+    case "consultation":
+      return asDate(p.providerStartTime) || asDate(p.roomTime) || asDate(p.triageTime) || asDate(p.arrivalTime);
+    case "waiting_observation":
+    case "waiting_admission":
+    case "waiting_discharge":
+      // after consult completes we don’t have a separate time column;
+      // use providerStartTime as the nearest pivot if available
+      return asDate(p.providerStartTime) || asDate(p.triageTime) || asDate(p.arrivalTime);
+    default:
+      return asDate(p.arrivalTime);
+  }
+}
+
+function minutesSince(date) {
+  if (!date) return 0;
+  return Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
+}
+
+export function ManagerInterface() {
+  const [boardPatients, setBoardPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
 
-  const activePatients = patients.filter(p => p.isActive && p.currentStage !== 'departed');
-  
-  const getPatientsByStage = (stage) => {
-    return activePatients.filter(p => p.currentStage === stage);
-  };
+  // Fetch from backend whiteboard, poll every 5s
+  useEffect(() => {
+    let dead = false;
 
-  const handleEndMonitoring = (patientId) => {
-    onMoveToStage(patientId, 'departed');
-    onUpdatePatient(patientId, { isActive: false });
-  };
+    async function load() {
+      try {
+        const res = await fetch("http://localhost:5000/api/whiteboard");
+        const data = res.ok ? await res.json() : [];
+        if (dead) return;
 
-  const getPatientAge = (patient) => {
-    if (patient.age) return `${patient.age}y`;
-    if (patient.dateOfBirth) {
-      const age = new Date().getFullYear() - new Date(patient.dateOfBirth).getFullYear();
-      return `${age}y`;
+        // Normalize date objects for FE computations
+        const normalized = (data || []).map((r) => ({
+          ...r,
+          arrivalTime: asDate(r.arrivalTime),
+          triageTime: asDate(r.triageTime),
+          roomTime: asDate(r.roomTime),
+          providerStartTime: asDate(r.providerStartTime),
+        }));
+
+        setBoardPatients(normalized);
+      } catch (e) {
+        console.error("❌ /api/whiteboard failed:", e);
+        if (!dead) setBoardPatients([]);
+      }
     }
-    return 'Unknown';
+
+    load();
+    const t = setInterval(load, 5000);
+    return () => {
+      dead = true;
+      clearInterval(t);
+    };
+  }, []);
+
+  // Derived helpers (pure FE)
+  const getTotalTime = (p) => minutesSince(p.arrivalTime);
+  const getStageTime = (p) => minutesSince(pickStageStart(p));
+
+  // “Active” = everything not departed
+  const activePatients = useMemo(
+    () => boardPatients.filter((p) => p.currentStage !== "departed"),
+    [boardPatients]
+  );
+
+  const getPatientsByStage = (stage) =>
+    activePatients.filter((p) => p.currentStage === stage);
+
+  const getPatientAge = (p) => {
+    if (p.age) return `${p.age}y`;
+    if (p.dateOfBirth) {
+      const dob = new Date(p.dateOfBirth);
+      let a = new Date().getFullYear() - dob.getFullYear();
+      const m = new Date().getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && new Date().getDate() < dob.getDate())) a--;
+      return `${a}y`;
+    }
+    return "Unknown";
   };
 
-  const isOverThreshold = (patient, stage) => {
-    const threshold = TIME_THRESHOLDS[stage];
+  const isOverThreshold = (p) => {
+    const threshold = TIME_THRESHOLDS[p.currentStage];
     if (!threshold) return false;
-    return getStageTime(patient, stage) > threshold;
+    return getStageTime(p) > threshold;
   };
 
-  const getStageAlerts = () => {
-    const alerts = [];
-    
-    // Time threshold alerts
-    activePatients.forEach(patient => {
-      const threshold = TIME_THRESHOLDS[patient.currentStage];
-      if (threshold && getStageTime(patient) > threshold) {
-        alerts.push({
-          type: 'time',
-          message: `${patient.name} has been in ${STAGE_LABELS[patient.currentStage]} for ${getStageTime(patient)} minutes (threshold: ${threshold}m)`,
-          patient: patient
+  // Alerts from current dataset
+  const alerts = useMemo(() => {
+    const out = [];
+    activePatients.forEach((p) => {
+      const t = TIME_THRESHOLDS[p.currentStage];
+      if (t && getStageTime(p) > t) {
+        out.push({
+          type: "time",
+          message: `${p.full_name || p.name || p.queue_number} has been in ${STAGE_LABELS[p.currentStage] || p.currentStage
+            } for ${getStageTime(p)} minutes (threshold: ${t}m)`,
+        });
+      }
+      if ((p.esiLevel === 1 || p.esiLevel === 2) && getTotalTime(p) > 30) {
+        out.push({
+          type: "priority",
+          message: `High priority ${p.full_name || p.name || p.queue_number} (ESI ${p.esiLevel}) has waited ${getTotalTime(p)} minutes`,
         });
       }
     });
-
-    // ESI 1-2 alerts
-    activePatients.forEach(patient => {
-      if ((patient.esiLevel === 1 || patient.esiLevel === 2) && getTotalTime(patient) > 30) {
-        alerts.push({
-          type: 'priority',
-          message: `High priority patient ${patient.name} (ESI ${patient.esiLevel}) has been waiting ${getTotalTime(patient)} minutes`,
-          patient: patient
-        });
-      }
-    });
-
-    return alerts;
-  };
-
-  const alerts = getStageAlerts();
+    return out;
+  }, [activePatients]);
 
   return (
     <div className="p-6 space-y-6">
@@ -131,10 +191,10 @@ export function ManagerInterface({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {alerts.map((alert, index) => (
-              <Alert key={index} className="border-orange-200">
+            {alerts.map((a, i) => (
+              <Alert key={i} className="border-orange-200">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>{alert.message}</AlertDescription>
+                <AlertDescription>{a.message}</AlertDescription>
               </Alert>
             ))}
           </CardContent>
@@ -148,13 +208,24 @@ export function ManagerInterface({
           <TabsTrigger value="stages">Stage Management</TabsTrigger>
         </TabsList>
 
+        {/* Overview – quick counts per stage */}
         <TabsContent value="overview" className="space-y-6">
-          {/* Stage Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {Object.entries(STAGE_LABELS).map(([stage, label]) => {
               const count = getPatientsByStage(stage).length;
-              if (count === 0 && !['waiting_triage', 'waiting_registration', 'waiting_doctor', 'waiting_admission', 'waiting_observation', 'waiting_discharge'].includes(stage)) return null;
-              
+              if (
+                count === 0 &&
+                ![
+                  "waiting_triage",
+                  "waiting_registration",
+                  "waiting_doctor",
+                  "waiting_admission",
+                  "waiting_observation",
+                  "waiting_discharge",
+                ].includes(stage)
+              )
+                return null;
+
               return (
                 <Card key={stage}>
                   <CardContent className="p-4 text-center">
@@ -166,39 +237,44 @@ export function ManagerInterface({
             })}
           </div>
 
-          {/* Recent Registrations */}
+          {/* Recently registered (simple example—uses whatever name is available) */}
           <Card>
             <CardHeader>
-              <CardTitle>Recently Registered Patients</CardTitle>
+              <CardTitle>Recently Active Patients</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {activePatients
-                  .filter(p => p.name)
-                  .slice(0, 10)
-                  .map((patient) => (
-                    <div key={patient.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <div className="font-medium">{patient.name}</div>
-                        <div className="text-sm text-gray-600">
-                          {getPatientAge(patient)} • {patient.sex} • {patient.chiefComplaint}
-                        </div>
+                {activePatients.slice(0, 10).map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+                  >
+                    <div>
+                      <div className="font-medium">
+                        {p.full_name || p.name || p.queue_number}
                       </div>
-                      <div className="flex items-center gap-2">
-                        {patient.esiLevel && (
-                          <Badge className={ESI_COLORS[patient.esiLevel]}>
-                            ESI {patient.esiLevel}
-                          </Badge>
-                        )}
-                        <Badge variant="outline">{STAGE_LABELS[patient.currentStage]}</Badge>
+                      <div className="text-sm text-gray-600">
+                        {getPatientAge(p)} • {p.sex || "—"}
                       </div>
                     </div>
-                  ))}
+                    <div className="flex items-center gap-2">
+                      {p.esiLevel && (
+                        <Badge className={ESI_COLORS[p.esiLevel]}>
+                          ESI {p.esiLevel}
+                        </Badge>
+                      )}
+                      <Badge variant="outline">
+                        {STAGE_LABELS[p.currentStage] || p.currentStage}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Whiteboard table */}
         <TabsContent value="whiteboard" className="space-y-6">
           <Card>
             <CardHeader>
@@ -218,52 +294,48 @@ export function ManagerInterface({
                     <TableHead>Stage of Care</TableHead>
                     <TableHead>Stage Time</TableHead>
                     <TableHead>Alerts</TableHead>
-                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {activePatients.map((patient) => (
-                    <TableRow key={patient.id}>
-                      <TableCell>{patient.arrivalTime.toLocaleTimeString()}</TableCell>
+                  {activePatients.map((p) => (
+                    <TableRow key={p.id} onClick={() => setSelectedPatient(p)}>
                       <TableCell>
-                        <Badge variant="outline">{getTotalTime(patient)}m</Badge>
+                        {p.arrivalTime ? p.arrivalTime.toLocaleTimeString() : "—"}
                       </TableCell>
-                      <TableCell className="font-medium">{patient.name || 'Not registered'}</TableCell>
-                      <TableCell>{getPatientAge(patient)}</TableCell>
-                      <TableCell>{patient.sex || '-'}</TableCell>
-                      <TableCell className="max-w-xs truncate">{patient.chiefComplaint || '-'}</TableCell>
-                      <TableCell className="max-w-xs truncate">{patient.diagnosis || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{getTotalTime(p)}m</Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {p.full_name || p.name || p.queue_number}
+                      </TableCell>
+                      <TableCell>{getPatientAge(p)}</TableCell>
+                      <TableCell>{p.sex || "-"}</TableCell>
+                      <TableCell className="max-w-xs truncate">{p.chiefComplaint ?? '-'}</TableCell>
+                      <TableCell className="max-w-xs truncate">{p.diagnosis ?? '-'}</TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          <Badge variant="outline">{STAGE_LABELS[patient.currentStage]}</Badge>
-                          {patient.esiLevel && (
-                            <Badge className={ESI_COLORS[patient.esiLevel]}>
-                              ESI {patient.esiLevel}
+                          <Badge variant="outline">
+                            {STAGE_LABELS[p.currentStage] || p.currentStage}
+                          </Badge>
+                          {p.esiLevel && (
+                            <Badge className={ESI_COLORS[p.esiLevel]}>
+                              ESI {p.esiLevel}
                             </Badge>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={isOverThreshold(patient, patient.currentStage) ? "destructive" : "outline"}>
-                          {getStageTime(patient)}m
+                        <Badge variant={isOverThreshold(p) ? "destructive" : "outline"}>
+                          {getStageTime(p)}m
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        {(patient.esiLevel === 1 || patient.esiLevel === 2) && getTotalTime(patient) > 30 && (
-                          <AlertTriangle className="h-4 w-4 text-red-500" />
-                        )}
-                        {isOverThreshold(patient, patient.currentStage) && (
+                      <TableCell className="flex gap-2">
+                        {(p.esiLevel === 1 || p.esiLevel === 2) &&
+                          getTotalTime(p) > 30 && (
+                            <AlertTriangle className="h-4 w-4 text-red-500" />
+                          )}
+                        {isOverThreshold(p) && (
                           <Clock className="h-4 w-4 text-orange-500" />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {patient.currentStage === 'awaiting_departure' && (
-                          <Button 
-                            size="sm" 
-                            onClick={() => handleEndMonitoring(patient.id)}
-                          >
-                            End Monitoring
-                          </Button>
                         )}
                       </TableCell>
                     </TableRow>
@@ -274,28 +346,31 @@ export function ManagerInterface({
           </Card>
         </TabsContent>
 
+        {/* Stage Management board */}
         <TabsContent value="stages" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Object.entries(STAGE_LABELS).map(([stage, label]) => {
-              const stagePatients = getPatientsByStage(stage);
-              if (stagePatients.length === 0) return null;
+              const list = getPatientsByStage(stage);
+              if (list.length === 0) return null;
 
               return (
                 <Card key={stage}>
                   <CardHeader>
                     <CardTitle className="text-lg">{label}</CardTitle>
-                    <Badge variant="outline">{stagePatients.length} patients</Badge>
+                    <Badge variant="outline">{list.length} patients</Badge>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    {stagePatients.map((patient) => (
-                      <div key={patient.id} className="p-2 bg-gray-50 rounded text-sm">
-                        <div className="font-medium">{patient.name || patient.id}</div>
-                        <div className="text-gray-600">
-                          {getStageTime(patient)}m in stage • {getTotalTime(patient)}m total
+                    {list.map((p) => (
+                      <div key={p.id} className="p-2 bg-gray-50 rounded text-sm">
+                        <div className="font-medium">
+                          {p.full_name || p.name || p.queue_number}
                         </div>
-                        {patient.esiLevel && (
-                          <Badge className={`${ESI_COLORS[patient.esiLevel]} text-xs`}>
-                            ESI {patient.esiLevel}
+                        <div className="text-gray-600">
+                          {getStageTime(p)}m in stage • {getTotalTime(p)}m total
+                        </div>
+                        {p.esiLevel && (
+                          <Badge className="mt-1" variant="outline">
+                            ESI {p.esiLevel}
                           </Badge>
                         )}
                       </div>

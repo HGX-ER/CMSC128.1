@@ -57,6 +57,7 @@ app.use("/api", require("./routes/board"));
 app.use("/api", require("./routes/patient"));
 const getDoctorRoutes = require("./routes/getdoctor");
 app.use("/api/getdoctor", getDoctorRoutes);
+app.use('/api', require('./routes/whiteboard'));
 
 /* ===== Error handler ===== */
 app.use((err, req, res, next) => {

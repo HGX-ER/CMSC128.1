@@ -1,7 +1,7 @@
 // backend/routes/doctors.js
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const db = require("../db");
+const db = require('../db');
 
 // ---------- helpers ----------
 const toDoctor = (r) => ({
@@ -24,76 +24,139 @@ const toEncounter = (r) => ({
     esiLevel: r.priority_esi ?? null,
     assignedDoctor: r.assigned_doctor || null,
     assignedNurse: r.assigned_nurse || null,
-    arrivalTime: r.arrival_time ? new Date(r.arrival_time).toISOString() : null,
-    triageTime: r.triage_time ? new Date(r.triage_time).toISOString() : null,
+    arrivalTime: r.arrival_time || null,
+    triageTime: r.triage_time || null,
     disposition: r.disposition || null,
+    diagnosis: r.diagnosis || null,
 });
 
-// ---------- GET all doctors ----------
-router.get("/doctors", async (_req, res) => {
+// Map UI disposition -> next encounter.status
+const NEXT_STAGE_BY_DISPOSITION = {
+    'Discharge': 'discharge_documents',
+    'Observation': 'waiting_observation',
+    'Admission Non-ICU': 'awaiting_non_icu',
+    'Admission ICU': 'awaiting_icu',
+};
+
+// ---------- DOCTOR LIST ----------
+router.get('/doctors', async (_req, res) => {
     try {
         const [rows] = await db.query(
             `SELECT username, full_name, specialty, room, floor
              FROM users
-             WHERE role='doctor'
+             WHERE role = 'doctor'
              ORDER BY COALESCE(full_name, username)`
         );
         res.json(rows.map(toDoctor));
     } catch (e) {
-        console.error("GET /doctors error:", e);
-        res.status(500).json({ error: "Failed to load doctors" });
+        console.error('GET /doctors error:', e);
+        res.status(500).json({ error: 'Failed to load doctors' });
     }
 });
 
-// ---------- GET one doctor profile ----------
-router.get("/doctor/:username", async (req, res) => {
+// ---------- MANAGER LIST (optional nice-to-have) ----------
+router.get('/managers', async (_req, res) => {
     try {
         const [rows] = await db.query(
             `SELECT username, full_name, specialty, room, floor
-             FROM users
-             WHERE role='doctor' AND username = ?
-                 LIMIT 1`,
-            [req.params.username]
+       FROM users
+       WHERE role = 'ed_manager'
+       ORDER BY COALESCE(full_name, username)`
         );
-        if (!rows.length) return res.status(404).json({ error: "Doctor not found" });
-        res.json(toDoctor(rows[0]));
+        res.json(rows.map(toDoctor));
     } catch (e) {
-        console.error("GET /doctor/:username error:", e);
-        res.status(500).json({ error: "Failed to load doctor" });
+        console.error('GET /managers error:', e);
+        res.status(500).json({ error: 'Failed to load managers' });
     }
 });
 
-// ---------- GET patients assigned to a doctor ----------
-router.get("/doctor/:username/patients", async (req, res) => {
+// ---------- USER PROFILE for doctors AND managers ----------
+// Keeps your existing frontend call `/api/doctor/manager1` working.
+router.get('/doctor/:username', async (req, res) => {
     try {
+        const { username } = req.params;
         const [rows] = await db.query(
-            `
-                SELECT e.id AS encounter_id, e.queue_number, e.status, e.priority_esi,
-                       e.assigned_doctor, e.assigned_nurse, e.arrival_time, e.triage_time,
-                       e.disposition,
-                       p.id AS patient_id, p.full_name, p.dob, p.sex
-                FROM encounters e
-                         JOIN patients p ON p.id = e.patient_id
-                WHERE e.assigned_doctor = ?
-                  AND e.status <> 'departed'
-                ORDER BY
-                    CASE e.status WHEN 'waiting_doctor' THEN 0 WHEN 'consultation' THEN 1 ELSE 2 END,
-                    COALESCE(e.priority_esi, 99),
-                    e.arrival_time ASC
-            `,
-            [req.params.username]
+            `SELECT username, role, full_name, specialty, room, floor
+             FROM users
+             WHERE username = ?
+               AND role IN ('doctor','ed_manager')
+                 LIMIT 1`,
+            [username]
+        );
+        if (!rows.length) return res.status(404).json({ error: 'User not found' });
+        res.json(toDoctor(rows[0]));
+    } catch (e) {
+        console.error('GET /doctor/:username error:', e);
+        res.status(500).json({ error: 'Failed to load profile' });
+    }
+});
+
+// ---------- Clean alias specifically for managers (optional) ----------
+router.get('/manager/:username', async (req, res) => {
+    try {
+        const { username } = req.params;
+        const [rows] = await db.query(
+            `SELECT username, role, full_name, specialty, room, floor
+       FROM users
+       WHERE username = ?
+         AND role = 'ed_manager'
+       LIMIT 1`,
+            [username]
+        );
+        if (!rows.length) return res.status(404).json({ error: 'Manager not found' });
+        res.json(toDoctor(rows[0]));
+    } catch (e) {
+        console.error('GET /manager/:username error:', e);
+        res.status(500).json({ error: 'Failed to load manager' });
+    }
+});
+
+// ---------- Patients assigned to a doctor ----------
+router.get('/doctor/:username/patients', async (req, res) => {
+    try {
+        const { username } = req.params;
+        const [rows] = await db.query(
+            `SELECT
+         e.id AS encounter_id,
+         e.queue_number,
+         e.status,
+         e.priority_esi,
+         e.assigned_doctor,
+         e.assigned_nurse,
+         e.arrival_time,
+         e.triage_time,
+         e.provider_start_time,
+         e.diagnosis,
+         e.disposition,
+         p.id AS patient_id,
+         p.full_name,
+         p.dob,
+         p.sex
+       FROM encounters e
+       JOIN patients p ON p.id = e.patient_id
+       WHERE e.assigned_doctor = ?
+         AND e.status <> 'departed'
+       ORDER BY
+         CASE e.status
+           WHEN 'waiting_doctor' THEN 0
+           WHEN 'consultation' THEN 1
+           ELSE 2
+         END,
+         COALESCE(e.priority_esi, 99),
+         e.arrival_time ASC`,
+            [username]
         );
         res.json(rows.map(toEncounter));
     } catch (e) {
-        console.error("GET /doctor/:username/patients error:", e);
-        res.status(500).json({ error: "Failed to load doctor patients" });
+        console.error('GET /doctor/:username/patients error:', e);
+        res.status(500).json({ error: 'Failed to load doctor patients' });
     }
 });
 
-// ---------- start a consultation ----------
-router.post("/doctor/encounters/:id/start", async (req, res) => {
+// ---------- Start consultation ----------
+router.post('/doctor/encounters/:id/start', async (req, res) => {
     const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: "Invalid encounter id" });
+    if (!id) return res.status(400).json({ error: 'Invalid encounter id' });
 
     const conn = await db.getConnection();
     try {
@@ -101,66 +164,80 @@ router.post("/doctor/encounters/:id/start", async (req, res) => {
 
         await conn.query(
             `UPDATE encounters
-             SET status='consultation', provider_start_time=NOW()
-             WHERE id=?`,
+         SET status = 'consultation',
+             provider_start_time = IFNULL(provider_start_time, NOW()),
+             updated_at = NOW()
+       WHERE id = ?`,
             [id]
         );
 
         await conn.query(
             `INSERT INTO encounter_events (encounter_id, type, at, payload)
-             VALUES (?, 'provider_started', NOW(), NULL)`,
+       VALUES (?, 'provider_started', NOW(), NULL)`,
             [id]
         );
 
         await conn.commit();
-        res.json({ success: true });
+        res.json({ ok: true });
     } catch (e) {
         await conn.rollback();
-        console.error("POST /doctor/encounters/:id/start error:", e);
-        res.status(500).json({ error: "Failed to start consultation" });
+        console.error('POST /doctor/encounters/:id/start error:', e);
+        res.status(500).json({ error: 'Failed to start consultation' });
     } finally {
         conn.release();
     }
 });
 
-// ---------- complete a consultation ----------
-router.patch("/doctor/encounters/:id/complete", async (req, res) => {
+// ---------- Complete consultation ----------
+router.patch('/doctor/encounters/:id/complete', async (req, res) => {
     const id = Number(req.params.id);
     const { diagnosis, disposition } = req.body || {};
-    if (!id) return res.status(400).json({ error: "Invalid encounter id" });
+    if (!id) return res.status(400).json({ error: 'Invalid encounter id' });
     if (!diagnosis || !disposition) {
-        return res.status(400).json({ error: "diagnosis and disposition are required" });
+        return res.status(400).json({ error: 'diagnosis and disposition are required' });
     }
 
-    const nextMap = {
-        "Discharge": "dispositioned",
-        "Observation": "waiting_observation",
-        "Admission Non-ICU": "waiting_admission",
-        "Admission ICU": "waiting_admission",
+    const NEXT_STAGE_BY_DISPOSITION = {
+        'Discharge': 'discharge_documents',
+        'Observation': 'waiting_observation',
+        'Admission Non-ICU': 'awaiting_non_icu',
+        'Admission ICU': 'awaiting_icu',
     };
-    const next = nextMap[disposition] || "dispositioned";
+
+    const nextStatus = NEXT_STAGE_BY_DISPOSITION[disposition];
+    if (!nextStatus) {
+        return res.status(400).json({ error: `Unknown disposition: ${disposition}` });
+    }
 
     const conn = await db.getConnection();
     try {
         await conn.beginTransaction();
 
-        await conn.query(
-            `UPDATE encounters SET status=?, disposition=? WHERE id=?`,
-            [next, disposition, id]
+        // Save status + diagnosis + disposition
+        const [r] = await conn.query(
+            `UPDATE encounters
+         SET status = ?, diagnosis = ?, disposition = ?, updated_at = NOW()
+       WHERE id = ?`,
+            [nextStatus, diagnosis, disposition, id]
         );
+        if (!r.affectedRows) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Encounter not found' });
+        }
 
+        // Log event
         await conn.query(
             `INSERT INTO encounter_events (encounter_id, type, at, payload)
-             VALUES (?, 'dispositioned', NOW(), JSON_OBJECT('diagnosis', ?, 'disposition', ?))`,
-            [id, diagnosis, disposition]
+             VALUES (?, 'dispositioned', NOW(), JSON_OBJECT('nextStatus', ?, 'diagnosis', ?, 'disposition', ?))`,
+            [id, nextStatus, diagnosis, disposition]
         );
 
         await conn.commit();
-        res.json({ success: true, nextStatus: next });
+        res.json({ ok: true, nextStatus });
     } catch (e) {
         await conn.rollback();
-        console.error("PATCH /doctor/encounters/:id/complete error:", e);
-        res.status(500).json({ error: "Failed to complete consultation" });
+        console.error('PATCH /doctor/encounters/:id/complete error:', e);
+        res.status(500).json({ error: e.sqlMessage || e.message || 'Server error' });
     } finally {
         conn.release();
     }
