@@ -297,6 +297,8 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
                                   sex: patient.sex || '',
                                   chiefComplaint: patient.chiefComplaint || ''
                                 }));
+                                // 🔹 Automatically switch to the registration tab
+                                document.querySelector('[value="patient-registration"]')?.click();
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

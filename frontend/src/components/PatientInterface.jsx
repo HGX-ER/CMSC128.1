@@ -21,8 +21,12 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   const [realtimeComments, setRealtimeComments] = useState([]);
   const [patientComment, setPatientComment] = useState('');
   const [submittedComments, setSubmittedComments] = useState([]);
+  const [backendPatientData, setBackendPatientData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   
-  const patient = patients.find(p => p.id === currentPatientId);
+  // Try to get patient from backend first, fallback to local state
+  const patient = backendPatientData || patients.find(p => p.id === currentPatientId);
 
   // Staff profile pictures and information
   const staffProfiles = {
@@ -76,6 +80,88 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     }
   };
   
+  // Fetch patient data from backend
+  useEffect(() => {
+    const fetchPatientStatus = async () => {
+      if (!currentPatientId) return;
+      
+      try {
+        const response = await fetch(`/api/patient/status/${currentPatientId}`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError('Queue number not found in the system');
+            setIsLoading(false);
+            return;
+          }
+          throw new Error('Failed to fetch patient status');
+        }
+        
+        const data = await response.json();
+        
+        // Map backend status to frontend currentStage
+        const statusToStageMap = {
+          'arrived': 'kiosk',
+          'waiting_for_triage': 'waiting_triage',
+          'in_triage': 'triage',
+          'waiting_for_registration': 'waiting_registration',
+          'in_registration': 'registration',
+          'waiting_for_provider': 'waiting_doctor',
+          'with_provider': 'consultation',
+          'waiting_for_admission': 'waiting_admission',
+          'waiting_for_observation': 'waiting_observation',
+          'waiting_for_discharge': 'waiting_discharge',
+          'admission_in_progress': 'admission_orders',
+          'awaiting_bed': 'awaiting_non_icu',
+          'awaiting_icu_bed': 'awaiting_icu',
+          'discharge_in_progress': 'discharge_documents',
+          'ready_to_depart': 'awaiting_departure',
+          'departed': 'departed'
+        };
+        
+        // Transform backend data to match frontend format
+        const transformedPatient = {
+          id: data.queue_number,
+          name: data.patient.full_name,
+          queueNumber: data.queue_number,
+          esiLevel: data.timestamps?.triaged ? parseInt(data.priority_esi) : null,
+          currentStage: statusToStageMap[data.status] || data.status,
+          arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
+          isActive: data.status !== 'departed',
+          stageHistory: data.events?.map(event => ({
+            stage: statusToStageMap[event.type] || event.type,
+            startTime: new Date(event.at),
+            endTime: null,
+            payload: event.payload
+          })) || [],
+          // Additional fields from backend
+          chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
+          assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
+          assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
+          sex: data.patient.sex,
+          dob: data.patient.dob
+        };
+        
+        setBackendPatientData(transformedPatient);
+        setError(null);
+        setIsLoading(false);
+      } catch (err) {
+        console.error('Error fetching patient status:', err);
+        // Fallback to local state if backend fails
+        setError('Using offline data - updates may be delayed');
+        setIsLoading(false);
+      }
+    };
+
+    // Initial fetch
+    fetchPatientStatus();
+
+    // Poll every 5 seconds for updates
+    const pollInterval = setInterval(fetchPatientStatus, 5000);
+
+    return () => clearInterval(pollInterval);
+  }, [currentPatientId]);
+
   // Update timer every minute
   useEffect(() => {
     const timer = setInterval(() => {
@@ -208,14 +294,42 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     }
   };
   
+  if (isLoading && !patient) {
+    return (
+      <div className="min-h-screen bg-blue-50 p-4 flex items-center justify-center">
+        <Card className="w-full max-w-md shadow-lg">
+          <CardContent className="p-8 text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+            <h3 className="text-lg font-medium mb-2">Loading your visit information...</h3>
+            <p className="text-gray-600">Connecting to the Emergency Department system...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error && !patient) {
+    return (
+      <div className="min-h-screen bg-blue-50 p-4 flex items-center justify-center">
+        <Card className="w-full max-w-md shadow-lg border-l-4 border-l-red-500">
+          <CardContent className="p-8 text-center">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Activity className="w-6 h-6 text-red-600" />
+            </div>
+            <h3 className="text-lg font-medium mb-2 text-red-800">Unable to Load Visit Information</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <p className="text-sm text-gray-500">
+              Please check with the registration desk or try logging in again.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!patient) {
     return (
-      <div
-        className="min-h-screen p-4 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: "url('https://xmple.com/wallpaper/white-gradient-blue-linear-3840x2160-c2-add8e6-ffffff-a-285-f-14.svg')"
-        }}
-      >
+      <div className="min-h-screen bg-blue-50 p-4 flex items-center justify-center">
         <Card className="w-full max-w-md shadow-lg">
           <CardContent className="p-8 text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
@@ -314,12 +428,27 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   const StageIcon = getStageIcon(patient.currentStage);
 
   return (
-    <div className="min-h-screen bg-[#47a1bd1a] p-4">
+    <div className="min-h-screen bg-blue-50 p-4">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4">Emergency Department</h1>
+          <h1 className="text-4xl mb-2">Emergency Department</h1>
           <p className="text-xl text-gray-600">Visit Tracker - {patient.name || 'Patient'}</p>
+          
+          {/* Connection Status Indicator */}
+          <div className="flex items-center justify-center gap-2 mt-2">
+            {backendPatientData ? (
+              <>
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-green-600">Live updates from ED system</span>
+              </>
+            ) : (
+              <>
+                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                <span className="text-xs text-yellow-600">Offline mode - updates may be delayed</span>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Main Status Card */}
@@ -388,24 +517,78 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
                   </div>
                 )}
 
-                {/* Comment Input */}
-                <div className="space-y-2 pt-3 border-t border-green-300">
-                  <p className="text-xs text-green-700">Have questions or concerns about this stage? Let us know:</p>
-                  <div className="flex gap-2">
-                    <Textarea
-                      value={patientComment}
-                      onChange={(e) => setPatientComment(e.target.value)}
-                      placeholder="Type your comment or question here..."
-                      className="flex-1 min-h-[60px] text-sm"
-                    />
-                    <Button
-                      onClick={handleSubmitComment}
-                      disabled={!patientComment.trim()}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 self-end"
-                    >
-                      <Send className="w-4 h-4" />
-                    </Button>
+                {/* Satisfaction Survey */}
+                <div className="mt-4 p-4 border border-green-300 rounded-xl bg-white shadow-sm">
+                  <p className="text-center text-green-800 font-semibold mb-4">
+                    Please rate your satisfaction during the{" "}
+                    <span className="underline">{getStageDisplayName(patient.currentStage)}</span> phase.
+                  </p>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-sm text-green-800">
+                      <thead>
+                        <tr>
+                          <th className="text-left py-2 px-3">Parameters</th>
+                          {["Very Satisfied", "Satisfied", "Neutral", "Dissatisfied", "Very Dissatisfied"].map(
+                            (label) => (
+                              <th key={label} className="text-center py-2 px-3 font-medium">
+                                {label}
+                              </th>
+                            )
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          "Staff communication during this phase",
+                          "Comfort while waiting or being attended to",
+                          "Timeliness of service",
+                          "Clarity of explanations or instructions",
+                          "Overall experience in this phase",
+                        ].map((question, index) => (
+                          <tr
+                            key={index}
+                            className="border-t border-green-200 hover:bg-green-50 transition"
+                          >
+                            <td className="py-2 px-3">{question}</td>
+                            {["Very Satisfied", "Satisfied", "Neutral", "Dissatisfied", "Very Dissatisfied"].map(
+                              (option) => (
+                                <td key={option} className="text-center py-2">
+                                  <input
+                                    type="radio"
+                                    name={`question-${index}`}
+                                    value={option}
+                                    className="accent-green-600 cursor-pointer w-4 h-4"
+                                  />
+                                </td>
+                              )
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="mt-8 space-y-2 pt-4">
+                    <p className="text-sm font-bold text-green-800">
+                      Additional Comments or Concerns (Optional):
+                    </p>
+                    <div className="flex gap-2">
+                      <Textarea
+                        value={patientComment}
+                        onChange={(e) => setPatientComment(e.target.value)}
+                        placeholder="Type your feedback here..."
+                        className="flex-1 min-h-[80px] text-sm"
+                      />
+                      <Button
+                        onClick={handleSubmitComment}
+                        disabled={!patientComment.trim()}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 self-end"
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -551,84 +734,57 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
           )}
         </div>
 
+        {/* Entertainment and Information Tabs */}
         <Tabs defaultValue="tips" className="w-full">
-          {/* Horizontal tab bar */}
-          <TabsList className="flex w-full overflow-x-auto gap-1 rounded-lg bg-muted p-1 shadow-sm">
-            
-            <TabsTrigger
-              value="tips"
-              className="
-                flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap
-                data-[state=active]:bg-white data-[state=active]:text-[#47a1bd]
-                hover:bg-[#47a1bd] hover:text-white cursor-pointer transition-colors duration-200 rounded-md py-2 hover:shadow-md
-              "
-            >
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="tips" className="flex items-center gap-1 text-xs">
               <Lightbulb className="w-3 h-3" />
-              <span className="hidden sm:inline">Daily Health</span>
+              <span className="hidden sm:inline">Health Tips</span>
               <span className="sm:hidden">Tips</span>
             </TabsTrigger>
-
-            <TabsTrigger
-              value="news"
-              className="
-                flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap
-                data-[state=active]:bg-white data-[state=active]:text-[#47a1bd]
-                hover:bg-[#47a1bd] hover:text-white cursor-pointer transition-colors duration-200 rounded-md py-2 hover:shadow-md
-              "
-            >
-              <Bell className="w-3 h-3" />
-              <span className="hidden sm:inline">Hospital News &</span>
-              <span className="sm:hidden">Updates</span>
+            <TabsTrigger value="news" className="flex items-center gap-1 text-xs">
+              <Newspaper className="w-3 h-3" />
+              <span className="hidden sm:inline">News</span>
+              <span className="sm:hidden">News</span>
             </TabsTrigger>
-
-            <TabsTrigger
-              value="trivia"
-              className="
-                flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap
-                data-[state=active]:bg-white data-[state=active]:text-[#47a1bd]
-                hover:bg-[#47a1bd] hover:text-white cursor-pointer transition-colors duration-200 rounded-md py-2 hover:shadow-md
-              "
-            >
+            <TabsTrigger value="trivia" className="flex items-center gap-1 text-xs">
               <Brain className="w-3 h-3" />
-              <span className="hidden sm:inline">Medical Knowledge</span>
-              <span className="sm:hidden">Trivia</span>
+              <span className="hidden sm:inline">Trivia</span>
+              <span className="sm:hidden">Quiz</span>
             </TabsTrigger>
-
-            <TabsTrigger
-              value="relax"
-              className="
-                flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap
-                data-[state=active]:bg-white data-[state=active]:text-[#47a1bd]
-                hover:bg-[#47a1bd] hover:text-white cursor-pointer transition-colors duration-200 rounded-md py-2 hover:shadow-md
-              "
-            >
+            <TabsTrigger value="relax" className="flex items-center gap-1 text-xs">
               <Wind className="w-3 h-3" />
-              <span className="hidden sm:inline">Relaxation</span>
-              <span className="sm:hidden">Exercises</span>
+              <span className="hidden sm:inline">Relax</span>
+              <span className="sm:hidden">Calm</span>
             </TabsTrigger>
-
-            <TabsTrigger
-              value="services"
-              className="
-                flex items-center justify-center gap-1 text-xs flex-1 whitespace-nowrap
-                data-[state=active]:bg-white data-[state=active]:text-[#47a1bd]
-                hover:bg-[#47a1bd] hover:text-white cursor-pointer transition-colors duration-200 rounded-md py-2 hover:shadow-md
-              "
-            >
-              <Lightbulb className="w-3 h-3" />
-              <span className="hidden sm:inline">Hospital Services &</span>
-              <span className="sm:hidden">Amenities</span>
+            <TabsTrigger value="services" className="flex items-center gap-1 text-xs">
+              <Building className="w-3 h-3" />
+              <span className="hidden sm:inline">Services</span>
+              <span className="sm:hidden">Info</span>
             </TabsTrigger>
-
           </TabsList>
 
-          {/* Tab contents */}
-          <TabsContent value="tips"><HealthTips /></TabsContent>
-          <TabsContent value="news"><HospitalAnnouncements /></TabsContent>
-          <TabsContent value="trivia"><MedicalTrivia /></TabsContent>
-          <TabsContent value="relax"><RelaxationExercises /></TabsContent>
-          <TabsContent value="announcements"><HospitalAnnouncements /></TabsContent>
-          <TabsContent value="services"><HospitalServices /></TabsContent>
+          <div className="mt-6">
+            <TabsContent value="tips" className="mt-0">
+              <HealthTips />
+            </TabsContent>
+
+            <TabsContent value="news" className="mt-0">
+              <HospitalAnnouncements />
+            </TabsContent>
+
+            <TabsContent value="trivia" className="mt-0">
+              <MedicalTrivia />
+            </TabsContent>
+
+            <TabsContent value="relax" className="mt-0">
+              <RelaxationExercises />
+            </TabsContent>
+
+            <TabsContent value="services" className="mt-0">
+              <HospitalServices />
+            </TabsContent>
+          </div>
         </Tabs>
 
         {/* Important Information */}

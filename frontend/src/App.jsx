@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePatientManagement } from './hooks/usePatientManagement';
 import { useAuth } from './hooks/useAuth';
 import { LoginInterface } from './components/LoginInterface';
@@ -70,6 +70,20 @@ export default function App() {
   const patientManagement = usePatientManagement();
   const auth = useAuth();
 
+  // Reset currentRole when user logs out or user changes
+  useEffect(() => {
+    if (!auth.isAuthenticated) {
+      setCurrentRole(null);
+    }
+  }, [auth.isAuthenticated]);
+
+  // Reset currentRole when a different user logs in
+  useEffect(() => {
+    if (auth.user) {
+      setCurrentRole(null);
+    }
+  }, [auth.user?.username, auth.user?.role]);
+
   // Show login screen if not authenticated
   if (!auth.isAuthenticated) {
     return (
@@ -108,9 +122,9 @@ export default function App() {
         {/* Header */}
         <div className="bg-white shadow-sm border-b">
           <div className="flex items-center justify-between px-6 py-4">
-            <div className="flex items-center gap-2" style={{ color: "#004f61" }}>
-              <User className="h-5 w-5" />
-              <h2 className="text-xl font-bold">Patient Portal</h2>
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5 text-blue-600" />
+              <h2 className="text-xl font-semibold">Patient Portal</h2>
             </div>
             
             <div className="flex items-center gap-4">
@@ -145,7 +159,7 @@ export default function App() {
   if (auth.user?.role === 'patient' && availableRoles.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md sm:max-w-lg md:max-w-xl shadow-lg">
+        <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <User className="h-16 w-16 mx-auto text-gray-400 mb-4" />
             <h2 className="text-xl font-semibold mb-2">Patient Access</h2>
@@ -320,13 +334,15 @@ export default function App() {
       <div className="bg-white shadow-sm border-b">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentRole(null)}
-              className="text-sm"
-            >
-              ← Back
-            </Button>
+            {currentRole !== 'doctor' && (
+              <Button
+                variant="outline"
+                onClick={() => setCurrentRole(null)}
+                className="text-sm"
+              >
+                ← Back
+              </Button>
+            )}
             <div className="flex items-center gap-2">
               {(() => {
                 const config = ROLE_CONFIGS[currentRole];
@@ -342,6 +358,9 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-4">
+            <Badge variant="outline" className="px-3 py-1">
+              {auth.user?.name} ({auth.user?.role.replace('_', ' ')})
+            </Badge>
             <Badge variant="outline" className="px-3 py-1">
               Active Patients: {patientManagement.patients.filter(p => p.isActive).length}
             </Badge>

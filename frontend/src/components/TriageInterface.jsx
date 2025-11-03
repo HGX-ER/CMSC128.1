@@ -51,13 +51,6 @@ export function TriageInterface({ onBack }) {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <Button variant="outline" onClick={onBack}>
-            ← Back
-          </Button>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <FaUserInjured className="text-blue-600" />
-            Triage Station
-          </h1>
           <div />
         </div>
 
