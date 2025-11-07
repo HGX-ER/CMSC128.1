@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { useState } from "react";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -21,9 +20,10 @@ import {
   AlertCircle,
   Hash,
   Stethoscope,
-  Camera,
-  X,
   Hospital,
+  Ticket,
+  Printer,
+  CheckCircle,
 } from "lucide-react";
 
 const ROLE_INFO = {
@@ -61,32 +61,8 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("patient");
-  const [showScanner, setShowScanner] = useState(false);
-
-  const qrRegionId = "qr-reader";
-
-  useEffect(() => {
-    let html5QrCode;
-    if (showScanner) {
-      html5QrCode = new Html5Qrcode(qrRegionId);
-      html5QrCode
-        .start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          (decodedText) => {
-            console.log("Scanned:", decodedText);
-            setQueueNumber(decodedText.trim());
-            setShowScanner(false);
-            html5QrCode.stop();
-          },
-          (errorMsg) => {}
-        )
-        .catch((err) => console.error("QR start failed:", err));
-    }
-    return () => {
-      if (html5QrCode) html5QrCode.stop().catch(() => {});
-    };
-  }, [showScanner]);
+  const [generatedQueueNumber, setGeneratedQueueNumber] = useState("");
+  const [showGenerator, setShowGenerator] = useState(false);
 
   const handleStaffSubmit = async (e) => {
     e.preventDefault();
@@ -116,28 +92,101 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
     }
   };
 
-  const handleCloseScanner = () => setShowScanner(false);
+  const generateQueueNumber = () => {
+    const today = new Date();
+    const year = today.getFullYear().toString().slice(-2);
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const random = Math.floor(Math.random() * 9000) + 1000;
+    const queueNum = `ED${year}${month}${day}-${random}`; // Fixed template literal
+    setGeneratedQueueNumber(queueNum);
+    setShowGenerator(true);
+  };
+
+  const handlePrintQueueNumber = () => {
+    const printWindow = window.open('', '', 'width=400,height=600');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>ED Queue Number</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              padding: 20px;
+              text-align: center;
+            }
+            .header {
+              color: #004f61;
+              margin-bottom: 20px;
+            }
+            .queue-number {
+              font-size: 32px;
+              font-weight: bold;
+              color: #47a1bd;
+              padding: 20px;
+              border: 3px solid #96cfe0;
+              border-radius: 10px;
+              margin: 20px 0;
+              letter-spacing: 2px;
+            }
+            .info {
+              color: #666;
+              margin-top: 20px;
+              line-height: 1.6;
+            }
+            .footer {
+              margin-top: 30px;
+              color: #999;
+              font-size: 12px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1><b> ED Sats </b></h1>
+            <h2>Queue Number</h2>
+          </div>
+          <div class="queue-number">${generatedQueueNumber}</div>
+          <div class="info">
+            <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            <p><strong>Time:</strong> ${new Date().toLocaleTimeString()}</p>
+            <p>Please keep this number safe.</p>
+            <p>You will need it to check your visit status.</p>
+          </div>
+          <div class="footer">
+            <p> (Emergency Department Real-Time Patient Tracking and Satisfaction Monitoring System) </p>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const handleUseGeneratedNumber = () => {
+    setQueueNumber(generatedQueueNumber);
+    setShowGenerator(false);
+  };
 
   return (
     <div
       className="min-h-screen bg-cover bg-center flex items-center justify-center p-4"
       style={{
-        backgroundImage:
-          "url('https://xmple.com/wallpaper/white-gradient-blue-linear-3840x2160-c2-add8e6-ffffff-a-285-f-14.svg')",
+        backgroundImage: "url('https://xmple.com/wallpaper/white-gradient-blue-linear-3840x2160-c2-add8e6-ffffff-a-285-f-14.svg')" // Fixed URL
       }}
     >
       <div className="w-full max-w-md space-y-6">
         <Card className="shadow-lg">
-          <CardHeader className="text-center flex flex-col items-center gap-">
+          <CardHeader className="text-center flex flex-col items-center">
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
               style={{ backgroundColor: "#96cfe0" }}
             >
               <Hospital className="w-8 h-8 text-white" />
             </div>
-            <CardTitle className="text-4xl font-bold" style={{ color: "#004f61" }}>ERIS</CardTitle>
+            <CardTitle className="text-4xl font-bold" style={{ color: "#004f61" }}>ED Sats</CardTitle>
             <p className="text-lg mt-0">
-              Emergency Response Information System
+              Emergency Department Real-Time Patient Tracking and Satisfaction Monitoring System 
             </p>
           </CardHeader>
 
@@ -260,61 +309,106 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                     </span>
                   </div>
                   <p className="text-sm" style={{ color: "#004f61" }}>
-                    You can scan your QR code or type your queue number manually
-                    to access your visit status.
+                    Generate a new queue number for your ED visit, or enter your existing number to check your status.
                   </p>
                 </div>
 
-                {/* QR Scanner */}
-                {showScanner ? (
-                  <div
-                    className="p-4 border-2 rounded-lg bg-white shadow-lg"
-                    style={{ borderColor: "#96cfe0" }}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <h4
-                        className="font-medium"
-                        style={{ color: "#004f61" }}
-                      >
-                        Scan Your QR Code
-                      </h4>
+                {/* Queue Number Generator */}
+                {!showGenerator ? (
+                  <div className="space-y-3">
+                    <div className="text-center">
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleCloseScanner}
-                        className="h-8 w-8 p-0"
+                        onClick={generateQueueNumber}
+                        className="w-full"
+                        style={{
+                          backgroundColor: "#4CAF50",
+                          color: "white",
+                        }}
                       >
-                        <X className="h-4 w-4" />
+                        <Ticket className="w-4 h-4 mr-2" />
+                        Generate Queue Number
                       </Button>
                     </div>
-
-                    <div
-                      id={qrRegionId}
-                      className="w-full aspect-square max-w-sm mx-auto rounded-lg border-2 border-[#96cfe0]"
-                    />
-                    <p className="text-center text-sm text-gray-600 mt-3">
-                      Position the QR code within the frame
-                    </p>
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-s uppercase">
+                        <span className="bg-white px-2 text-gray-500">
+                          Or enter queue number 
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 ) : (
-                  <Button
-                    type="button"
-                    onClick={() => setShowScanner(true)}
-                    className="w-full"
-                    style={{
-                      backgroundColor: "#47a1bdff",
-                      hover: { backgroundColor: "#7ec2d7" },
-                    }}
-                  >
-                    <Camera className="w-4 h-4 mr-2" />
-                    Scan QR Code
-                  </Button>
+                  <Card style={{ backgroundColor: "#f0f9ff", borderColor: "#47a1bd" }}>
+                    <CardContent className="p-6">
+                      <div className="text-center space-y-4">
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                          <CheckCircle className="w-6 h-6 text-green-600" />
+                          <h3 className="font-semibold text-lg" style={{ color: "#004f61" }}>
+                            Queue Number Generated!
+                          </h3>
+                        </div>
+                        <div
+                          className="p-4 border-2 rounded-lg"
+                          style={{
+                            backgroundColor: "white",
+                            borderColor: "#47a1bd",
+                          }}
+                        >
+                          <p className="text-sm text-gray-600 mb-2">Your Queue Number:</p>
+                          <p
+                            className="text-3xl font-mono tracking-wider"
+                            style={{ color: "#47a1bd" }}
+                          >
+                            {generatedQueueNumber}
+                          </p>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          Please save this number. You'll need it to check your visit status.
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            onClick={handlePrintQueueNumber}
+                            variant="outline"
+                            className="flex-1"
+                            style={{ borderColor: "#47a1bd", color: "#47a1bd" }}
+                          >
+                            <Printer className="w-4 h-4 mr-2" />
+                            Print
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={handleUseGeneratedNumber}
+                            className="flex-1"
+                            style={{
+                              backgroundColor: "#47a1bd",
+                              color: "white",
+                            }}
+                          >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Use This Number
+                          </Button>
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => setShowGenerator(false)}
+                          variant="ghost"
+                          className="w-full text-sm"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
 
                 <form onSubmit={handlePatientSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="queueNumber">Or Enter Queue Number</Label>
+                    <Label htmlFor="queueNumber">Enter Queue Number</Label>
                     <div className="relative flex items-center">
                       <Hash
                         className="absolute text-gray-400 w-4 h-4"
@@ -344,7 +438,6 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                     className="w-full"
                     style={{
                       backgroundColor: "#47a1bdff",
-                      hover: { backgroundColor: "#7ec2d7" },
                     }}
                     disabled={isLoading || !queueNumber}
                   >
@@ -393,8 +486,8 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
         </Card>
 
         <div className="text-center text-sm text-gray-500">
-          <p>Emergency Response Information System</p>
-          <p>ERIS • {new Date().getFullYear()}</p>
+          <p>Emergency Department Real-Time Patient Tracking and Satisfaction Monitoring System</p>
+          <p>ED Sats • {new Date().getFullYear()}</p>
         </div>
       </div>
     </div>

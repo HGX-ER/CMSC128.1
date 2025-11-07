@@ -152,7 +152,3 @@ INSERT INTO observations (encounter_id, type, value, unit) VALUES
                                                                ((SELECT id FROM encounters WHERE queue_number='ED001'),'bp_dia','80','mmHg');
 
 ALTER TABLE encounters ADD COLUMN diagnosis TEXT NULL AFTER provider_start_time;
-
-SELECT id, status, diagnosis, disposition
-FROM encounters
-WHERE id = 2;

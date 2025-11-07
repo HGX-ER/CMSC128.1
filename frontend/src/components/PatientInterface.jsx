@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -13,17 +14,41 @@ import { HealthTips } from './HealthTips';
 import { RelaxationExercises } from './RelaxationExercises';
 import { HospitalServices } from './HospitalServices';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.jsx';
-import { Clock, Timer, Heart, Activity, Stethoscope, UserCheck, CheckCircle, MapPin, Loader2, History, Newspaper, Brain, Lightbulb, Wind, Building, Bell, MessageCircle, Send } from 'lucide-react';
+import { Clock, Timer, Heart, Activity, Stethoscope, UserCheck, CheckCircle, MapPin, Loader2, History, Newspaper, Brain, Lightbulb, Wind, Building, Bell, MessageCircle, Send, Star } from 'lucide-react';
 
-export function PatientInterface({ patients, currentPatientId, getTotalTime, getCurrentStageTime, onAddSatisfactionFeedback }) {
+export function PatientInterface({ patients, currentPatientId, getTotalTime, getCurrentStageTime, onAddSatisfactionFeedback, onAddRealtimeFeedback }) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [satisfactionModal, setSatisfactionModal] = useState(null);
   const [realtimeComments, setRealtimeComments] = useState([]);
   const [patientComment, setPatientComment] = useState('');
   const [submittedComments, setSubmittedComments] = useState([]);
   const [backendPatientData, setBackendPatientData] = useState(null);
+  const [commentSatisfaction, setCommentSatisfaction] = useState(0);
+  const [commentHoveredStar, setCommentHoveredStar] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Clipboard fallback helper function
+  const copyToClipboard = (text) => {
+    // Fallback for browsers that block clipboard API
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      textArea.remove();
+      return true;
+    } catch (err) {
+      console.error('Failed to copy', err);
+      textArea.remove();
+      return false;
+    }
+  };
   
   // Try to get patient from backend first, fallback to local state
   const patient = backendPatientData || patients.find(p => p.id === currentPatientId);
@@ -282,15 +307,33 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   };
 
   const handleSubmitComment = () => {
-    if (patientComment.trim()) {
+    if (patientComment.trim() && commentSatisfaction > 0) {
       const newComment = {
         time: new Date(),
         message: patientComment,
+        rating: commentSatisfaction,
         stage: patient.currentStage,
         isPatient: true
       };
       setSubmittedComments([...submittedComments, newComment]);
+      
+      // Send feedback to ED Manager
+      if (onAddRealtimeFeedback) {
+        onAddRealtimeFeedback(currentPatientId, {
+          rating: commentSatisfaction,
+          comment: patientComment,
+          stage: patient.currentStage,
+          stageName: getStageDisplayName(patient.currentStage)
+        });
+      }
+      
       setPatientComment('');
+      setCommentSatisfaction(0);
+      toast.success('Your feedback has been sent to the ED Manager!');
+    } else if (commentSatisfaction === 0) {
+      toast.error('Please select a star rating before submitting');
+    } else {
+      toast.error('Please add a comment before submitting');
     }
   };
   
@@ -510,6 +553,18 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
                         <MessageCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <p className="text-sm text-blue-700 font-medium">You: {comment.message}</p>
+                          <div className="flex items-center gap-1 mt-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`w-3 h-3 ${
+                                  star <= comment.rating
+                                    ? 'text-yellow-500 fill-yellow-500'
+                                    : 'text-gray-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
                           <p className="text-xs text-gray-500">{comment.time.toLocaleTimeString()}</p>
                         </div>
                       </div>
@@ -517,78 +572,64 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
                   </div>
                 )}
 
-                {/* Satisfaction Survey */}
+                {/* Real-time Feedback Section */}
                 <div className="mt-4 p-4 border border-green-300 rounded-xl bg-white shadow-sm">
                   <p className="text-center text-green-800 font-semibold mb-4">
-                    Please rate your satisfaction during the{" "}
-                    <span className="underline">{getStageDisplayName(patient.currentStage)}</span> phase.
+                    How are you feeling right now? Share your experience with the ED Manager
                   </p>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-sm text-green-800">
-                      <thead>
-                        <tr>
-                          <th className="text-left py-2 px-3">Parameters</th>
-                          {["Very Satisfied", "Satisfied", "Neutral", "Dissatisfied", "Very Dissatisfied"].map(
-                            (label) => (
-                              <th key={label} className="text-center py-2 px-3 font-medium">
-                                {label}
-                              </th>
-                            )
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          "Staff communication during this phase",
-                          "Comfort while waiting or being attended to",
-                          "Timeliness of service",
-                          "Clarity of explanations or instructions",
-                          "Overall experience in this phase",
-                        ].map((question, index) => (
-                          <tr
-                            key={index}
-                            className="border-t border-green-200 hover:bg-green-50 transition"
-                          >
-                            <td className="py-2 px-3">{question}</td>
-                            {["Very Satisfied", "Satisfied", "Neutral", "Dissatisfied", "Very Dissatisfied"].map(
-                              (option) => (
-                                <td key={option} className="text-center py-2">
-                                  <input
-                                    type="radio"
-                                    name={`question-${index}`}
-                                    value={option}
-                                    className="accent-green-600 cursor-pointer w-4 h-4"
-                                  />
-                                </td>
-                              )
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  {/* Star Rating */}
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <p className="text-sm font-medium text-green-800 mr-3">Rate your current experience:</p>
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setCommentSatisfaction(star)}
+                          onMouseEnter={() => setCommentHoveredStar(star)}
+                          onMouseLeave={() => setCommentHoveredStar(0)}
+                          className="transition-transform hover:scale-110"
+                        >
+                          <Star
+                            className={`w-6 h-6 ${
+                              star <= (commentHoveredStar || commentSatisfaction)
+                                ? 'text-yellow-500 fill-yellow-500'
+                                : 'text-gray-300'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                    <span className="text-sm text-green-700 ml-2">
+                      {commentSatisfaction > 0 && `${commentSatisfaction}/5 stars`}
+                    </span>
                   </div>
 
-                  <div className="mt-8 space-y-2 pt-4">
+                  {/* Comment Input */}
+                  <div className="space-y-2">
                     <p className="text-sm font-bold text-green-800">
-                      Additional Comments or Concerns (Optional):
+                      Additional Comments or Concerns:
                     </p>
                     <div className="flex gap-2">
                       <Textarea
                         value={patientComment}
                         onChange={(e) => setPatientComment(e.target.value)}
-                        placeholder="Type your feedback here..."
+                        placeholder="Tell us about your experience, any concerns, or suggestions..."
                         className="flex-1 min-h-[80px] text-sm"
                       />
                       <Button
                         onClick={handleSubmitComment}
-                        disabled={!patientComment.trim()}
+                        disabled={!patientComment.trim() || commentSatisfaction === 0}
                         size="sm"
                         className="bg-green-600 hover:bg-green-700 self-end"
                       >
                         <Send className="w-4 h-4" />
                       </Button>
                     </div>
+                    <p className="text-xs text-green-600">
+                      Your feedback will be sent directly to the ED Manager for immediate attention
+                    </p>
                   </div>
                 </div>
               </div>
