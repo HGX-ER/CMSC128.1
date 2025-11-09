@@ -240,12 +240,88 @@ export function NurseInterface({
       </div>
 
       <Tabs defaultValue="patient-list" className="w-full">
-        <TabsList className="flex justify-center gap-4 border-b pb-2">
-          <TabsTrigger value="patient-list">Patient Management</TabsTrigger>
-          <TabsTrigger value="doctor-workload">Doctor Workload</TabsTrigger>
-          <TabsTrigger value="doctor-assignment">Doctor Assignment</TabsTrigger>
-          <TabsTrigger value="time-adjustment">Time Management</TabsTrigger>
-        </TabsList>
+        <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
+          <TabsTrigger
+            value="patient-list"
+            className="
+              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+              hover:bg-blue-50 hover:text-blue-700
+              dark:hover:bg-gray-800 
+              data-[state=active]:!bg-blue-100
+              dark:data-[state=active]:!bg-blue-100 
+              data-[state=active]:!text-blue-800
+              dark:data-[state=active]:!text-blue-800
+              data-[state=active]:!border-blue-300
+              dark:data-[state=active]:!border-blue-300
+              data-[state=active]:shadow-lg
+              data-[state=active]:scale-[1.05]
+            "
+          >
+            Patient Management
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="doctor-workload"
+            className="
+              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+              hover:bg-blue-50 hover:text-blue-700
+              dark:hover:bg-gray-800 
+              data-[state=active]:!bg-blue-100
+              dark:data-[state=active]:!bg-blue-100 
+              data-[state=active]:!text-blue-800
+              dark:data-[state=active]:!text-blue-800
+              data-[state=active]:!border-blue-300
+              dark:data-[state=active]:!border-blue-300
+              data-[state=active]:shadow-lg
+              data-[state=active]:scale-[1.05]
+            "
+          >
+            Doctor Workload
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="doctor-assignment"
+            className="
+              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+              hover:bg-blue-50 hover:text-blue-700
+              dark:hover:bg-gray-800 
+              data-[state=active]:!bg-blue-100
+              dark:data-[state=active]:!bg-blue-100 
+              data-[state=active]:!text-blue-800
+              dark:data-[state=active]:!text-blue-800
+              data-[state=active]:!border-blue-300
+              dark:data-[state=active]:!border-blue-300
+              data-[state=active]:shadow-lg
+              data-[state=active]:scale-[1.05]
+            "
+          >
+            Doctor Assignment
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="time-adjustment"
+            className="
+              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+              hover:bg-blue-50 hover:text-blue-700
+              dark:hover:bg-gray-800 
+              data-[state=active]:!bg-blue-100
+              dark:data-[state=active]:!bg-blue-100 
+              data-[state=active]:!text-blue-800
+              dark:data-[state=active]:!text-blue-800
+              data-[state=active]:!border-blue-300
+              dark:data-[state=active]:!border-blue-300
+              data-[state=active]:shadow-lg
+              data-[state=active]:scale-[1.05]
+            "
+          >
+            Time Management
+          </TabsTrigger>
+      </TabsList>
+
 
         <TabsContent value="patient-list" className="mt-6">
           <Card>

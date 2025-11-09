@@ -200,10 +200,10 @@ export default function App() {
               </div>
 
               <h1 className="text-4xl font-bold" style={{ color: "#004f61" }}>
-                ERIS
+                ED Sats
               </h1>
               <p className="text-lg mt-2 text-gray-600">
-                Emergency Response Information System
+                Emergency Department Real-Time Patient Tracking and Satisfaction Monitoring System
               </p>
             </div>
 

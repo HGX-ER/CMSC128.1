@@ -164,7 +164,8 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
           assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
           assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
           sex: data.patient.sex,
-          dob: data.patient.dob
+          dob: data.patient.dob,
+          disposition: data.timestamps.dispositioned,
         };
         
         setBackendPatientData(transformedPatient);
@@ -443,16 +444,125 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     }
   };
 
-  const getProgressPercentage = () => {
-    const stages = [
-      'kiosk', 'waiting_triage', 'triage', 'waiting_registration', 
-      'registration', 'waiting_doctor', 'consultation', 'waiting_discharge',
-      'discharge_documents', 'awaiting_departure', 'departed'
+const getProgressPercentage = () => {
+
+    // This is the universal path every patient follows up to consultation
+
+    const basePath = [
+      'kiosk', 
+      'waiting_triage', 
+      'triage', 
+      'waiting_registration', 
+      'registration', 
+      'waiting_doctor', 
+      'consultation'
     ];
+
+
+    // Path for patients being discharged
+    const dischargePath = [
+      ...basePath,
+      'waiting_discharge',
+      'discharge_documents', 
+      'awaiting_departure', 
+      'departed'
+    ];
+
+    // Path for patients being admitted to a regular ward
+
+    const admissionPath = [
+      ...basePath,
+      'waiting_admission',
+      'admission_orders',
+      'awaiting_non_icu', 
+      'departed' // 'departed' from the ED to the ward
+    ];
+
+    // Path for patients being admitted to the ICU
+    const icuPath = [
+      ...basePath,
+      'waiting_admission',
+      'admission_orders',
+      'awaiting_icu',
+      'departed' // 'departed' from the ED to the ICU
+    ];
+
+    // Path for patients being moved to observation
+    const observationPath = [
+      ...basePath,
+      'waiting_observation',
+
+      // Assuming observation eventually follows a discharge path
+      'waiting_discharge',
+      'discharge_documents', 
+      'awaiting_departure', 
+      'departed'
+    ];
+
+      // Determine which path the patient is on
+      let fullPath = dischargePath; // Default to discharge path
+      const stage = patient.currentStage;
+      const disposition = patient.disposition; // Get from transformed patient
+
+      // Check for admission stages or disposition
+      if (
+        stage === 'waiting_admission' || 
+        stage === 'admission_orders' || 
+        stage === 'awaiting_non_icu' ||
+        disposition === 'Admit - Ward'
+      ) {
+        fullPath = admissionPath;
+      } 
+
+      // Check for ICU stages or disposition
+      else if (
+        stage === 'awaiting_icu' ||
+        disposition === 'Admit - ICU'
+      ) {
+        fullPath = icuPath;
+      } 
+
+      // Check for observation stages or disposition
+      else if (
+        stage === 'waiting_observation' ||
+        disposition === 'Observation'
+      ) {
+        fullPath = observationPath;
+      }
+
+      // Handle edge cases where stage is ambiguous but disposition clarifies
+      if ((stage === 'waiting_admission' || stage === 'admission_orders') && disposition === 'Admit - ICU') {
+         fullPath = icuPath;
+      }
+
+      if ((stage === 'waiting_admission' || stage === 'admission_orders') && disposition === 'Admit - Ward') {
+         fullPath = admissionPath;
+      }
+
+    const currentIndex = fullPath.indexOf(stage);
+
+    if (currentIndex === -1) {
+         // If stage isn't found (e.g., a new unmapped stage), try to find it in the base path
+         const baseIndex = basePath.indexOf(stage);
+         if (baseIndex !== -1) {
+            // Calculate progress assuming the default (discharge) path length
+            const totalSteps = dischargePath.length - 1;
+            return Math.round((baseIndex / totalSteps) * 100);
+         }
+         console.warn(`Stage ${stage} not found in any progress path.`);
+         return 0; // Fallback
+    }
+
+  
+
+    const totalSteps = fullPath.length - 1;
+
+    if (totalSteps <= 0) return 100; // Path only has one step
+
     
-    const currentIndex = stages.indexOf(patient.currentStage);
-    if (currentIndex === -1) return 0;
-    return Math.round((currentIndex / (stages.length - 1)) * 100);
+
+    return Math.round((currentIndex / totalSteps) * 100);
+
   };
 
   const getStageIcon = (stage) => {
@@ -777,29 +887,113 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
 
         {/* Entertainment and Information Tabs */}
         <Tabs defaultValue="tips" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="tips" className="flex items-center gap-1 text-xs">
-              <Lightbulb className="w-3 h-3" />
+          <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
+            <TabsTrigger
+              value="tips"
+              className="
+                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+                hover:bg-blue-50 hover:text-blue-700
+                dark:hover:bg-gray-800 
+                data-[state=active]:!bg-blue-100
+                dark:data-[state=active]:!bg-blue-100 
+                data-[state=active]:!text-blue-800
+                dark:data-[state=active]:!text-blue-800
+                data-[state=active]:!border-blue-300
+                dark:data-[state=active]:!border-blue-300
+                data-[state=active]:shadow-lg
+                data-[state=active]:scale-[1.05]
+              "
+            >
+              <Lightbulb className="w-4 h-4" />
               <span className="hidden sm:inline">Health Tips</span>
-              <span className="sm:hidden">Tips</span>
+              <span className="sm:hidden"></span>
             </TabsTrigger>
-            <TabsTrigger value="news" className="flex items-center gap-1 text-xs">
-              <Newspaper className="w-3 h-3" />
+
+            <TabsTrigger
+              value="news"
+              className="
+                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+                hover:bg-blue-50 hover:text-blue-700
+                dark:hover:bg-gray-800 
+                data-[state=active]:!bg-blue-100
+                dark:data-[state=active]:!bg-blue-100 
+                data-[state=active]:!text-blue-800
+                dark:data-[state=active]:!text-blue-800
+                data-[state=active]:!border-blue-300
+                dark:data-[state=active]:!border-blue-300
+                data-[state=active]:shadow-lg
+                data-[state=active]:scale-[1.05]
+              "
+            >
+              <Newspaper className="w-4 h-4" />
               <span className="hidden sm:inline">News</span>
               <span className="sm:hidden">News</span>
             </TabsTrigger>
-            <TabsTrigger value="trivia" className="flex items-center gap-1 text-xs">
-              <Brain className="w-3 h-3" />
+
+            <TabsTrigger
+              value="trivia"
+              className="
+                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+                hover:bg-blue-50 hover:text-blue-700
+                dark:hover:bg-gray-800 
+                data-[state=active]:!bg-blue-100
+                dark:data-[state=active]:!bg-blue-100 
+                data-[state=active]:!text-blue-800
+                dark:data-[state=active]:!text-blue-800
+                data-[state=active]:!border-blue-300
+                dark:data-[state=active]:!border-blue-300
+                data-[state=active]:shadow-lg
+                data-[state=active]:scale-[1.05]
+              "
+            >
+              <Brain className="w-4 h-4" />
               <span className="hidden sm:inline">Trivia</span>
               <span className="sm:hidden">Quiz</span>
             </TabsTrigger>
-            <TabsTrigger value="relax" className="flex items-center gap-1 text-xs">
-              <Wind className="w-3 h-3" />
+
+            <TabsTrigger
+              value="relax"
+              className="
+                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+                hover:bg-blue-50 hover:text-blue-700
+                dark:hover:bg-gray-800 
+                data-[state=active]:!bg-blue-100
+                dark:data-[state=active]:!bg-blue-100 
+                data-[state=active]:!text-blue-800
+                dark:data-[state=active]:!text-blue-800
+                data-[state=active]:!border-blue-300
+                dark:data-[state=active]:!border-blue-300
+                data-[state=active]:shadow-lg
+                data-[state=active]:scale-[1.05]
+              "
+            >
+              <Wind className="w-4 h-4" />
               <span className="hidden sm:inline">Relax</span>
               <span className="sm:hidden">Calm</span>
             </TabsTrigger>
-            <TabsTrigger value="services" className="flex items-center gap-1 text-xs">
-              <Building className="w-3 h-3" />
+
+            <TabsTrigger
+              value="services"
+              className="
+                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+                hover:bg-blue-50 hover:text-blue-700
+                dark:hover:bg-gray-800 
+                data-[state=active]:!bg-blue-100
+                dark:data-[state=active]:!bg-blue-100 
+                data-[state=active]:!text-blue-800
+                dark:data-[state=active]:!text-blue-800
+                data-[state=active]:!border-blue-300
+                dark:data-[state=active]:!border-blue-300
+                data-[state=active]:shadow-lg
+                data-[state=active]:scale-[1.05]
+              "
+            >
+              <Building className="w-4 h-4" />
               <span className="hidden sm:inline">Services</span>
               <span className="sm:hidden">Info</span>
             </TabsTrigger>
@@ -827,6 +1021,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
             </TabsContent>
           </div>
         </Tabs>
+
 
         {/* Important Information */}
         <Card className="shadow-lg">

@@ -6,7 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 const STAGE_LABELS = {
   waiting_triage: 'Waiting for Triage',
-  waiting_registration: 'For Registration', 
+  waiting_registration: 'For Registration',
   waiting_doctor: 'Waiting to be seen by Doctor',
   waiting_admission: 'For Admission',
   waiting_observation: 'For Observation',
@@ -30,10 +30,10 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
     const completedPatients = patients.filter(p => !p.isActive || p.currentStage === 'departed');
 
     // Current shift patients
-    const shiftStart = dayShift 
+    const shiftStart = dayShift
       ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0)
       : new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getHours() < 8 ? 1 : 0), 20, 0, 0);
-    
+
     const currentShiftPatients = patients.filter(p => p.arrivalTime >= shiftStart);
 
     // Stage counts
@@ -43,7 +43,7 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
     }));
 
     // Average times
-    const avgTotalTime = completedPatients.length > 0 
+    const avgTotalTime = completedPatients.length > 0
       ? Math.round(completedPatients.reduce((sum, p) => sum + getTotalTime(p), 0) / completedPatients.length)
       : 0;
 
@@ -53,7 +53,7 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
       return {
         hour: `${hour.toString().padStart(2, '0')}:00`,
         patients: hourPatients.length,
-        avgWaitTime: hourPatients.length > 0 
+        avgWaitTime: hourPatients.length > 0
           ? Math.round(hourPatients.reduce((sum, p) => sum + getTotalTime(p), 0) / hourPatients.length)
           : 0
       };
@@ -70,7 +70,7 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
 
     // Age and sex breakdown
     const demographics = completedPatients.reduce((acc, patient) => {
-      const ageGroup = patient.age ? 
+      const ageGroup = patient.age ?
         (patient.age < 18 ? 'Pediatric' : 'Adult') : 'Unknown';
       const sex = patient.sex || 'Unknown';
       const key = `${ageGroup} ${sex}`;
@@ -115,11 +115,10 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
           </Badge>
 
           <Badge
-            className={`text-lg px-4 py-2 ${
-              currentShift === "0700H-1500H"
+            className={`text-lg px-4 py-2 ${currentShift === "0700H-1500H"
                 ? "bg-yellow-100 text-yellow-800 border border-yellow-300"
                 : "bg-indigo-100 text-indigo-800 border border-indigo-300"
-            }`}
+              }`}
           >
             {currentShift === "0700H-1500H" ? "Day Shift" : "Night Shift"}
           </Badge>
@@ -127,11 +126,86 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
       </div>
 
       <Tabs defaultValue="realtime" className="w-full">
-        <TabsList className="flex w-full justify-between rounded-lg p-1 bg-gray-100">
-          <TabsTrigger value="realtime" >Real-time Data</TabsTrigger>
-          <TabsTrigger value="analytics">Waiting Time Analytics</TabsTrigger>
-          <TabsTrigger value="trends">Trends</TabsTrigger>
-          <TabsTrigger value="census">Census</TabsTrigger>
+        <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
+          <TabsTrigger
+            value="realtime"
+            className="
+              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+              hover:bg-blue-50 hover:text-blue-700
+              dark:hover:bg-gray-800 
+              data-[state=active]:!bg-blue-100
+              dark:data-[state=active]:!bg-blue-100 
+              data-[state=active]:!text-blue-800
+              dark:data-[state=active]:!text-blue-800
+              data-[state=active]:!border-blue-300
+              dark:data-[state=active]:!border-blue-300
+              data-[state=active]:shadow-lg
+              data-[state=active]:scale-[1.05]
+            "
+          >
+            Real-time Data
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="analytics"
+            className="
+              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+              hover:bg-blue-50 hover:text-blue-700
+              dark:hover:bg-gray-800 
+              data-[state=active]:!bg-blue-100
+              dark:data-[state=active]:!bg-blue-100 
+              data-[state=active]:!text-blue-800
+              dark:data-[state=active]:!text-blue-800
+              data-[state=active]:!border-blue-300
+              dark:data-[state=active]:!border-blue-300
+              data-[state=active]:shadow-lg
+              data-[state=active]:scale-[1.05]
+            "
+          >
+            Waiting Time Analytics
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="trends"
+            className="
+              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+              hover:bg-blue-50 hover:text-blue-700
+              dark:hover:bg-gray-800 
+              data-[state=active]:!bg-blue-100
+              dark:data-[state=active]:!bg-blue-100 
+              data-[state=active]:!text-blue-800
+              dark:data-[state=active]:!text-blue-800
+              data-[state=active]:!border-blue-300
+              dark:data-[state=active]:!border-blue-300
+              data-[state=active]:shadow-lg
+              data-[state=active]:scale-[1.05]
+            "
+          >
+            Trends
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="census"
+            className="
+              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+              hover:bg-blue-50 hover:text-blue-700
+              dark:hover:bg-gray-800 
+              data-[state=active]:!bg-blue-100
+              dark:data-[state=active]:!bg-blue-100 
+              data-[state=active]:!text-blue-800
+              dark:data-[state=active]:!text-blue-800
+              data-[state=active]:!border-blue-300
+              dark:data-[state=active]:!border-blue-300
+              data-[state=active]:shadow-lg
+              data-[state=active]:scale-[1.05]
+            "
+          >
+            Census
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="realtime" className="space-y-6">
@@ -174,10 +248,10 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={analytics.stageCounts}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="stage" 
-                    angle={-45} 
-                    textAnchor="end" 
+                  <XAxis
+                    dataKey="stage"
+                    angle={-45}
+                    textAnchor="end"
                     height={100}
                     fontSize={12}
                   />
@@ -216,10 +290,10 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
               </CardHeader>
               <CardContent className="space-y-3">
                 {Object.entries(STAGE_LABELS).map(([stage, label]) => {
-                  const stagePatients = patients.filter(p => 
+                  const stagePatients = patients.filter(p =>
                     p.stageHistory.some(h => h.stage === stage)
                   );
-                  const avgTime = stagePatients.length > 0 
+                  const avgTime = stagePatients.length > 0
                     ? Math.round(stagePatients.reduce((sum, p) => sum + getStageTime(p, stage), 0) / stagePatients.length)
                     : 0;
 
