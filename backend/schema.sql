@@ -30,10 +30,6 @@ CREATE TABLE patients (
 ) ENGINE=InnoDB;
 
 -- ENCOUNTERS
--- IMPORTANT CHANGES:
--- 1) status -> VARCHAR(32) (more flexible than ENUM while prototyping)
--- 2) diagnosis -> TEXT (frontend/route writes diagnosis)
--- 3) updated_at -> for bookkeeping
 CREATE TABLE encounters (
                             id INT AUTO_INCREMENT PRIMARY KEY,
                             patient_id INT NOT NULL,
@@ -61,12 +57,12 @@ CREATE TABLE encounters (
                                     ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
-CREATE INDEX idx_queue_number       ON encounters(queue_number);
-CREATE INDEX idx_patient_id         ON encounters(patient_id);
-CREATE INDEX idx_enc_status         ON encounters(status);
+CREATE INDEX idx_queue_number ON encounters(queue_number);
+CREATE INDEX idx_patient_id ON encounters(patient_id);
+CREATE INDEX idx_enc_status ON encounters(status);
 CREATE INDEX idx_enc_assigned_doctor ON encounters(assigned_doctor);
 CREATE INDEX idx_enc_assigned_nurse ON encounters(assigned_nurse);
-CREATE INDEX idx_enc_arrival_time   ON encounters(arrival_time);
+CREATE INDEX idx_enc_arrival_time ON encounters(arrival_time);
 
 -- OBSERVATIONS
 CREATE TABLE observations (
@@ -108,47 +104,23 @@ CREATE INDEX idx_encounter_event ON encounter_events(encounter_id, at);
 INSERT INTO users (username, password, role, full_name, specialty, room, floor) VALUES
                                                                                     ('nurse1','1234','nurse','Nurse Jane Flores',NULL,NULL,NULL),
                                                                                     ('doc1','1234','doctor','Dr. Sarah Smith','Emergency Medicine','201','2nd Floor'),
-                                                                                    ('manager1','1234','ed_manager','ED Manager',NULL,NULL,NULL)
-ON DUPLICATE KEY UPDATE
-                     password=VALUES(password),
-                     role=VALUES(role),
-                     full_name=VALUES(full_name),
-                     specialty=VALUES(specialty),
-                     room=VALUES(room),
-                     floor=VALUES(floor);
+                                                                                    ('manager1','1234','ed_manager','ED Manager',NULL,NULL,NULL);
 
 -- SEED PATIENTS
 INSERT INTO patients (full_name, dob, sex, contact_number, emergency_contact, insurance_info, address) VALUES
                                                                                                            ('Juan Dela Cruz','2001-01-15','Male','09171234567','Maria Cruz','PhilHealth','Manila'),
                                                                                                            ('Maria Santos','1999-07-20','Female','09181234567','Jose Santos','Maxicare','Quezon City'),
-                                                                                                           ('Pedro Gomez','1988-03-10','Male','09191234567','Anna Gomez','Intellicare','Pasig')
-ON DUPLICATE KEY UPDATE
-                     full_name=VALUES(full_name),
-                     dob=VALUES(dob),
-                     sex=VALUES(sex),
-                     contact_number=VALUES(contact_number),
-                     emergency_contact=VALUES(emergency_contact),
-                     insurance_info=VALUES(insurance_info),
-                     address=VALUES(address);
+                                                                                                           ('Pedro Gomez','1988-03-10','Male','09191234567','Anna Gomez','Intellicare','Pasig');
 
 -- SEED ENCOUNTERS
--- Doc queue has one patient already waiting for doc1
 INSERT INTO encounters (patient_id, queue_number, status, priority_esi, assigned_doctor, assigned_nurse, arrival_time)
 VALUES
     (1,'ED001','waiting_doctor',4,'doc1','nurse1',NOW()),
     (2,'ED002','registered',3,NULL,'nurse1',NOW()),
-    (3,'ED003','arrived',NULL,NULL,'nurse1',NOW())
-ON DUPLICATE KEY UPDATE
-                     status=VALUES(status),
-                     priority_esi=VALUES(priority_esi),
-                     assigned_doctor=VALUES(assigned_doctor),
-                     assigned_nurse=VALUES(assigned_nurse),
-                     arrival_time=VALUES(arrival_time);
+    (3,'ED003','arrived',NULL,NULL,'nurse1',NOW());
 
 -- SEED OBSERVATIONS
 INSERT INTO observations (encounter_id, type, value, unit) VALUES
                                                                ((SELECT id FROM encounters WHERE queue_number='ED001'),'complaint','Headache',NULL),
                                                                ((SELECT id FROM encounters WHERE queue_number='ED001'),'bp_sys','130','mmHg'),
                                                                ((SELECT id FROM encounters WHERE queue_number='ED001'),'bp_dia','80','mmHg');
-
-ALTER TABLE encounters ADD COLUMN diagnosis TEXT NULL AFTER provider_start_time;
