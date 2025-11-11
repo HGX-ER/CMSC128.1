@@ -1,8 +1,6 @@
-// backend/routes/registration.js
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
-
 
 // ============================================================
 // ✅ GET /api/registration
@@ -35,39 +33,47 @@ router.get("/registration", async (_req, res) => {
     }
 });
 
-
 // ============================================================
 // POST /api/registration/new
 // Create a new patient and encounter (Queue Generation)
 // ============================================================
 router.post("/registration/new", async (req, res) => {
     try {
+        console.log("📝 Generating new queue number...");
+
+        // Create a new patient with empty data
         const [result] = await db.query(`
             INSERT INTO patients (full_name, dob, sex)
-            VALUES ('', NULL, NULL)
+            VALUES ('New Patient', NULL, NULL)
         `);
 
         const patientId = result.insertId;
 
-        // Generate a short queue number (ED + 3 digits)
-        const nextNum = String(Math.floor(1 + Math.random() * 999)).padStart(3, "0");
-        const qn = `ED${nextNum}`;
+        // Generate queue number in format: ED + random 3 digits
+        const randomNum = String(Math.floor(100 + Math.random() * 900));
+        const queueNumber = `ED${randomNum}`;
 
+        // Create encounter with the generated queue number
         await db.query(
-            `
-                INSERT INTO encounters (patient_id, queue_number, status, arrival_time)
-                VALUES (?, ?, 'arrived', NOW())
-            `,
-            [patientId, qn]
+            `INSERT INTO encounters (patient_id, queue_number, status, arrival_time)
+             VALUES (?, ?, 'arrived', NOW())`,
+            [patientId, queueNumber]
         );
 
-        res.json({ queueNumber: qn });
+        console.log(`✅ Generated queue number: ${queueNumber} for patient ID: ${patientId}`);
+
+        res.json({
+            success: true,
+            queueNumber: queueNumber
+        });
     } catch (err) {
-        console.error("Error creating registration:", err);
-        res.status(500).json({ error: err.message });
+        console.error("❌ Error creating registration:", err);
+        res.status(500).json({
+            success: false,
+            error: err.message
+        });
     }
 });
-
 
 // ============================================================
 // PUT /api/registration/patient/:queueNumber
@@ -100,18 +106,16 @@ router.put("/registration/patient/:queueNumber", async (req, res) => {
 
         // Update patient record
         await db.query(
-            `
-                UPDATE patients
-                SET
-                    full_name = ?,
-                    dob = ?,
-                    sex = ?,
-                    contact_number = ?,
-                    emergency_contact = ?,
-                    insurance_info = ?,
-                    address = ?
-                WHERE id = ?
-            `,
+            `UPDATE patients
+             SET
+                 full_name = ?,
+                 dob = ?,
+                 sex = ?,
+                 contact_number = ?,
+                 emergency_contact = ?,
+                 insurance_info = ?,
+                 address = ?
+             WHERE id = ?`,
             [
                 name || "",
                 dateOfBirth || null,
@@ -132,20 +136,18 @@ router.put("/registration/patient/:queueNumber", async (req, res) => {
 
         // Log event
         await db.query(
-            `
-            INSERT INTO encounter_events (encounter_id, type, at, payload)
-            SELECT e.id, 'registered', NOW(), JSON_OBJECT(
-                'full_name', ?,
-                'dob', ?,
-                'sex', ?,
-                'contact_number', ?,
-                'emergency_contact', ?,
-                'insurance_info', ?,
-                'address', ?
-            )
-            FROM encounters e
-            WHERE e.queue_number = ?
-            `,
+            `INSERT INTO encounter_events (encounter_id, type, at, payload)
+             SELECT e.id, 'registered', NOW(), JSON_OBJECT(
+                     'full_name', ?,
+                     'dob', ?,
+                     'sex', ?,
+                     'contact_number', ?,
+                     'emergency_contact', ?,
+                     'insurance_info', ?,
+                     'address', ?
+                                               )
+             FROM encounters e
+             WHERE e.queue_number = ?`,
             [
                 name,
                 dateOfBirth,
@@ -164,6 +166,5 @@ router.put("/registration/patient/:queueNumber", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
 
 module.exports = router;

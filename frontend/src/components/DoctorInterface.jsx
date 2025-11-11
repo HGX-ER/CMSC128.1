@@ -240,12 +240,45 @@ export function DoctorInterface({
 
       {/* Navigation Tabs */}
       <Tabs defaultValue="consultation" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="consultation" className="flex items-center gap-2">
+        <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
+          <TabsTrigger
+            value="consultation"
+            className="
+              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+              hover:bg-blue-50 hover:text-blue-700
+              dark:hover:bg-gray-800 
+              data-[state=active]:!bg-blue-100
+              dark:data-[state=active]:!bg-blue-100 
+              data-[state=active]:!text-blue-800
+              dark:data-[state=active]:!text-blue-800
+              data-[state=active]:!border-blue-300
+              dark:data-[state=active]:!border-blue-300
+              data-[state=active]:shadow-lg
+              data-[state=active]:scale-[1.05]
+            "
+          >
             <Stethoscope className="w-4 h-4" />
             Patient Consultation
           </TabsTrigger>
-          <TabsTrigger value="status" className="flex items-center gap-2">
+          
+          <TabsTrigger
+            value="status"
+            className="
+              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+              hover:bg-blue-50 hover:text-blue-700
+              dark:hover:bg-gray-800 
+              data-[state=active]:!bg-blue-100
+              dark:data-[state=active]:!bg-blue-100 
+              data-[state=active]:!text-blue-800
+              dark:data-[state=active]:!text-blue-800
+              data-[state=active]:!border-blue-300
+              dark:data-[state=active]:!border-blue-300
+              data-[state=active]:shadow-lg
+              data-[state=active]:scale-[1.05]
+            "
+          >
             <Activity className="w-4 h-4" />
             Patient Status
           </TabsTrigger>

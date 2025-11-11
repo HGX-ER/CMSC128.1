@@ -164,7 +164,8 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
           assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
           assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
           sex: data.patient.sex,
-          dob: data.patient.dob
+          dob: data.patient.dob,
+          disposition: data.timestamps.dispositioned,
         };
         
         setBackendPatientData(transformedPatient);
@@ -443,16 +444,53 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     }
   };
 
-  const getProgressPercentage = () => {
-    const stages = [
-      'kiosk', 'waiting_triage', 'triage', 'waiting_registration', 
-      'registration', 'waiting_doctor', 'consultation', 'waiting_discharge',
-      'discharge_documents', 'awaiting_departure', 'departed'
+const getProgressPercentage = () => {
+    // This is the simple, linear path you provided
+    const trackedPath = [
+      'kiosk',
+      'waiting_triage',
+      'triage',
+      'waiting_registration',
+      'registration',
+      'waiting_doctor',
+      'consultation'
     ];
+
+    // Define all stages that mean the main progress is 100% complete
+    const completedStages = [
+        'waiting_admission',
+        'waiting_observation',
+        'waiting_discharge',
+        'admission_orders',
+        'awaiting_non_icu',
+        'awaiting_icu',
+        'discharge_documents',
+        'awaiting_departure',
+        'departed'
+    ];
+
+    const currentStage = patient.currentStage;
+    const currentIndex = trackedPath.indexOf(currentStage);
     
-    const currentIndex = stages.indexOf(patient.currentStage);
-    if (currentIndex === -1) return 0;
-    return Math.round((currentIndex / (stages.length - 1)) * 100);
+// Case 1: The current stage is *in* the main path.
+    if (currentIndex !== -1) {
+      const totalSteps = trackedPath.length - 1;
+      if (totalSteps <= 0) return 100; // Failsafe
+      return Math.round((currentIndex / totalSteps) * 100);
+    }
+
+    // Case 2: The current stage is *after* the main path (e.g., 'waiting_discharge').
+    if (completedStages.includes(currentStage)) {
+      return 100;
+    }
+    
+    // Case 3 (Fallback): The stage is unknown.
+    // We can still check history as a last resort.
+    const hasCompletedPath = patient.stageHistory.some(
+        s => s.stage === 'consultation'
+    );
+    
+    return hasCompletedPath ? 100 : 0; // Default to 0 if we truly don't know
   };
 
   const getStageIcon = (stage) => {
@@ -511,7 +549,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold text-blue-800">
-                  {getCurrentStageTime(patient)}<span className="text-lg">min</span>
+                  {getTotalTime(patient)}<span className="text-lg">min</span>
                 </div>
                 <p className="text-sm text-gray-600">in current stage</p>
               </div>
@@ -578,32 +616,53 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
                     How are you feeling right now? Share your experience with the ED Manager
                   </p>
 
-                  {/* Star Rating */}
-                  <div className="flex items-center justify-center gap-2 mb-4">
-                    <p className="text-sm font-medium text-green-800 mr-3">Rate your current experience:</p>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => setCommentSatisfaction(star)}
-                          onMouseEnter={() => setCommentHoveredStar(star)}
-                          onMouseLeave={() => setCommentHoveredStar(0)}
-                          className="transition-transform hover:scale-110"
-                        >
-                          <Star
-                            className={`w-6 h-6 ${
-                              star <= (commentHoveredStar || commentSatisfaction)
-                                ? 'text-yellow-500 fill-yellow-500'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        </button>
+                  {/* Satisfaction Rating */}
+                  <div className="text-center">
+                    <p className="text-base text-green-800 font-semibold mb-6">
+                      How satisfied are you with this stage?
+                    </p>
+
+                    <div className="flex justify-center items-center gap-6 mb-6">
+                      {[
+                        { id: 1, emoji: '😠', label: 'Very Unsatisfied' },
+                        { id: 2, emoji: '😕', label: 'Unsatisfied' },
+                        { id: 3, emoji: '😐', label: 'Neutral' },
+                        { id: 4, emoji: '🙂', label: 'Satisfied' },
+                        { id: 5, emoji: '😄', label: 'Very Satisfied' },
+                      ].map((smile, index, arr) => (
+                        <div key={smile.id} className="flex items-center">
+                          <div
+                            className="flex flex-col items-center cursor-pointer"
+                            onClick={() => setCommentSatisfaction(smile.id)}
+                            title={smile.label}
+                          >
+                            <span
+                              className={`text-6xl transition-transform duration-200 ${
+                                commentSatisfaction === smile.id
+                                  ? 'scale-125'
+                                  : 'opacity-60 hover:opacity-100 hover:scale-110'
+                              }`}
+                            >
+                              {smile.emoji}
+                            </span>
+                            <span
+                              className={`mt-2 text-sm font-medium ${
+                                commentSatisfaction === smile.id
+                                  ? 'text-blue-700'
+                                  : 'text-gray-500'
+                              }`}
+                            >
+                              {smile.label}
+                            </span>
+                          </div>
+
+                          {/* Divider - skip after last emoji */}
+                          {index < arr.length - 1 && (
+                            <div className="h-10 border-l border-gray-600 mx-6"></div>
+                          )}
+                        </div>
                       ))}
                     </div>
-                    <span className="text-sm text-green-700 ml-2">
-                      {commentSatisfaction > 0 && `${commentSatisfaction}/5 stars`}
-                    </span>
                   </div>
 
                   {/* Comment Input */}
@@ -777,29 +836,113 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
 
         {/* Entertainment and Information Tabs */}
         <Tabs defaultValue="tips" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="tips" className="flex items-center gap-1 text-xs">
-              <Lightbulb className="w-3 h-3" />
+          <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
+            <TabsTrigger
+              value="tips"
+              className="
+                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+                hover:bg-blue-50 hover:text-blue-700
+                dark:hover:bg-gray-800 
+                data-[state=active]:!bg-blue-100
+                dark:data-[state=active]:!bg-blue-100 
+                data-[state=active]:!text-blue-800
+                dark:data-[state=active]:!text-blue-800
+                data-[state=active]:!border-blue-300
+                dark:data-[state=active]:!border-blue-300
+                data-[state=active]:shadow-lg
+                data-[state=active]:scale-[1.05]
+              "
+            >
+              <Lightbulb className="w-4 h-4" />
               <span className="hidden sm:inline">Health Tips</span>
-              <span className="sm:hidden">Tips</span>
+              <span className="sm:hidden"></span>
             </TabsTrigger>
-            <TabsTrigger value="news" className="flex items-center gap-1 text-xs">
-              <Newspaper className="w-3 h-3" />
+
+            <TabsTrigger
+              value="news"
+              className="
+                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+                hover:bg-blue-50 hover:text-blue-700
+                dark:hover:bg-gray-800 
+                data-[state=active]:!bg-blue-100
+                dark:data-[state=active]:!bg-blue-100 
+                data-[state=active]:!text-blue-800
+                dark:data-[state=active]:!text-blue-800
+                data-[state=active]:!border-blue-300
+                dark:data-[state=active]:!border-blue-300
+                data-[state=active]:shadow-lg
+                data-[state=active]:scale-[1.05]
+              "
+            >
+              <Newspaper className="w-4 h-4" />
               <span className="hidden sm:inline">News</span>
               <span className="sm:hidden">News</span>
             </TabsTrigger>
-            <TabsTrigger value="trivia" className="flex items-center gap-1 text-xs">
-              <Brain className="w-3 h-3" />
+
+            <TabsTrigger
+              value="trivia"
+              className="
+                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+                hover:bg-blue-50 hover:text-blue-700
+                dark:hover:bg-gray-800 
+                data-[state=active]:!bg-blue-100
+                dark:data-[state=active]:!bg-blue-100 
+                data-[state=active]:!text-blue-800
+                dark:data-[state=active]:!text-blue-800
+                data-[state=active]:!border-blue-300
+                dark:data-[state=active]:!border-blue-300
+                data-[state=active]:shadow-lg
+                data-[state=active]:scale-[1.05]
+              "
+            >
+              <Brain className="w-4 h-4" />
               <span className="hidden sm:inline">Trivia</span>
               <span className="sm:hidden">Quiz</span>
             </TabsTrigger>
-            <TabsTrigger value="relax" className="flex items-center gap-1 text-xs">
-              <Wind className="w-3 h-3" />
+
+            <TabsTrigger
+              value="relax"
+              className="
+                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+                hover:bg-blue-50 hover:text-blue-700
+                dark:hover:bg-gray-800 
+                data-[state=active]:!bg-blue-100
+                dark:data-[state=active]:!bg-blue-100 
+                data-[state=active]:!text-blue-800
+                dark:data-[state=active]:!text-blue-800
+                data-[state=active]:!border-blue-300
+                dark:data-[state=active]:!border-blue-300
+                data-[state=active]:shadow-lg
+                data-[state=active]:scale-[1.05]
+              "
+            >
+              <Wind className="w-4 h-4" />
               <span className="hidden sm:inline">Relax</span>
               <span className="sm:hidden">Calm</span>
             </TabsTrigger>
-            <TabsTrigger value="services" className="flex items-center gap-1 text-xs">
-              <Building className="w-3 h-3" />
+
+            <TabsTrigger
+              value="services"
+              className="
+                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+                hover:bg-blue-50 hover:text-blue-700
+                dark:hover:bg-gray-800 
+                data-[state=active]:!bg-blue-100
+                dark:data-[state=active]:!bg-blue-100 
+                data-[state=active]:!text-blue-800
+                dark:data-[state=active]:!text-blue-800
+                data-[state=active]:!border-blue-300
+                dark:data-[state=active]:!border-blue-300
+                data-[state=active]:shadow-lg
+                data-[state=active]:scale-[1.05]
+              "
+            >
+              <Building className="w-4 h-4" />
               <span className="hidden sm:inline">Services</span>
               <span className="sm:hidden">Info</span>
             </TabsTrigger>
@@ -827,6 +970,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
             </TabsContent>
           </div>
         </Tabs>
+
 
         {/* Important Information */}
         <Card className="shadow-lg">

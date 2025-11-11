@@ -63,6 +63,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
   const [activeTab, setActiveTab] = useState("patient");
   const [generatedQueueNumber, setGeneratedQueueNumber] = useState("");
   const [showGenerator, setShowGenerator] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleStaffSubmit = async (e) => {
     e.preventDefault();
@@ -92,15 +93,49 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
     }
   };
 
-  const generateQueueNumber = () => {
-    const today = new Date();
-    const year = today.getFullYear().toString().slice(-2);
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    const random = Math.floor(Math.random() * 9000) + 1000;
-    const queueNum = `ED${year}${month}${day}-${random}`; // Fixed template literal
-    setGeneratedQueueNumber(queueNum);
-    setShowGenerator(true);
+  // Updated function to generate queue number via backend
+  const generateQueueNumber = async () => {
+    setIsGenerating(true);
+    setError("");
+    try {
+      console.log("Attempting to generate queue number...");
+      
+      const response = await fetch("http://localhost:5000/api/registration/new", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      
+      console.log("Response status:", response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        throw new Error(`Failed to generate queue number: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("Success data:", data);
+      
+      if (data.success) {
+        setGeneratedQueueNumber(data.queueNumber);
+        setShowGenerator(true);
+      } else {
+        throw new Error(data.error || "Failed to generate queue number");
+      }
+    } catch (err) {
+      console.error("Full error:", err);
+      setError(err.message || "Failed to generate queue number. Please check if the backend is running.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Updated function to use the generated number
+  const handleUseGeneratedNumber = () => {
+    setQueueNumber(generatedQueueNumber);
+    setShowGenerator(false);
   };
 
   const handlePrintQueueNumber = () => {
@@ -154,7 +189,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
             <p>You will need it to check your visit status.</p>
           </div>
           <div class="footer">
-            <p> (Emergency Department Real-Time Patient Tracking and Satisfaction Monitoring System) </p>
+            <p>Emergency Department Real-Time Patient Tracking System</p>
           </div>
         </body>
       </html>
@@ -163,16 +198,11 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
     printWindow.print();
   };
 
-  const handleUseGeneratedNumber = () => {
-    setQueueNumber(generatedQueueNumber);
-    setShowGenerator(false);
-  };
-
   return (
     <div
       className="min-h-screen bg-cover bg-center flex items-center justify-center p-4"
       style={{
-        backgroundImage: "url('https://xmple.com/wallpaper/white-gradient-blue-linear-3840x2160-c2-add8e6-ffffff-a-285-f-14.svg')" // Fixed URL
+        backgroundImage: "url('https://xmple.com/wallpaper/white-gradient-blue-linear-3840x2160-c2-add8e6-ffffff-a-285-f-14.svg')"
       }}
     >
       <div className="w-full max-w-md space-y-6">
@@ -185,9 +215,9 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
               <Hospital className="w-8 h-8 text-white" />
             </div>
             <CardTitle className="text-4xl font-bold" style={{ color: "#004f61" }}>ED Sats</CardTitle>
-            <p className="text-lg mt-0">
+            <CardDescription className="text-lg mt-2">
               Emergency Department Real-Time Patient Tracking and Satisfaction Monitoring System 
-            </p>
+            </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
@@ -289,7 +319,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                   </Button>
                 </form>
               </TabsContent>
-
+              
               {/* Patient Login */}
               <TabsContent value="patient" className="space-y-4">
                 <div
@@ -301,10 +331,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <Hash className="w-4 h-4" style={{ color: "#96cfe0" }} />
-                    <span
-                      className="font-medium"
-                      style={{ color: "#004f61" }}
-                    >
+                    <span className="font-medium" style={{ color: "#004f61" }}>
                       Patient Portal
                     </span>
                   </div>
@@ -325,18 +352,19 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                           backgroundColor: "#4CAF50",
                           color: "white",
                         }}
+                        disabled={isGenerating}
                       >
                         <Ticket className="w-4 h-4 mr-2" />
-                        Generate Queue Number
+                        {isGenerating ? "Generating..." : "Generate Queue Number"}
                       </Button>
                     </div>
                     <div className="relative">
                       <div className="absolute inset-0 flex items-center">
                         <span className="w-full border-t" />
                       </div>
-                      <div className="relative flex justify-center text-s uppercase">
-                        <span className="bg-white px-2 text-gray-500">
-                          Or enter queue number 
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">
+                          Or enter queue number
                         </span>
                       </div>
                     </div>
@@ -433,11 +461,12 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                     </div>
                   </div>
 
+
                   <Button
                     type="submit"
                     className="w-full"
                     style={{
-                      backgroundColor: "#47a1bdff",
+                      backgroundColor: "#47a1bd",
                     }}
                     disabled={isLoading || !queueNumber}
                   >

@@ -35,7 +35,7 @@ function publishEvent(evt) {
 }
 app.set("publishEvent", publishEvent);
 
-/* ===== Health check (optional but useful) ===== */
+/* ===== Health check ===== */
 app.get("/api/health", async (req, res) => {
     try {
         const [rows] = await db.query("SELECT NOW() AS server_time");
@@ -46,23 +46,37 @@ app.get("/api/health", async (req, res) => {
     }
 });
 
-const doctorsRoute = require("./routes/doctors");
-app.use("/api", doctorsRoute);
-
 /* ===== Routes ===== */
-app.use("/api", require("./routes/auth"));
-app.use("/api", require("./routes/registration"));
-app.use("/api/triage", require("./routes/triage"));
-app.use("/api", require("./routes/board"));
-app.use("/api", require("./routes/patient"));
+// Import routes
+const authRoutes = require("./routes/auth");
+const registrationRoutes = require("./routes/registration");
+const triageRoutes = require("./routes/triage");
+const boardRoutes = require("./routes/board");
+const patientRoutes = require("./routes/patient");
 const getDoctorRoutes = require("./routes/getdoctor");
+const whiteboardRoutes = require("./routes/whiteboard");
+const doctorsRoutes = require("./routes/doctors");
+
+// Mount routes
+app.use("/api", authRoutes);
+app.use("/api", registrationRoutes);
+app.use("/api/triage", triageRoutes);
+app.use("/api", boardRoutes);
+app.use("/api", patientRoutes);
 app.use("/api/getdoctor", getDoctorRoutes);
-app.use('/api', require('./routes/whiteboard'));
+app.use('/api', whiteboardRoutes);
+app.use("/api", doctorsRoutes);
 
 /* ===== Error handler ===== */
 app.use((err, req, res, next) => {
     console.error("❌ Global error handler:", err);
     res.status(500).json({ error: "Internal Server Error" });
+});
+
+/* ===== 404 handler for API routes ===== */
+app.use("/api/*", (req, res) => {
+    console.log(`❌ 404 - Route not found: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
 });
 
 /* ===== Start server ===== */
