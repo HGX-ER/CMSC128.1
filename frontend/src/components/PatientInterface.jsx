@@ -14,7 +14,7 @@ import { HealthTips } from './HealthTips';
 import { RelaxationExercises } from './RelaxationExercises';
 import { HospitalServices } from './HospitalServices';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.jsx';
-import { Clock, Timer, Heart, Activity, Stethoscope, UserCheck, CheckCircle, MapPin, Loader2, History, Newspaper, Brain, Lightbulb, Wind, Building, Bell, MessageCircle, Send, Star } from 'lucide-react';
+import { Clock, Timer, Heart, Activity, Stethoscope, UserCheck, CheckCircle, MapPin, Loader2, History, Newspaper, Brain, Lightbulb, Wind, Building, Bell, MessageCircle, Send, Star, RefreshCw } from 'lucide-react';
 
 export function PatientInterface({ patients, currentPatientId, getTotalTime, getCurrentStageTime, onAddSatisfactionFeedback, onAddRealtimeFeedback }) {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -27,31 +27,22 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   const [commentHoveredStar, setCommentHoveredStar] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
   
-  // Clipboard fallback helper function
-  const copyToClipboard = (text) => {
-    // Fallback for browsers that block clipboard API
-    const textArea = document.createElement("textarea");
-    textArea.value = text;
-    textArea.style.position = "fixed";
-    textArea.style.left = "-999999px";
-    textArea.style.top = "-999999px";
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    try {
-      document.execCommand('copy');
-      textArea.remove();
-      return true;
-    } catch (err) {
-      console.error('Failed to copy', err);
-      textArea.remove();
-      return false;
-    }
+  // Get queue number from URL or props
+  const getQueueNumber = () => {
+    // Try to get from URL first
+    const urlParams = new URLSearchParams(window.location.search);
+    const queueFromUrl = urlParams.get('queue');
+    
+    // Then try from props
+    return queueFromUrl || currentPatientId;
   };
+
+  const queueNumber = getQueueNumber();
   
   // Try to get patient from backend first, fallback to local state
-  const patient = backendPatientData || patients.find(p => p.id === currentPatientId);
+  const patient = backendPatientData || patients.find(p => p.id === queueNumber);
 
   // Staff profile pictures and information
   const staffProfiles = {
@@ -104,89 +95,246 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       photo: 'https://images.unsplash.com/photo-1758204054877-fb1c7ba85ea1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxudXJzZSUyMHByb2Zlc3Npb25hbCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2MDY2ODE5Nnww&ixlib=rb-4.1.0&q=80&w=1080'
     }
   };
-  
-  // Fetch patient data from backend
+
+  // Real-time polling for patient status
+  useEffect(() => {
+    if (!queueNumber) {
+      console.log('No queue number available for polling');
+      return;
+    }
+
+    const pollPatientStatus = async () => {
+  try {
+    console.log("🔄 Polling patient status for:", queueNumber);
+    
+    const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.log('Queue number not found yet, will retry...');
+        return;
+      }
+      throw new Error(`Failed to fetch patient status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Map backend status to frontend currentStage
+    const statusToStageMap = {
+      'arrived': 'kiosk',
+      'waiting_for_triage': 'waiting_triage',
+      'in_triage': 'triage',
+      'waiting_for_registration': 'waiting_registration',
+      'in_registration': 'registration',
+      'waiting_for_provider': 'waiting_doctor',
+      'with_provider': 'consultation',
+      'waiting_for_admission': 'waiting_admission',
+      'waiting_for_observation': 'waiting_observation',
+      'waiting_for_discharge': 'waiting_discharge',
+      'admission_in_progress': 'admission_orders',
+      'awaiting_bed': 'awaiting_non_icu',
+      'awaiting_icu_bed': 'awaiting_icu',
+      'discharge_in_progress': 'discharge_documents',
+      'ready_to_depart': 'awaiting_departure',
+      'departed': 'departed'
+    };
+    
+    // Transform backend data to match frontend format
+    const transformedPatient = {
+      id: data.queue_number,
+      name: data.patient.full_name,
+      queueNumber: data.queue_number,
+      esiLevel: data.priority_esi ? parseInt(data.priority_esi) : null,
+      currentStage: data.frontend_stage || statusToStageMap[data.status] || data.status,
+      arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
+      isActive: data.status !== 'departed',
+      stageHistory: data.events?.map(event => ({
+        stage: event.frontend_stage || statusToStageMap[event.type] || event.type,
+        startTime: new Date(event.at),
+        endTime: null,
+        payload: event.payload
+      })) || [],
+      chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
+      assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
+      assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
+      sex: data.patient.sex,
+      dob: data.patient.dob,
+      disposition: data.timestamps.dispositioned,
+    };
+    
+    setBackendPatientData(transformedPatient);
+    setLastUpdated(new Date());
+    setError(null);
+  } catch (err) {
+    console.error('Error polling patient status:', err);
+    // Don't set error here to avoid disrupting the UI during polling
+  }
+};
+
+    // Poll immediately and then every 5 seconds
+    pollPatientStatus();
+    const intervalId = setInterval(pollPatientStatus, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [queueNumber]);
+
+  // Initial patient data fetch
   useEffect(() => {
     const fetchPatientStatus = async () => {
-      if (!currentPatientId) return;
-      
-      try {
-        const response = await fetch(`/api/patient/status/${currentPatientId}`);
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            setError('Queue number not found in the system');
-            setIsLoading(false);
-            return;
-          }
-          throw new Error('Failed to fetch patient status');
-        }
-        
-        const data = await response.json();
-        
-        // Map backend status to frontend currentStage
-        const statusToStageMap = {
-          'arrived': 'kiosk',
-          'waiting_for_triage': 'waiting_triage',
-          'in_triage': 'triage',
-          'waiting_for_registration': 'waiting_registration',
-          'in_registration': 'registration',
-          'waiting_for_provider': 'waiting_doctor',
-          'with_provider': 'consultation',
-          'waiting_for_admission': 'waiting_admission',
-          'waiting_for_observation': 'waiting_observation',
-          'waiting_for_discharge': 'waiting_discharge',
-          'admission_in_progress': 'admission_orders',
-          'awaiting_bed': 'awaiting_non_icu',
-          'awaiting_icu_bed': 'awaiting_icu',
-          'discharge_in_progress': 'discharge_documents',
-          'ready_to_depart': 'awaiting_departure',
-          'departed': 'departed'
-        };
-        
-        // Transform backend data to match frontend format
-        const transformedPatient = {
-          id: data.queue_number,
-          name: data.patient.full_name,
-          queueNumber: data.queue_number,
-          esiLevel: data.timestamps?.triaged ? parseInt(data.priority_esi) : null,
-          currentStage: statusToStageMap[data.status] || data.status,
-          arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
-          isActive: data.status !== 'departed',
-          stageHistory: data.events?.map(event => ({
-            stage: statusToStageMap[event.type] || event.type,
-            startTime: new Date(event.at),
-            endTime: null,
-            payload: event.payload
-          })) || [],
-          // Additional fields from backend
-          chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
-          assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
-          assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
-          sex: data.patient.sex,
-          dob: data.patient.dob,
-          disposition: data.timestamps.dispositioned,
-        };
-        
-        setBackendPatientData(transformedPatient);
-        setError(null);
+  if (!queueNumber) {
+    setError('No queue number provided');
+    setIsLoading(false);
+    return;
+  }
+  
+  try {
+    setIsLoading(true);
+    console.log("📋 Fetching patient status for:", queueNumber);
+    
+    const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        setError(`Queue number "${queueNumber}" not found in the system`);
         setIsLoading(false);
-      } catch (err) {
-        console.error('Error fetching patient status:', err);
-        // Fallback to local state if backend fails
-        setError('Using offline data - updates may be delayed');
-        setIsLoading(false);
+        return;
       }
+      throw new Error(`Failed to fetch patient status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Map backend status to frontend currentStage
+    const statusToStageMap = {
+      'arrived': 'kiosk',
+      'waiting_for_triage': 'waiting_triage',
+      'in_triage': 'triage',
+      'waiting_for_registration': 'waiting_registration',
+      'in_registration': 'registration',
+      'waiting_for_provider': 'waiting_doctor',
+      'with_provider': 'consultation',
+      'waiting_for_admission': 'waiting_admission',
+      'waiting_for_observation': 'waiting_observation',
+      'waiting_for_discharge': 'waiting_discharge',
+      'admission_in_progress': 'admission_orders',
+      'awaiting_bed': 'awaiting_non_icu',
+      'awaiting_icu_bed': 'awaiting_icu',
+      'discharge_in_progress': 'discharge_documents',
+      'ready_to_depart': 'awaiting_departure',
+      'departed': 'departed'
     };
+    
+    // Transform backend data to match frontend format
+    const transformedPatient = {
+      id: data.queue_number,
+      name: data.patient.full_name,
+      queueNumber: data.queue_number,
+      esiLevel: data.priority_esi ? parseInt(data.priority_esi) : null,
+      currentStage: data.frontend_stage || statusToStageMap[data.status] || data.status,
+      arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
+      isActive: data.status !== 'departed',
+      stageHistory: data.events?.map(event => ({
+        stage: event.frontend_stage || statusToStageMap[event.type] || event.type,
+        startTime: new Date(event.at),
+        endTime: null,
+        payload: event.payload
+      })) || [],
+      chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
+      assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
+      assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
+      sex: data.patient.sex,
+      dob: data.patient.dob,
+      disposition: data.timestamps.dispositioned,
+    };
+    
+    setBackendPatientData(transformedPatient);
+    setLastUpdated(new Date());
+    setError(null);
+  } catch (err) {
+    console.error('Error fetching patient status:', err);
+    setError('Using offline data - updates may be delayed');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-    // Initial fetch
+    // Initial fetch only - polling will handle updates
     fetchPatientStatus();
+  }, [queueNumber]);
 
-    // Poll every 5 seconds for updates
-    const pollInterval = setInterval(fetchPatientStatus, 5000);
+  // Manual refresh function
+  const handleManualRefresh = async () => {
+  if (!queueNumber) {
+    toast.error('No queue number available');
+    return;
+  }
 
-    return () => clearInterval(pollInterval);
-  }, [currentPatientId]);
+  setIsLoading(true);
+  try {
+    console.log("🔄 Manual refresh for:", queueNumber);
+    
+    const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to refresh patient status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Map backend status to frontend currentStage
+    const statusToStageMap = {
+      'arrived': 'kiosk',
+      'waiting_for_triage': 'waiting_triage',
+      'in_triage': 'triage',
+      'waiting_for_registration': 'waiting_registration',
+      'in_registration': 'registration',
+      'waiting_for_provider': 'waiting_doctor',
+      'with_provider': 'consultation',
+      'waiting_for_admission': 'waiting_admission',
+      'waiting_for_observation': 'waiting_observation',
+      'waiting_for_discharge': 'waiting_discharge',
+      'admission_in_progress': 'admission_orders',
+      'awaiting_bed': 'awaiting_non_icu',
+      'awaiting_icu_bed': 'awaiting_icu',
+      'discharge_in_progress': 'discharge_documents',
+      'ready_to_depart': 'awaiting_departure',
+      'departed': 'departed'
+    };
+    
+    // Transform backend data to match frontend format
+    const transformedPatient = {
+      id: data.queue_number,
+      name: data.patient.full_name,
+      queueNumber: data.queue_number,
+      esiLevel: data.priority_esi ? parseInt(data.priority_esi) : null,
+      currentStage: data.frontend_stage || statusToStageMap[data.status] || data.status,
+      arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
+      isActive: data.status !== 'departed',
+      stageHistory: data.events?.map(event => ({
+        stage: event.frontend_stage || statusToStageMap[event.type] || event.type,
+        startTime: new Date(event.at),
+        endTime: null,
+        payload: event.payload
+      })) || [],
+      chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
+      assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
+      assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
+      sex: data.patient.sex,
+      dob: data.patient.dob,
+      disposition: data.timestamps.dispositioned,
+    };
+    
+    setBackendPatientData(transformedPatient);
+    setLastUpdated(new Date());
+    setError(null);
+    toast.success('Status updated!');
+  } catch (err) {
+    console.error('Error refreshing patient status:', err);
+    toast.error('Failed to refresh status');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // Update timer every minute
   useEffect(() => {
@@ -302,7 +450,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
 
   const handleSatisfactionSubmit = (feedback) => {
     if (satisfactionModal && onAddSatisfactionFeedback) {
-      onAddSatisfactionFeedback(currentPatientId, satisfactionModal.stageIndex, feedback);
+      onAddSatisfactionFeedback(queueNumber, satisfactionModal.stageIndex, feedback);
     }
     setSatisfactionModal(null);
   };
@@ -320,7 +468,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       
       // Send feedback to ED Manager
       if (onAddRealtimeFeedback) {
-        onAddRealtimeFeedback(currentPatientId, {
+        onAddRealtimeFeedback(queueNumber, {
           rating: commentSatisfaction,
           comment: patientComment,
           stage: patient.currentStage,
@@ -337,6 +485,44 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       toast.error('Please add a comment before submitting');
     }
   };
+
+  // Show loading if no queue number and still loading
+  if (!queueNumber && isLoading) {
+    return (
+      <div className="min-h-screen bg-blue-50 p-4 flex items-center justify-center">
+        <Card className="w-full max-w-md shadow-lg">
+          <CardContent className="p-8 text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+            <h3 className="text-lg font-medium mb-2">Loading your visit information...</h3>
+            <p className="text-gray-600">Please wait while we fetch your current status.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error if no queue number
+  if (!queueNumber) {
+    return (
+      <div className="min-h-screen bg-blue-50 p-4 flex items-center justify-center">
+        <Card className="w-full max-w-md shadow-lg border-l-4 border-l-red-500">
+          <CardContent className="p-8 text-center">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Activity className="w-6 h-6 text-red-600" />
+            </div>
+            <h3 className="text-lg font-medium mb-2 text-red-800">Queue Number Required</h3>
+            <p className="text-gray-600 mb-4">Please provide a queue number to view your visit status.</p>
+            <Button 
+              onClick={() => window.history.back()}
+              className="w-full"
+            >
+              Go Back
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   
   if (isLoading && !patient) {
     return (
@@ -346,6 +532,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
             <h3 className="text-lg font-medium mb-2">Loading your visit information...</h3>
             <p className="text-gray-600">Connecting to the Emergency Department system...</p>
+            <p className="text-sm text-gray-500 mt-2">Queue: {queueNumber}</p>
           </CardContent>
         </Card>
       </div>
@@ -365,6 +552,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
             <p className="text-sm text-gray-500">
               Please check with the registration desk or try logging in again.
             </p>
+            <p className="text-sm text-gray-500 mt-2">Queue: {queueNumber}</p>
           </CardContent>
         </Card>
       </div>
@@ -379,6 +567,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
             <h3 className="text-lg font-medium mb-2">Loading your visit information...</h3>
             <p className="text-gray-600">Please wait while we fetch your current status.</p>
+            <p className="text-sm text-gray-500 mt-2">Queue: {queueNumber}</p>
           </CardContent>
         </Card>
       </div>
@@ -517,18 +706,39 @@ const getProgressPercentage = () => {
           <p className="text-xl text-gray-600">Visit Tracker - {patient.name || 'Patient'}</p>
           
           {/* Connection Status Indicator */}
-          <div className="flex items-center justify-center gap-2 mt-2">
-            {backendPatientData ? (
-              <>
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-green-600">Live updates from ED system</span>
-              </>
-            ) : (
-              <>
-                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <span className="text-xs text-yellow-600">Offline mode - updates may be delayed</span>
-              </>
-            )}
+          <div className="flex items-center justify-center gap-4 mt-2">
+            <div className="flex items-center gap-2">
+              {backendPatientData ? (
+                <>
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs text-green-600">Live updates from ED system</span>
+                </>
+              ) : (
+                <>
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  <span className="text-xs text-yellow-600">Offline mode - updates may be delayed</span>
+                </>
+              )}
+            </div>
+
+            {/* Refresh Button and Last Updated */}
+            <div className="flex items-center gap-2">
+              <Button 
+                onClick={handleManualRefresh}
+                disabled={isLoading}
+                size="sm" 
+                variant="outline"
+                className="flex items-center gap-1 h-7"
+              >
+                <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              {lastUpdated && (
+                <span className="text-xs text-gray-500">
+                  Last updated: {lastUpdated.toLocaleTimeString()}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1004,9 +1214,11 @@ const getProgressPercentage = () => {
           </CardContent>
         </Card>
 
-        {/* Current Time */}
-        <div className="text-center text-sm text-gray-500">
-          Last updated: {currentTime.toLocaleString()}
+        {/* Current Time and Data Update Time */}
+        <div className="text-center text-sm text-gray-500 space-y-1">
+          <p>Current time: {currentTime.toLocaleString()}</p>
+          {lastUpdated && <p>Data updated: {lastUpdated.toLocaleString()}</p>}
+          <p>Page automatically updates every 5 seconds</p>
         </div>
 
         {/* Satisfaction Feedback Modal */}

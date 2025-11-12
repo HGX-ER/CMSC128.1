@@ -62,6 +62,17 @@ router.post("/registration/new", async (req, res) => {
 
         console.log(`✅ Generated queue number: ${queueNumber} for patient ID: ${patientId}`);
 
+        // Send real-time event notification
+        const publishEvent = req.app.get("publishEvent");
+        if (publishEvent) {
+            publishEvent({
+                type: "queue_generated",
+                queueNumber: queueNumber,
+                patientId: patientId,
+                timestamp: new Date().toISOString()
+            });
+        }
+
         res.json({
             success: true,
             queueNumber: queueNumber
@@ -159,6 +170,16 @@ router.put("/registration/patient/:queueNumber", async (req, res) => {
                 queueNumber,
             ]
         );
+
+        // Send real-time update
+        const publishEvent = req.app.get("publishEvent");
+        if (publishEvent) {
+            publishEvent({
+                type: "patient_registered",
+                queueNumber: queueNumber,
+                timestamp: new Date().toISOString()
+            });
+        }
 
         res.json({ message: "Patient registration updated successfully" });
     } catch (err) {

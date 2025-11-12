@@ -93,7 +93,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
     }
   };
 
-  // Updated function to generate queue number via backend
+  // Generate queue number via backend
   const generateQueueNumber = async () => {
     setIsGenerating(true);
     setError("");
@@ -121,22 +121,52 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
       if (data.success) {
         setGeneratedQueueNumber(data.queueNumber);
         setShowGenerator(true);
+        
+        // Automatically check status after 1 second to ensure DB is updated
+        setTimeout(() => {
+          handleUseGeneratedNumber(true);
+        }, 1000);
       } else {
         throw new Error(data.error || "Failed to generate queue number");
       }
     } catch (err) {
       console.error("Full error:", err);
-      setError(err.message || "Failed to generate queue number. Please check if the backend is running.");
+      setError(err.message || "Failed to generate queue number");
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Updated function to use the generated number
-  const handleUseGeneratedNumber = () => {
+  // Use the generated number and automatically check status
+  // Use the generated number and automatically check status
+const handleUseGeneratedNumber = async (autoCheck = false) => {
+  if (autoCheck) {
+    // Auto-check: set the queue number and check status after a longer delay
     setQueueNumber(generatedQueueNumber);
     setShowGenerator(false);
-  };
+    
+    // Wait 2 seconds to ensure backend has fully committed the data
+    setTimeout(() => {
+      setIsLoading(true);
+      setError("");
+      const checkStatus = async () => {
+        try {
+          const result = await onQueueLogin(generatedQueueNumber);
+          if (!result.success) setError(result.error || "Queue number not found");
+        } catch {
+          setError("An unexpected error occurred");
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      checkStatus();
+    }, 2000); // Increased from 1 second to 2 seconds
+  } else {
+    // Manual use: just set the queue number in input
+    setQueueNumber(generatedQueueNumber);
+    setShowGenerator(false);
+  }
+};
 
   const handlePrintQueueNumber = () => {
     const printWindow = window.open('', '', 'width=400,height=600');
@@ -238,10 +268,9 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
               </TabsList>
 
               {activeTab === "staff" && (
-                <p className="text-sm text-gray-600 text-center mb-2">
-                  Sign in with your hospital account to access the staff
-                  dashboard.
-                </p>
+                <CardDescription className="text-sm text-center mb-2">
+                  Sign in with your hospital account to access the staff dashboard.
+                </CardDescription>
               )}
 
               {/* Staff Login */}
@@ -249,61 +278,45 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                 <form onSubmit={handleStaffSubmit} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="username">Username</Label>
-                    <div className="relative flex items-center">
-                      <User
-                        className="absolute text-gray-400 w-4 h-4"
-                        style={{
-                          left: "1rem",
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                        }}
-                      />
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="username"
                         type="text"
                         placeholder="Enter your username"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        style={{ paddingLeft: "2.75rem" }}
+                        className="pl-10"
                         required
                       />
                     </div>
                   </div>
 
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative flex items-center">
-                    <Shield
-                      className="absolute text-gray-400 w-4 h-4"
-                      style={{
-                        left: "1rem",
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                      }}
-                    />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      style={{
-                        paddingLeft: "2.75rem",
-                        paddingRight: "2.5rem",
-                      }}
-                      className="h-10"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="text-gray-400 hover:text-gray-600 w-5 h-5" />
-                      ) : (
-                        <Eye className="text-gray-400 hover:text-gray-600 w-5 h-5" />
-                      )}
-                    </button>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative">
+                      <Shield className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="pl-10 pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   <Button
@@ -319,7 +332,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                   </Button>
                 </form>
               </TabsContent>
-              
+
               {/* Patient Login */}
               <TabsContent value="patient" className="space-y-4">
                 <div
@@ -410,7 +423,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                           </Button>
                           <Button
                             type="button"
-                            onClick={handleUseGeneratedNumber}
+                            onClick={() => handleUseGeneratedNumber(false)}
                             className="flex-1"
                             style={{
                               backgroundColor: "#47a1bd",
@@ -419,6 +432,18 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                           >
                             <CheckCircle className="w-4 h-4 mr-2" />
                             Use This Number
+                          </Button>
+                        </div>
+                        <div className="text-center">
+                          <Button
+                            type="button"
+                            onClick={() => handleUseGeneratedNumber(true)}
+                            variant="outline"
+                            className="w-full"
+                            style={{ borderColor: "#4CAF50", color: "#4CAF50" }}
+                          >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Check Status Now
                           </Button>
                         </div>
                         <Button
@@ -437,30 +462,19 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                 <form onSubmit={handlePatientSubmit} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="queueNumber">Enter Queue Number</Label>
-                    <div className="relative flex items-center">
-                      <Hash
-                        className="absolute text-gray-400 w-4 h-4"
-                        style={{
-                          left: "1rem",
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                        }}
-                      />
+                    <div className="relative">
+                      <Hash className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="queueNumber"
                         type="text"
-                        placeholder="Enter your queue number manually"
+                        placeholder="Enter your queue number"
                         value={queueNumber}
-                        onChange={(e) =>
-                          setQueueNumber(e.target.value.toUpperCase())
-                        }
-                        style={{ paddingLeft: "2.75rem" }}
-                        className="font-mono"
+                        onChange={(e) => setQueueNumber(e.target.value.toUpperCase())}
+                        className="pl-10 font-mono"
                         required
                       />
                     </div>
                   </div>
-
 
                   <Button
                     type="submit"
