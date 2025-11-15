@@ -56,6 +56,7 @@ const patientRoutes = require("./routes/patient");
 const getDoctorRoutes = require("./routes/getdoctor");
 const whiteboardRoutes = require("./routes/whiteboard");
 const doctorsRoutes = require("./routes/doctors");
+const feedbackRoutes = require('./routes/feedback');
 
 // Mount routes
 app.use("/api", authRoutes);
@@ -66,6 +67,7 @@ app.use("/api", patientRoutes);
 app.use("/api/getdoctor", getDoctorRoutes);
 app.use('/api', whiteboardRoutes);
 app.use("/api", doctorsRoutes);
+app.use('/api', feedbackRoutes);
 
 /* ===== Error handler ===== */
 app.use((err, req, res, next) => {

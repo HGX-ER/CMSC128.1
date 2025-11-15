@@ -138,35 +138,34 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
   };
 
   // Use the generated number and automatically check status
-  // Use the generated number and automatically check status
-const handleUseGeneratedNumber = async (autoCheck = false) => {
-  if (autoCheck) {
-    // Auto-check: set the queue number and check status after a longer delay
-    setQueueNumber(generatedQueueNumber);
-    setShowGenerator(false);
-    
-    // Wait 2 seconds to ensure backend has fully committed the data
-    setTimeout(() => {
-      setIsLoading(true);
-      setError("");
-      const checkStatus = async () => {
-        try {
-          const result = await onQueueLogin(generatedQueueNumber);
-          if (!result.success) setError(result.error || "Queue number not found");
-        } catch {
-          setError("An unexpected error occurred");
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      checkStatus();
-    }, 2000); // Increased from 1 second to 2 seconds
-  } else {
-    // Manual use: just set the queue number in input
-    setQueueNumber(generatedQueueNumber);
-    setShowGenerator(false);
-  }
-};
+  const handleUseGeneratedNumber = async (autoCheck = false) => {
+    if (autoCheck) {
+      // Auto-check: set the queue number and check status after a longer delay
+      setQueueNumber(generatedQueueNumber);
+      setShowGenerator(false);
+      
+      // Wait 2 seconds to ensure backend has fully committed the data
+      setTimeout(() => {
+        setIsLoading(true);
+        setError("");
+        const checkStatus = async () => {
+          try {
+            const result = await onQueueLogin(generatedQueueNumber);
+            if (!result.success) setError(result.error || "Queue number not found");
+          } catch {
+            setError("An unexpected error occurred");
+          } finally {
+            setIsLoading(false);
+          }
+        };
+        checkStatus();
+      }, 2000); // Increased from 1 second to 2 seconds
+    } else {
+      // Manual use: just set the queue number in input
+      setQueueNumber(generatedQueueNumber);
+      setShowGenerator(false);
+    }
+  };
 
   const handlePrintQueueNumber = () => {
     const printWindow = window.open('', '', 'width=400,height=600');
@@ -279,14 +278,14 @@ const handleUseGeneratedNumber = async (autoCheck = false) => {
                   <div className="space-y-2">
                     <Label htmlFor="username">Username</Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <User className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="username"
                         type="text"
                         placeholder="Enter your username"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        className="pl-10"
+                        style={{ paddingLeft: "4rem" }} 
                         required
                       />
                     </div>
@@ -295,20 +294,20 @@ const handleUseGeneratedNumber = async (autoCheck = false) => {
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
                     <div className="relative">
-                      <Shield className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Shield className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Enter your password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10 pr-10"
+                        style={{ paddingLeft: "4rem", paddingRight: "2.5rem" }} 
                         required
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-3"
+                        className="absolute right-4 top-1/2 -translate-y-1/2"
                       >
                         {showPassword ? (
                           <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -343,7 +342,6 @@ const handleUseGeneratedNumber = async (autoCheck = false) => {
                   }}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <Hash className="w-4 h-4" style={{ color: "#96cfe0" }} />
                     <span className="font-medium" style={{ color: "#004f61" }}>
                       Patient Portal
                     </span>
@@ -463,14 +461,15 @@ const handleUseGeneratedNumber = async (autoCheck = false) => {
                   <div className="space-y-2">
                     <Label htmlFor="queueNumber">Enter Queue Number</Label>
                     <div className="relative">
-                      <Hash className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Hash className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="queueNumber"
                         type="text"
                         placeholder="Enter your queue number"
                         value={queueNumber}
                         onChange={(e) => setQueueNumber(e.target.value.toUpperCase())}
-                        className="pl-10 font-mono"
+                        className="!pl-14 font-mono"
+                        style={{ paddingLeft: "4rem", paddingRight: "2.5rem" }} 
                         required
                       />
                     </div>

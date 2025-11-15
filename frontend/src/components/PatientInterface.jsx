@@ -455,8 +455,33 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     setSatisfactionModal(null);
   };
 
-  const handleSubmitComment = () => {
-    if (patientComment.trim() && commentSatisfaction > 0) {
+  // Update the handleSubmitComment function in PatientInterface.jsx
+
+const handleSubmitComment = async () => {
+  if (patientComment.trim() && commentSatisfaction > 0) {
+    try {
+      // Send feedback to backend
+      const response = await fetch('http://localhost:5000/api/feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          queueNumber: queueNumber,
+          rating: commentSatisfaction,
+          comment: patientComment,
+          stage: patient.currentStage,
+          stageName: getStageDisplayName(patient.currentStage)
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit feedback');
+      }
+
+      const result = await response.json();
+      
+      // Add to local state for immediate display
       const newComment = {
         time: new Date(),
         message: patientComment,
@@ -466,25 +491,22 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       };
       setSubmittedComments([...submittedComments, newComment]);
       
-      // Send feedback to ED Manager
-      if (onAddRealtimeFeedback) {
-        onAddRealtimeFeedback(queueNumber, {
-          rating: commentSatisfaction,
-          comment: patientComment,
-          stage: patient.currentStage,
-          stageName: getStageDisplayName(patient.currentStage)
-        });
-      }
-      
+      // Clear form
       setPatientComment('');
       setCommentSatisfaction(0);
+      
       toast.success('Your feedback has been sent to the ED Manager!');
-    } else if (commentSatisfaction === 0) {
-      toast.error('Please select a star rating before submitting');
-    } else {
-      toast.error('Please add a comment before submitting');
+      
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      toast.error('Failed to send feedback. Please try again.');
     }
-  };
+  } else if (commentSatisfaction === 0) {
+    toast.error('Please select a rating before submitting');
+  } else {
+    toast.error('Please add a comment before submitting');
+  }
+};
 
   // Show loading if no queue number and still loading
   if (!queueNumber && isLoading) {
@@ -702,8 +724,8 @@ const getProgressPercentage = () => {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-4xl mb-2">Emergency Department</h1>
-          <p className="text-xl text-gray-600">Visit Tracker - {patient.name || 'Patient'}</p>
+          <h1 className="text-4xl font-bold mb-2">Emergency Department</h1>
+          <p className="text-xl text-gray-600">Visit Tracker</p>
           
           {/* Connection Status Indicator */}
           <div className="flex items-center justify-center gap-4 mt-2">
@@ -1088,7 +1110,6 @@ const getProgressPercentage = () => {
             >
               <Newspaper className="w-4 h-4" />
               <span className="hidden sm:inline">News</span>
-              <span className="sm:hidden">News</span>
             </TabsTrigger>
 
             <TabsTrigger
@@ -1110,7 +1131,6 @@ const getProgressPercentage = () => {
             >
               <Brain className="w-4 h-4" />
               <span className="hidden sm:inline">Trivia</span>
-              <span className="sm:hidden">Quiz</span>
             </TabsTrigger>
 
             <TabsTrigger
@@ -1131,8 +1151,7 @@ const getProgressPercentage = () => {
               "
             >
               <Wind className="w-4 h-4" />
-              <span className="hidden sm:inline">Relax</span>
-              <span className="sm:hidden">Calm</span>
+              <span className="hidden sm:inline">Relaxation Exercises</span>
             </TabsTrigger>
 
             <TabsTrigger
@@ -1154,7 +1173,6 @@ const getProgressPercentage = () => {
             >
               <Building className="w-4 h-4" />
               <span className="hidden sm:inline">Services</span>
-              <span className="sm:hidden">Info</span>
             </TabsTrigger>
           </TabsList>
 

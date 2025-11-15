@@ -150,5 +150,23 @@ INSERT INTO observations (encounter_id, type, value, unit) VALUES
                                                                ((SELECT id FROM encounters WHERE queue_number='ED001'),'complaint','Headache',NULL),
                                                                ((SELECT id FROM encounters WHERE queue_number='ED001'),'bp_sys','130','mmHg'),
                                                                ((SELECT id FROM encounters WHERE queue_number='ED001'),'bp_dia','80','mmHg');
+-- PATIENT FEEDBACK
+CREATE TABLE patient_feedback (
+                                  id INT AUTO_INCREMENT PRIMARY KEY,
+                                  encounter_id INT NOT NULL,
+                                  queue_number VARCHAR(32) NOT NULL,
+                                  rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+                                  comment TEXT,
+                                  stage VARCHAR(64) NOT NULL,
+                                  stage_display_name VARCHAR(128),
+                                  submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                  CONSTRAINT fk_feedback_encounter FOREIGN KEY (encounter_id)
+                                      REFERENCES encounters(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                                  INDEX idx_feedback_queue (queue_number),
+                                  INDEX idx_feedback_encounter (encounter_id),
+                                  INDEX idx_feedback_submitted (submitted_at)
+) ENGINE=InnoDB;
+
 
 ALTER TABLE encounters ADD COLUMN diagnosis TEXT NULL AFTER provider_start_time;
+
