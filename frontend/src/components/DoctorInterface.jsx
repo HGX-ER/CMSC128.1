@@ -117,8 +117,9 @@ export function DoctorInterface({
     "A calm mind and caring heart create miracles every day.",
     "Today is another opportunity to make a difference!",
   ];
-  const randomMotivation =
-    motivationalPhrases[Math.floor(Math.random() * motivationalPhrases.length)];
+  const randomMotivation = useMemo(() => {
+    return motivationalPhrases[Math.floor(Math.random() * motivationalPhrases.length)];
+  }, []); 
 
   // Actions
   const handleSelectPatient = (id) => setSelectedPatient(id);

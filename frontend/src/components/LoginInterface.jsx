@@ -121,11 +121,10 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
       if (data.success) {
         setGeneratedQueueNumber(data.queueNumber);
         setShowGenerator(true);
-        
-        // Automatically check status after 1 second to ensure DB is updated
+
         setTimeout(() => {
-          handleUseGeneratedNumber(true);
-        }, 1000);
+          handleUseGeneratedNumber(true, data.queueNumber);
+        }, 5000);
       } else {
         throw new Error(data.error || "Failed to generate queue number");
       }
@@ -138,31 +137,28 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
   };
 
   // Use the generated number and automatically check status
-  const handleUseGeneratedNumber = async (autoCheck = false) => {
+  const handleUseGeneratedNumber = async (autoCheck = false, newQueue) => {
+    const numToUse = newQueue || generatedQueueNumber;
+
     if (autoCheck) {
-      // Auto-check: set the queue number and check status after a longer delay
-      setQueueNumber(generatedQueueNumber);
+      setQueueNumber(numToUse);
       setShowGenerator(false);
-      
-      // Wait 2 seconds to ensure backend has fully committed the data
-      setTimeout(() => {
+
+      setTimeout(async () => {
         setIsLoading(true);
         setError("");
-        const checkStatus = async () => {
-          try {
-            const result = await onQueueLogin(generatedQueueNumber);
-            if (!result.success) setError(result.error || "Queue number not found");
-          } catch {
-            setError("An unexpected error occurred");
-          } finally {
-            setIsLoading(false);
-          }
-        };
-        checkStatus();
-      }, 2000); // Increased from 1 second to 2 seconds
+
+        try {
+          const result = await onQueueLogin(numToUse);
+          if (!result.success) setError(result.error);
+        } catch {
+          setError("An unexpected error occurred");
+        } finally {
+          setIsLoading(false);
+        }
+      }, 2000);
     } else {
-      // Manual use: just set the queue number in input
-      setQueueNumber(generatedQueueNumber);
+      setQueueNumber(numToUse);
       setShowGenerator(false);
     }
   };
@@ -407,6 +403,9 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                         </div>
                         <p className="text-sm text-gray-600">
                           Please save this number. You'll need it to check your visit status.
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          The generated queue number will be displayed for 5 seconds and automatically logins.
                         </p>
                         <div className="flex gap-2">
                           <Button

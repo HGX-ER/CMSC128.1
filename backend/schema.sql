@@ -135,9 +135,7 @@ ON DUPLICATE KEY UPDATE
 -- Doc queue has one patient already waiting for doc1
 INSERT INTO encounters (patient_id, queue_number, status, priority_esi, assigned_doctor, assigned_nurse, arrival_time)
 VALUES
-    (1,'ED001','waiting_doctor',4,'doc1','nurse1',NOW()),
-    (2,'ED002','registered',3,NULL,'nurse1',NOW()),
-    (3,'ED003','arrived',NULL,NULL,'nurse1',NOW())
+    (1,'ED001','waiting_doctor',4,'doc1','nurse1',NOW())
 ON DUPLICATE KEY UPDATE
                      status=VALUES(status),
                      priority_esi=VALUES(priority_esi),

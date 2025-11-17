@@ -22,6 +22,7 @@ const getStageDisplayName = (stage) => {
     triage: 'Triage Assessment',
     waiting_registration: 'Registration Waiting Area',
     registration: 'Registration',
+    registered: 'Registration (Registered)',
     waiting_doctor: 'Doctor Waiting Area',
     consultation: 'Doctor Consultation',
     waiting_admission: 'Admission Waiting',

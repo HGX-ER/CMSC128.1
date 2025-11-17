@@ -124,6 +124,9 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       'arrived': 'kiosk',
       'waiting_for_triage': 'waiting_triage',
       'in_triage': 'triage',
+      'triaged': 'waiting_registration',  // <-- CHANGED: triaged -> waiting_registration
+      'registration': 'registering',
+      'registered': 'registration',  // ✅ ADD THIS LINE
       'waiting_for_registration': 'waiting_registration',
       'in_registration': 'registration',
       'waiting_for_provider': 'waiting_doctor',
@@ -138,6 +141,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       'ready_to_depart': 'awaiting_departure',
       'departed': 'departed'
     };
+
     
     // Transform backend data to match frontend format
     const transformedPatient = {
@@ -148,10 +152,10 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       currentStage: data.frontend_stage || statusToStageMap[data.status] || data.status,
       arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
       isActive: data.status !== 'departed',
-      stageHistory: data.events?.map(event => ({
+      stageHistory: data.events?.map((event, index, array) => ({
         stage: event.frontend_stage || statusToStageMap[event.type] || event.type,
         startTime: new Date(event.at),
-        endTime: null,
+        endTime: array[index + 1] ? new Date(array[index + 1].at) : null,  // ✅ This fixes the completion status
         payload: event.payload
       })) || [],
       chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
@@ -209,6 +213,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       'arrived': 'kiosk',
       'waiting_for_triage': 'waiting_triage',
       'in_triage': 'triage',
+      'triaged': 'waiting_registration',  // <-- CHANGED: triaged -> waiting_registration
       'waiting_for_registration': 'waiting_registration',
       'in_registration': 'registration',
       'waiting_for_provider': 'waiting_doctor',
@@ -233,10 +238,10 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       currentStage: data.frontend_stage || statusToStageMap[data.status] || data.status,
       arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
       isActive: data.status !== 'departed',
-      stageHistory: data.events?.map(event => ({
+      stageHistory: data.events?.map((event, index, array) => ({
         stage: event.frontend_stage || statusToStageMap[event.type] || event.type,
         startTime: new Date(event.at),
-        endTime: null,
+        endTime: array[index + 1] ? new Date(array[index + 1].at) : null,  // ✅ This fixes the completion status
         payload: event.payload
       })) || [],
       chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
@@ -286,6 +291,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       'arrived': 'kiosk',
       'waiting_for_triage': 'waiting_triage',
       'in_triage': 'triage',
+      'triaged': 'waiting_registration',  // <-- CHANGED: triaged -> waiting_registration
       'waiting_for_registration': 'waiting_registration',
       'in_registration': 'registration',
       'waiting_for_provider': 'waiting_doctor',
@@ -310,10 +316,10 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       currentStage: data.frontend_stage || statusToStageMap[data.status] || data.status,
       arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
       isActive: data.status !== 'departed',
-      stageHistory: data.events?.map(event => ({
+      stageHistory: data.events?.map((event, index, array) => ({
         stage: event.frontend_stage || statusToStageMap[event.type] || event.type,
         startTime: new Date(event.at),
-        endTime: null,
+        endTime: array[index + 1] ? new Date(array[index + 1].at) : null,  // ✅ This fixes the completion status
         payload: event.payload
       })) || [],
       chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
@@ -600,9 +606,10 @@ const handleSubmitComment = async () => {
     const descriptions = {
       kiosk: 'You have successfully checked in',
       waiting_triage: 'Please wait to be called for triage assessment',
-      triage: 'You are currently being assessed by the triage nurse',
+      triaged: 'You are currently being assessed by the triage nurse',
       waiting_registration: 'Please proceed to registration when called',
       registration: 'Your information is being registered',
+      registered:'You have been registered',
       waiting_doctor: 'Please wait in the designated area to see the doctor',
       consultation: 'You are currently with the doctor',
       waiting_admission: 'Admission is being arranged',
@@ -622,9 +629,10 @@ const handleSubmitComment = async () => {
     const displayNames = {
       kiosk: 'Check-in Area',
       waiting_triage: 'Triage Waiting Area',
-      triage: 'Triage Assessment',
+      triaged: 'Triage Assessment',
       waiting_registration: 'Registration Waiting Area',
       registration: 'Registration',
+      registered: 'Registration (Registered)',  // ✅ ADD THIS LINE (as fallback)
       waiting_doctor: 'Doctor Waiting Area',
       consultation: 'Doctor Consultation',
       waiting_admission: 'Admission Waiting',
@@ -637,8 +645,9 @@ const handleSubmitComment = async () => {
       awaiting_departure: 'Ready for Departure',
       departed: 'Visit Completed'
     };
-    return displayNames[stage] || 'In Process';
+    return displayNames[stage] || `In Process (${stage})`;
   };
+
 
   const getStaffDisplayName = (username) => {
     return staffProfiles[username]?.name || username;
