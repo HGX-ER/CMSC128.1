@@ -80,7 +80,7 @@ export function ManagerInterface({
   const fetchFeedback = async () => {
     try {
       setIsLoadingFeedback(true);
-      const response = await fetch('http://localhost:5000/api/feedback');
+      const response = await fetch('https://cmsc128-backend.onrender.com/api/feedback');
       
       if (!response.ok) {
         throw new Error('Failed to fetch feedback');
@@ -106,7 +106,7 @@ export function ManagerInterface({
 
   // Listen for SSE events for real-time updates
   useEffect(() => {
-    const eventSource = new EventSource('http://localhost:5000/stream/events');
+    const eventSource = new EventSource('https://cmsc128-backend.onrender.com/stream/events');
     
     eventSource.addEventListener('message', (event) => {
       try {
