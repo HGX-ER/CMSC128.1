@@ -20,7 +20,11 @@ app.use(bodyParser.json());
 // ===== SSE bus =====
 const sseClients = new Set();
 
-app.get("/stream/events", (req, res) => {
+app.get("/", (req, res) => {
+    res.send("Backend is running!");
+});
+
+app.get("/stream/events",  cors({ origin: FRONTEND_URL, credentials: true }),(req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
