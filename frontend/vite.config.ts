@@ -5,6 +5,7 @@
 
   export default defineConfig({
     plugins: [react()],
+    base: process.env.VITE_BASE_PATH || "/CMSC128.1",
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
