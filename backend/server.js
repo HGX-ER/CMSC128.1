@@ -20,15 +20,17 @@ app.use(bodyParser.json());
 // ===== SSE bus =====
 const sseClients = new Set();
 
+// Root route to test backend
 app.get("/", (req, res) => {
     res.send("Backend is running!");
 });
 
-app.get("/stream/events",  cors({ origin: FRONTEND_URL, credentials: true }),(req, res) => {
+// SSE route
+app.get("/stream/events", cors({ origin: FRONTEND_URL, credentials: true }), (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
-    res.setHeader("Access-Control-Allow-Origin", FRONTEND_URL); // add this
+    res.setHeader("Access-Control-Allow-Origin", FRONTEND_URL);
     res.flushHeaders();
 
     res.write('event: ping\ndata: "connected"\n\n');
