@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Base API URL
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://cmsc128-backend.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_BASE,
