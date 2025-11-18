@@ -1,5 +1,5 @@
 {
-      "name": "Emergency Department Management System (Copy)",
+      "name": "edms",
       "version": "0.1.0",
       "private": true,
       "dependencies": {
