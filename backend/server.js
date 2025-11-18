@@ -11,6 +11,8 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "https://cmsc-128-1.vercel.app"
 // ===== CORS =====
 app.use(cors({
     origin: FRONTEND_URL,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
 }));
 app.use(bodyParser.json());
@@ -22,6 +24,7 @@ app.get("/stream/events", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("Access-Control-Allow-Origin", FRONTEND_URL); // add this
     res.flushHeaders();
 
     res.write('event: ping\ndata: "connected"\n\n');
