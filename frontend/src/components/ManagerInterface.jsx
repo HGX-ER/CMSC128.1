@@ -106,7 +106,7 @@ export function ManagerInterface({
 
   // Listen for SSE events for real-time updates
   useEffect(() => {
-    const eventSource = new EventSource('https://cmsc128-backend.onrender.com/stream/events');
+    const eventSource = new EventSource('https://cmsc1281-production.up.railway.app/api/stream/events');
     
     eventSource.addEventListener('message', (event) => {
       try {

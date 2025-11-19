@@ -15,7 +15,7 @@ export function useEventBus(onEvent) {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    const url = 'https://cmsc128-backend.onrender.com/stream/events'; // not under /api
+    const url = 'https://cmsc1281-production.up.railway.app/api/stream/events'; // not under /api
     let es;
 
     const open = () => {
