@@ -1,11 +1,13 @@
-import axios from 'axios';
+import axios from "axios";
 
-// Base API URL
-const API_BASE = import.meta.env.VITE_API_URL || 'https://cmsc1281-production.up.railway.app/api';
+// Base URLs
+const BACKEND_ROOT = import.meta.env.VITE_API_ROOT || "https://cmsc1281-production.up.railway.app";
+const API_BASE = import.meta.env.VITE_API_URL || `${BACKEND_ROOT}/api`;
 
+// Axios instance for REST API
 const api = axios.create({
   baseURL: API_BASE,
-  withCredentials: false, // set true if you use cookies
+  withCredentials: false,
 });
 
 // Response interceptor
@@ -16,10 +18,9 @@ api.interceptors.response.use(
 
 // SSE helper
 export function createEventSource(path) {
-  const base = API_BASE.replace(/\/api$/, ''); // remove /api for SSE
-  const url = `${base}${path}`;
+  const url = `${BACKEND_ROOT}${path}`; // do NOT add /api for SSE
   return new EventSource(url);
 }
 
-export { API_BASE };
+export { API_BASE, BACKEND_ROOT };
 export default api;
