@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Base API URL
-const API_BASE = import.meta.env.VITE_API_URL || 'https://cmsc1281-production.up.railway.app';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://cmsc1281-production.up.railway.app/api';
 
 const api = axios.create({
   baseURL: API_BASE,
