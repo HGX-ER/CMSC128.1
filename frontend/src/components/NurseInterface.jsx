@@ -55,7 +55,7 @@ export function NurseInterface({
   useEffect(() => {
     const loadDoctors = async () => {
       try {
-        const res = await fetch('https://cmsc128-backend.onrender.com/api/doctors');
+        const res = await fetch('https://cmsc1281-production.up.railway.app/api/doctors');
         if (!res.ok) throw new Error('No /api/doctors');
         const list = await res.json();
         const normalized = Array.isArray(list) ? list.map(normalizeDoctor) : [];
@@ -71,7 +71,7 @@ export function NurseInterface({
   useEffect(() => {
     const fetchUpdatedPatients = async () => {
       try {
-        const response = await fetch("https://cmsc128-backend.onrender.com/api/board");
+        const response = await fetch("https://cmsc1281-production.up.railway.app/api/board");
         if (!response.ok) throw new Error("Failed to fetch updated patient data");
         const data = await response.json();
         if (Array.isArray(data)) onUpdatePatient(null, data);
@@ -125,7 +125,7 @@ export function NurseInterface({
   const handleAssignDoctor = async () => {
     if (selectedPatient && selectedDoctor) {
       try {
-        const res = await fetch("https://cmsc128-backend.onrender.com/api/board/assign-doctor", {
+        const res = await fetch("https://cmsc1281-production.up.railway.app/api/board/assign-doctor", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -155,7 +155,7 @@ export function NurseInterface({
 
     // Try backend; fall back to local handler
     try {
-      const res = await fetch("https://cmsc128-backend.onrender.com/api/board/adjust-stage-time", {
+      const res = await fetch("https://cmsc1281-production.up.railway.app/api/board/adjust-stage-time", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -175,7 +175,7 @@ export function NurseInterface({
 
   const handleAssignNurse = async (patient) => {
     try {
-      await fetch("https://cmsc128-backend.onrender.com/api/board/assign-nurse", {
+      await fetch("https://cmsc1281-production.up.railway.app/api/board/assign-nurse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

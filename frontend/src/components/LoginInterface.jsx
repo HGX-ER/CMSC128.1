@@ -100,7 +100,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
     try {
       console.log("Attempting to generate queue number...");
       
-      const response = await fetch("https://cmsc128-backend.onrender.com/api/registration/new", {
+      const response = await fetch("https://cmsc1281-production.up.railway.app/api/registration/new", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

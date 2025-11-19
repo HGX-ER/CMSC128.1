@@ -142,7 +142,7 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
       address: registrationData.address
     };
 
-    const response = await fetch(`https://cmsc128-backend.onrender.com/api/registration/patient/${registrationQueueNumber}`, {
+    const response = await fetch(`https://cmsc1281-production.up.railway.app/api/registration/patient/${registrationQueueNumber}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)

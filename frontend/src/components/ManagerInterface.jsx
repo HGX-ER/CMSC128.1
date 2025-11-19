@@ -80,7 +80,7 @@ export function ManagerInterface({
   const fetchFeedback = async () => {
     try {
       setIsLoadingFeedback(true);
-      const response = await fetch('https://cmsc128-backend.onrender.com/api/feedback');
+      const response = await fetch('https://cmsc1281-production.up.railway.app/api/feedback');
       
       if (!response.ok) {
         throw new Error('Failed to fetch feedback');

@@ -56,7 +56,7 @@ export function DoctorInterface({
     async function load() {
       try {
         const prof = await fetch(
-          `https://cmsc128-backend.onrender.com/api/doctor/${encodeURIComponent(currentDoctorUsername)}`
+          `https://cmsc1281-production.up.railway.app/api/doctor/${encodeURIComponent(currentDoctorUsername)}`
         ).then((r) => (r.ok ? r.json() : null));
         if (!stop && prof) setDoctor(prof);
       } catch (e) {
@@ -65,7 +65,7 @@ export function DoctorInterface({
 
       try {
         const list = await fetch(
-          `https://cmsc128-backend.onrender.com/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
+          `https://cmsc1281-production.up.railway.app/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
         ).then((r) => (r.ok ? r.json() : []));
         const normalized = (list || []).map((p) => ({
           ...p,
@@ -128,7 +128,7 @@ export function DoctorInterface({
     if (!selectedPatient) return;
     try {
       const res = await fetch(
-        `https://cmsc128-backend.onrender.com/api/doctor/encounters/${selectedPatient}/start`,
+        `https://cmsc1281-production.up.railway.app/api/doctor/encounters/${selectedPatient}/start`,
         { method: "POST", headers: { "Content-Type": "application/json" } }
       );
       if (!res.ok) throw new Error("start failed");
@@ -152,7 +152,7 @@ export function DoctorInterface({
     if (!selectedPatient || !diagnosis || !disposition) return;
     try {
       const res = await fetch(
-        `https://cmsc128-backend.onrender.com/api/doctor/encounters/${selectedPatient}/complete`,
+        `https://cmsc1281-production.up.railway.app/api/doctor/encounters/${selectedPatient}/complete`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -165,7 +165,7 @@ export function DoctorInterface({
 
       // Refresh immediately
       const list = await fetch(
-        `https://cmsc128-backend.onrender.com/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
+        `https://cmsc1281-production.up.railway.app/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
       ).then((r) => (r.ok ? r.json() : []));
       const normalized = (list || []).map((p) => ({
         ...p,
