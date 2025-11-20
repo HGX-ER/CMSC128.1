@@ -3,6 +3,7 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from './ui/dialog';
 import { Progress } from './ui/progress';
+
 import { 
   History, 
   Clock, 
@@ -14,6 +15,83 @@ import {
   ArrowRight,
   MapPin
 } from 'lucide-react';
+
+/* -----------------------------------------
+   5-STEP PROGRESS MODEL (Unified Logic)
+----------------------------------------- */
+
+const flow = [
+  "checkin",
+  "triage",
+  "registration",
+  "doctor",
+  "consultation"
+];
+
+// Correct timeline order (same as PatientInterface)
+const orderedTimelineFlow = [
+  "kiosk",              // Check-in  
+  "waiting_triage",
+  "in_triage",
+  "triaged",
+  "waiting_registration",
+  "registration",
+  "registered",
+  "waiting_doctor",
+  "with_provider",
+  "consultation",
+
+  // post-consultation stages (still appear but all completed)
+  "waiting_discharge",
+  "discharge_documents",
+  "awaiting_departure",
+  "departed",
+  "waiting_admission",
+  "admission_orders",
+  "awaiting_non_icu",
+  "awaiting_icu",
+  "waiting_observation"
+];
+
+const stageMap = {
+  kiosk: "checkin",
+  arrived: "checkin",
+
+  waiting_triage: "triage",
+  in_triage: "triage",
+  triaged: "triage",
+
+  waiting_registration: "registration",
+  in_registration: "registration",
+  registration: "registration",
+  registered: "registration",
+
+  waiting_doctor: "doctor",
+  with_provider: "doctor",
+
+  consultation: "consultation",
+
+  // After consultation = remain 100% (do not regress)
+  waiting_discharge: "consultation",
+  discharge_documents: "consultation",
+  awaiting_departure: "consultation",
+  departed: "consultation",
+  waiting_admission: "consultation",
+  admission_orders: "consultation",
+  awaiting_non_icu: "consultation",
+  awaiting_icu: "consultation",
+  waiting_observation: "consultation"
+};
+
+const getHistoryProgressPercentage = (stage) => {
+  const mapped = stageMap[stage] || "checkin";
+  const index = flow.indexOf(mapped);
+  return Math.round((index / (flow.length - 1)) * 100);
+};
+
+/* -----------------------------------------
+   UI Helpers
+----------------------------------------- */
 
 const getStageDisplayName = (stage) => {
   const displayNames = {
@@ -66,19 +144,16 @@ const formatDuration = (startTime, endTime) => {
   const end = endTime || new Date();
   const durationMs = end.getTime() - startTime.getTime();
   const minutes = Math.floor(durationMs / 1000 / 60);
-  
-  if (minutes < 60) {
-    return `${minutes}m`;
-  } else {
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours}h ${remainingMinutes}m`;
-  }
+
+  if (minutes < 60) return `${minutes}m`;
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
 };
 
-const formatTime = (date) => {
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-};
+const formatTime = (date) =>
+  date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const getSatisfactionDisplay = (rating) => {
   const displays = {
@@ -91,18 +166,15 @@ const getSatisfactionDisplay = (rating) => {
   return displays[rating] || { label: 'N/A', color: 'text-gray-600' };
 };
 
-export function StageHistory({ patient }) {
-  const completedStages = patient.stageHistory.filter(stage => stage.endTime);
-  const currentStage = patient.stageHistory.find(stage => !stage.endTime);
-  const totalCompletedTime = completedStages.reduce((total, stage) => {
-    if (stage.endTime) {
-      return total + (stage.endTime.getTime() - stage.startTime.getTime());
-    }
-    return total;
-  }, 0);
+/* -----------------------------------------
+   MAIN COMPONENT
+----------------------------------------- */
 
-  const totalStages = patient.stageHistory.length + (patient.currentStage === 'departed' ? 0 : 5); // Approximate remaining stages
-  const progressPercentage = Math.round((completedStages.length / totalStages) * 100);
+export function StageHistory({ patient }) {
+  const completedStages = patient.stageHistory.filter(s => s.endTime);
+  
+  // Progress uses SAME logic as main progress bar
+  const progressPercentage = getHistoryProgressPercentage(patient.currentStage);
 
   return (
     <Dialog>
@@ -112,6 +184,7 @@ export function StageHistory({ patient }) {
           View History
         </Button>
       </DialogTrigger>
+
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -124,7 +197,8 @@ export function StageHistory({ patient }) {
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Summary Stats */}
+
+          {/* Summary Cards */}
           <div className="grid grid-cols-2 gap-4">
             <Card>
               <CardContent className="p-4">
@@ -167,39 +241,49 @@ export function StageHistory({ patient }) {
             <CardHeader>
               <CardTitle className="text-lg">Stage Timeline</CardTitle>
             </CardHeader>
+
             <CardContent className="space-y-4">
-              {patient.stageHistory.map((stage, index) => {
-                const isCompleted = !!stage.endTime;
-                const isLast = index === patient.stageHistory.length - 1;
+              {/* Sort stage history to FOLLOW the correct ED flow */}
+              {[...patient.stageHistory]
+                .sort((a, b) => a.startTime - b.startTime)
+                .map((stage, index, sortedList) => {
+
+                // Force stages AFTER consultation to be completed
+                const isAfterConsultation =
+                  stageMap[stage.stage] === "consultation" &&
+                  stage.stage !== "consultation";
+
+                const isCompleted = !!stage.endTime || isAfterConsultation;
+                const isLast = index === sortedList.length - 1;
                 const satisfaction = stage.satisfaction;
 
                 return (
                   <div key={index} className="relative">
-                    {/* Timeline line */}
+
                     {!isLast && (
                       <div className="absolute left-6 top-12 w-0.5 h-16 bg-gray-200"></div>
                     )}
-                    
+
                     <div className="flex gap-4">
-                      {/* Status icon */}
+
                       <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
                         isCompleted ? 'bg-green-100' : 'bg-blue-100'
                       }`}>
-                        {isCompleted ? (
-                          <CheckCircle className="w-6 h-6 text-green-600" />
-                        ) : (
-                          <Timer className="w-6 h-6 text-blue-600" />
-                        )}
+                        {isCompleted
+                          ? <CheckCircle className="w-6 h-6 text-green-600" />
+                          : <Timer className="w-6 h-6 text-blue-600" />
+                        }
                       </div>
 
-                      {/* Stage details */}
                       <div className="flex-1 space-y-2">
+
                         <div className="flex items-center justify-between">
                           <div>
                             <h3 className="font-medium">{getStageDisplayName(stage.stage)}</h3>
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                               <Calendar className="w-3 h-3" />
                               <span>{formatTime(stage.startTime)}</span>
+
                               {stage.endTime && (
                                 <>
                                   <ArrowRight className="w-3 h-3" />
@@ -208,21 +292,21 @@ export function StageHistory({ patient }) {
                               )}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <Badge className={getStageColor(stage.stage, isCompleted)}>
-                              <Clock className="w-3 h-3 mr-1" />
-                              {formatDuration(stage.startTime, stage.endTime)}
-                            </Badge>
-                          </div>
+
+                          <Badge className={getStageColor(stage.stage, isCompleted)}>
+                            <Clock className="w-3 h-3 mr-1" />
+                            {formatDuration(stage.startTime, stage.endTime)}
+                          </Badge>
                         </div>
 
-                        {/* Satisfaction feedback */}
+                        {/* Satisfaction */}
                         {satisfaction && (
                           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                             <div className="flex items-center gap-2 mb-2">
                               <MessageSquare className="w-4 h-4 text-gray-600" />
                               <span className="text-sm font-medium text-gray-700">Patient Feedback</span>
                             </div>
+
                             <div className="flex items-center gap-3 mb-2">
                               <div className="flex items-center gap-1">
                                 {[1, 2, 3, 4, 5].map((star) => (
@@ -236,10 +320,14 @@ export function StageHistory({ patient }) {
                                   />
                                 ))}
                               </div>
-                              <span className={`text-sm font-medium ${getSatisfactionDisplay(satisfaction.rating).color}`}>
+
+                              <span className={`text-sm font-medium ${
+                                getSatisfactionDisplay(satisfaction.rating).color
+                              }`}>
                                 {getSatisfactionDisplay(satisfaction.rating).label}
                               </span>
                             </div>
+
                             {satisfaction.comment && (
                               <p className="text-sm text-gray-600 italic">
                                 "{satisfaction.comment}"
@@ -248,8 +336,8 @@ export function StageHistory({ patient }) {
                           </div>
                         )}
 
-                        {/* Current stage indicator */}
-                        {!isCompleted && (
+                        {/* Current Stage Indicator */}
+                        {(!isCompleted && stageMap[stage.stage] !== "consultation") && (
                           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                             <div className="flex items-center gap-2">
                               <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
@@ -257,6 +345,7 @@ export function StageHistory({ patient }) {
                             </div>
                           </div>
                         )}
+
                       </div>
                     </div>
                   </div>
@@ -274,6 +363,7 @@ export function StageHistory({ patient }) {
                   Feedback Summary
                 </CardTitle>
               </CardHeader>
+
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {completedStages
@@ -283,6 +373,7 @@ export function StageHistory({ patient }) {
                         <div className="font-medium text-sm mb-1">
                           {getStageDisplayName(stage.stage)}
                         </div>
+
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1">
                             {[1, 2, 3, 4, 5].map((star) => (
@@ -308,6 +399,7 @@ export function StageHistory({ patient }) {
               </CardContent>
             </Card>
           )}
+
         </div>
       </DialogContent>
     </Dialog>
