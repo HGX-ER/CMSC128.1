@@ -9,7 +9,7 @@ export function useAuth() {
   // STAFF login → POST /login
   const login = async (username, password) => {
     try {
-      const { data } = await api.post('/login', { username, password });
+      const { data } = await api.post('/api/login', { username, password });
       if (!data.success) return { success: false, error: data.message || 'Invalid credentials' };
       setUser(data.user);
       return { success: true };
@@ -21,7 +21,7 @@ export function useAuth() {
   // PATIENT login via queue number → GET /patient/status/:queue
   const loginWithQueueNumber = async (queueNumber) => {
     try {
-      await api.get(`/patient/status/${encodeURIComponent(queueNumber)}`);
+      await api.get(`/api/patient/status/${encodeURIComponent(queueNumber)}`);
       setUser({ username: queueNumber, role: 'patient', queueNumber });
       return { success: true };
     } catch {

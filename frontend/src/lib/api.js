@@ -5,7 +5,7 @@ const BACKEND_ROOT = import.meta.env.VITE_API_ROOT || "https://node-mysql-api-zs
 
 // Axios instance for REST API
 const api = axios.create({
-  baseURL: BACKEND_ROOT/api,   // everything goes through BACKEND_ROOT
+  baseURL: BACKEND_ROOT,   // everything goes through BACKEND_ROOT
   withCredentials: false,  // set true if backend requires cookies
 });
 
