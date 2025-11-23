@@ -80,7 +80,7 @@ export function ManagerInterface({
   const fetchFeedback = async () => {
     try {
       setIsLoadingFeedback(true);
-      const response = await fetch('https://cmsc1281-production.up.railway.app/api/feedback');
+      const response = await fetch('https://node-mysql-api-zsam.onrender.com/api/feedback');
       
       if (!response.ok) {
         throw new Error('Failed to fetch feedback');
@@ -106,7 +106,7 @@ export function ManagerInterface({
 
   // Listen for SSE events for real-time updates
   useEffect(() => {
-    const eventSource = new EventSource('https://cmsc1281-production.up.railway.app/api/stream/events');
+    const eventSource = new EventSource('https://node-mysql-api-zsam.onrender.com/api/stream/events');
     
     eventSource.addEventListener('message', (event) => {
       try {
