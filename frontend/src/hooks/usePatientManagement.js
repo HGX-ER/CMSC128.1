@@ -30,7 +30,7 @@ export function usePatientManagement() {
 
   const loadBoard = useCallback(async () => {
     try {
-      const { data } = await api.get('/board');
+      const { data } = await api.get('/api/board');
       const mapped = data.map((row) => ({
         id: row.queue_number,
         name: `${row.first_name ?? ''} ${row.last_name ?? ''}`.trim() || `Patient ${row.queue_number}`,
@@ -63,7 +63,7 @@ export function usePatientManagement() {
 
   const addPatient = useCallback(async () => {
     try {
-      const { data } = await api.post('/registration/new', {});
+      const { data } = await api.post('/api/registration/new', {});
       const queue = data.queueNumber;
       const newP = {
         id: queue,
@@ -176,11 +176,11 @@ export function usePatientManagement() {
 
   // Expose backend helpers if components want to call directly
   const completeRegistration = useCallback(async (queue_number, registrationData) => {
-    await api.put(`/registration/patient/${queue_number}`, registrationData);
+    await api.put(`/api/registration/patient/${queue_number}`, registrationData);
   }, []);
 
   const submitTriage = useCallback(async (encounterId, { esi, complaint, vitals }) => {
-    await api.post(`/encounters/${encounterId}/triage`, { esi, complaint, vitals });
+    await api.post(`/api/encounters/${encounterId}/triage`, { esi, complaint, vitals });
   }, []);
 
   return useMemo(() => ({
