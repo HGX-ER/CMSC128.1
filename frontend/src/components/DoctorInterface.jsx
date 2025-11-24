@@ -8,6 +8,7 @@ import { Label } from "./ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { DoctorPatientCard } from "./DoctorPatientCard";
+import { toast } from 'sonner';
 import { Stethoscope, Activity } from "lucide-react";
 
 const ESI_COLORS = {
@@ -40,6 +41,10 @@ export function DoctorInterface({
   const [diagnosis, setDiagnosis] = useState("");
   const [disposition, setDisposition] = useState("");
   const [consultationStartTime, setConsultationStartTime] = useState(null);
+  const [availableDoctors, setAvailableDoctors] = useState([]);
+  const [transferDoctor, setTransferDoctor] = useState("");
+  const [transferNote, setTransferNote] = useState("");
+  const [transferConfirm, setTransferConfirm] = useState(false);
 
   const [doctor, setDoctor] = useState({
     full_name: "",
@@ -84,6 +89,27 @@ export function DoctorInterface({
       stop = true;
       clearInterval(t);
     };
+  }, [currentDoctorUsername]);
+
+  // Load list of available doctors for transfer
+  useEffect(() => {
+    let cancelled = false;
+    const fetchDoctors = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/doctors');
+        if (!res.ok) return;
+        const list = await res.json();
+        if (cancelled) return;
+        // normalize: expect array of {username, full_name}
+        const normalized = (list || []).map(d => ({ username: d.username || d.id || d.user || d.name, full_name: d.full_name || d.name || d.display_name }));
+        setAvailableDoctors(normalized.filter(d => d.username !== currentDoctorUsername));
+      } catch (e) {
+        console.warn('Failed to fetch doctors list', e);
+      }
+    };
+
+    fetchDoctors();
+    return () => { cancelled = true; };
   }, [currentDoctorUsername]);
 
   // Groups for UI
@@ -621,6 +647,8 @@ export function DoctorInterface({
                   </p>
                 </div>
 
+                {/* Transfer UI moved to bottom of the dialog */}
+
                 <div>
                   <Label htmlFor="disposition" className="text-base font-medium">
                     Patient Disposition *
@@ -659,6 +687,111 @@ export function DoctorInterface({
                   ⚠️ Please complete both diagnosis and disposition to finish the consultation
                 </p>
               )}
+
+              {/* Transfer to another doctor - moved to bottom and highlighted */}
+              <div className="mt-6 p-4 rounded-lg border-2 border-red-300 bg-red-50">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-red-800">Transfer Patient</h3>
+                  <p className="text-sm text-red-600">Transfer patient to another doctor</p>
+                </div>
+
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <Label htmlFor="transfer" className="text-sm font-medium text-red-700">Choose receiving doctor</Label>
+                    <Select value={transferDoctor} onValueChange={setTransferDoctor}>
+                      <SelectTrigger className="min-w-[220px] mt-2">
+                        <SelectValue placeholder="Choose doctor to transfer to..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableDoctors.length === 0 ? (
+                          <SelectItem value="">No other doctors available</SelectItem>
+                        ) : (
+                          availableDoctors.map((d) => (
+                            <SelectItem key={d.username} value={d.username}>{d.full_name || d.username}</SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="transferNote" className="text-sm font-medium text-red-700">Optional note for receiving doctor</Label>
+                    <Textarea
+                      id="transferNote"
+                      value={transferNote}
+                      onChange={(e) => setTransferNote(e.target.value)}
+                      placeholder="Optional note to receiving doctor"
+                      rows={3}
+                      className="mt-2 w-full"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <Button
+                      onClick={async () => {
+                        if (!transferDoctor) {
+                          toast.error('Please choose a doctor to transfer to');
+                          return;
+                        }
+
+                        if (!transferConfirm) {
+                          setTransferConfirm(true);
+                          setTimeout(() => setTransferConfirm(false), 6000);
+                          return;
+                        }
+
+                        try {
+                          const res = await fetch(`http://localhost:5000/api/doctor/encounters/${selectedPatient}/transfer`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ toDoctor: transferDoctor, note: transferNote })
+                          });
+
+                          if (!res.ok) throw new Error('Transfer failed');
+
+                          toast.success('Patient transferred');
+                          // Refresh doctor patient list
+                          const list = await fetch(
+                            `http://localhost:5000/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
+                          ).then((r) => (r.ok ? r.json() : []));
+                          const normalized = (list || []).map((p) => ({
+                            ...p,
+                            arrivalTime: p.arrivalTime ? new Date(p.arrivalTime) : (p.arrival_time ? new Date(p.arrival_time) : null),
+                            currentStage: (p.currentStage || p.stage || p.status || "").toString().toLowerCase().replace(/[\s-]+/g, "_"),
+                          }));
+                          setDoctorPatients(normalized);
+
+                          // reset transfer UI and close dialog
+                          setTransferDoctor("");
+                          setTransferNote("");
+                          setTransferConfirm(false);
+                          setConsultationOpen(false);
+                          setSelectedPatient(null);
+                        } catch (e) {
+                          console.error(e);
+                          toast.error('Failed to transfer patient');
+                        }
+                      }}
+                      className={transferConfirm ? 'bg-red-600 hover:bg-red-700' : ''}
+                      size="sm"
+                    >
+                      {transferConfirm ? 'Confirm Transfer' : 'Transfer'}
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setTransferDoctor("");
+                        setTransferNote("");
+                        setTransferConfirm(false);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </DialogContent>

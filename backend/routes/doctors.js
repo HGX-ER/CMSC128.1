@@ -59,9 +59,9 @@ router.get('/managers', async (_req, res) => {
     try {
         const [rows] = await db.query(
             `SELECT username, full_name, specialty, room, floor
-       FROM users
-       WHERE role = 'ed_manager'
-       ORDER BY COALESCE(full_name, username)`
+             FROM users
+             WHERE role = 'ed_manager'
+             ORDER BY COALESCE(full_name, username)`
         );
         res.json(rows.map(toDoctor));
     } catch (e) {
@@ -97,10 +97,10 @@ router.get('/manager/:username', async (req, res) => {
         const { username } = req.params;
         const [rows] = await db.query(
             `SELECT username, role, full_name, specialty, room, floor
-       FROM users
-       WHERE username = ?
-         AND role = 'ed_manager'
-       LIMIT 1`,
+             FROM users
+             WHERE username = ?
+               AND role = 'ed_manager'
+                 LIMIT 1`,
             [username]
         );
         if (!rows.length) return res.status(404).json({ error: 'Manager not found' });
@@ -117,33 +117,33 @@ router.get('/doctor/:username/patients', async (req, res) => {
         const { username } = req.params;
         const [rows] = await db.query(
             `SELECT
-         e.id AS encounter_id,
-         e.queue_number,
-         e.status,
-         e.priority_esi,
-         e.assigned_doctor,
-         e.assigned_nurse,
-         e.arrival_time,
-         e.triage_time,
-         e.provider_start_time,
-         e.diagnosis,
-         e.disposition,
-         p.id AS patient_id,
-         p.full_name,
-         p.dob,
-         p.sex
-       FROM encounters e
-       JOIN patients p ON p.id = e.patient_id
-       WHERE e.assigned_doctor = ?
-         AND e.status <> 'departed'
-       ORDER BY
-         CASE e.status
-           WHEN 'waiting_doctor' THEN 0
-           WHEN 'consultation' THEN 1
-           ELSE 2
-         END,
-         COALESCE(e.priority_esi, 99),
-         e.arrival_time ASC`,
+                 e.id AS encounter_id,
+                 e.queue_number,
+                 e.status,
+                 e.priority_esi,
+                 e.assigned_doctor,
+                 e.assigned_nurse,
+                 e.arrival_time,
+                 e.triage_time,
+                 e.provider_start_time,
+                 e.diagnosis,
+                 e.disposition,
+                 p.id AS patient_id,
+                 p.full_name,
+                 p.dob,
+                 p.sex
+             FROM encounters e
+                      JOIN patients p ON p.id = e.patient_id
+             WHERE e.assigned_doctor = ?
+               AND e.status <> 'departed'
+             ORDER BY
+                 CASE e.status
+                     WHEN 'waiting_doctor' THEN 0
+                     WHEN 'consultation' THEN 1
+                     ELSE 2
+                     END,
+                 COALESCE(e.priority_esi, 99),
+                 e.arrival_time ASC`,
             [username]
         );
         res.json(rows.map(toEncounter));
@@ -164,16 +164,16 @@ router.post('/doctor/encounters/:id/start', async (req, res) => {
 
         await conn.query(
             `UPDATE encounters
-         SET status = 'consultation',
-             provider_start_time = IFNULL(provider_start_time, NOW()),
-             updated_at = NOW()
-       WHERE id = ?`,
+             SET status = 'consultation',
+                 provider_start_time = IFNULL(provider_start_time, NOW()),
+                 updated_at = NOW()
+             WHERE id = ?`,
             [id]
         );
 
         await conn.query(
             `INSERT INTO encounter_events (encounter_id, type, at, payload)
-       VALUES (?, 'provider_started', NOW(), NULL)`,
+             VALUES (?, 'provider_started', NOW(), NULL)`,
             [id]
         );
 
@@ -216,8 +216,8 @@ router.patch('/doctor/encounters/:id/complete', async (req, res) => {
         // Save status + diagnosis + disposition
         const [r] = await conn.query(
             `UPDATE encounters
-         SET status = ?, diagnosis = ?, disposition = ?, updated_at = NOW()
-       WHERE id = ?`,
+             SET status = ?, diagnosis = ?, disposition = ?, updated_at = NOW()
+             WHERE id = ?`,
             [nextStatus, diagnosis, disposition, id]
         );
         if (!r.affectedRows) {
@@ -238,6 +238,72 @@ router.patch('/doctor/encounters/:id/complete', async (req, res) => {
         await conn.rollback();
         console.error('PATCH /doctor/encounters/:id/complete error:', e);
         res.status(500).json({ error: e.sqlMessage || e.message || 'Server error' });
+    } finally {
+        conn.release();
+    }
+});
+
+// ---------- Transfer encounter to another doctor ----------
+router.post('/doctor/encounters/:id/transfer', async (req, res) => {
+    const id = Number(req.params.id);
+    const { toDoctor, note } = req.body || {};
+    if (!id) return res.status(400).json({ error: 'Invalid encounter id' });
+    if (!toDoctor) return res.status(400).json({ error: 'toDoctor is required' });
+
+    // If you have auth middleware that sets req.user, you can use it here for audit.
+    const performedBy = req.user?.username || null;
+
+    const conn = await db.getConnection();
+    try {
+        await conn.beginTransaction();
+
+        // Lock the encounter row to avoid race conditions
+        const [rows] = await conn.query(
+            `SELECT id, assigned_doctor, patient_id, status
+             FROM encounters
+             WHERE id = ?
+             FOR UPDATE`,
+            [id]
+        );
+        if (!rows || rows.length === 0) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Encounter not found' });
+        }
+        const current = rows[0];
+        const fromDoctor = current.assigned_doctor || null;
+
+        // Update assigned doctor and set to waiting_doctor so receiving doctor sees it
+        await conn.query(
+            `UPDATE encounters
+             SET assigned_doctor = ?, status = 'waiting_doctor', updated_at = NOW()
+             WHERE id = ?`,
+            [toDoctor, id]
+        );
+
+        // Insert an event/audit entry
+        await conn.query(
+            `INSERT INTO encounter_events (encounter_id, type, at, payload)
+             VALUES (?, 'transferred', NOW(), JSON_OBJECT(
+               'fromDoctor', ?, 'toDoctor', ?, 'note', ?, 'performedBy', ?
+             ))`,
+            [id, fromDoctor, toDoctor, note || null, performedBy]
+        );
+
+        await conn.commit();
+
+        // Return the updated encounter (optional)
+        const [updatedRows] = await db.query(
+            `SELECT id AS encounter_id, queue_number, status, assigned_doctor, arrival_time, disposition, diagnosis
+             FROM encounters
+             WHERE id = ?`,
+            [id]
+        );
+
+        return res.json({ ok: true, encounter: updatedRows[0] || null });
+    } catch (err) {
+        await conn.rollback();
+        console.error('POST /doctor/encounters/:id/transfer error:', err);
+        return res.status(500).json({ error: err.sqlMessage || err.message || 'Server error' });
     } finally {
         conn.release();
     }

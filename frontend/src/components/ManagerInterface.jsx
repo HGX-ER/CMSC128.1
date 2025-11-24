@@ -67,6 +67,7 @@ export function ManagerInterface({
 }) {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [esiFilter, setEsiFilter] = useState('all');
+  const [timeOrder, setTimeOrder] = useState('none');
   const [viewedFeedbackCount, setViewedFeedbackCount] = useState(0);
   
   // Backend feedback state
@@ -145,7 +146,15 @@ export function ManagerInterface({
     return activePatients.filter(p => p.esiLevel && p.esiLevel.toString() === esiFilter);
   };
   
-  const filteredActivePatients = getFilteredPatients();
+  const filteredActivePatients = useMemo(() => {
+    const arr = getFilteredPatients().slice();
+    if (timeOrder === 'newest') {
+      arr.sort((a, b) => new Date(b.arrivalTime) - new Date(a.arrivalTime));
+    } else if (timeOrder === 'oldest') {
+      arr.sort((a, b) => new Date(a.arrivalTime) - new Date(b.arrivalTime));
+    }
+    return arr;
+  }, [patients, esiFilter, timeOrder]);
   
   const getPatientsByStage = (stage) => {
     return activePatients.filter(p => p.currentStage === stage);
@@ -495,6 +504,16 @@ export function ManagerInterface({
                           ESI 5 (Non-Urgent)
                         </div>
                       </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={timeOrder} onValueChange={setTimeOrder}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Order by time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Time</SelectItem>
+                      <SelectItem value="newest">Newest First</SelectItem>
+                      <SelectItem value="oldest">Oldest First</SelectItem>
                     </SelectContent>
                   </Select>
                   <Badge variant="outline" className="text-sm">

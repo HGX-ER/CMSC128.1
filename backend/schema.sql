@@ -93,7 +93,8 @@ CREATE TABLE encounter_events (
                                       'provider_started',
                                       'results_ready',
                                       'dispositioned',
-                                      'departed'
+                                      'departed',
+                                      'transferred'
                                       ) NOT NULL,
                                   at DATETIME NOT NULL,
                                   payload JSON,
@@ -108,6 +109,7 @@ CREATE INDEX idx_encounter_event ON encounter_events(encounter_id, at);
 INSERT INTO users (username, password, role, full_name, specialty, room, floor) VALUES
                                                                                     ('nurse1','1234','nurse','Nurse Jane Flores',NULL,NULL,NULL),
                                                                                     ('doc1','1234','doctor','Dr. Sarah Smith','Emergency Medicine','201','2nd Floor'),
+                                                                                    ('doc2','1234','doctor','Dr. Becky Jones','Emergency Medicine','201','2nd Floor'),
                                                                                     ('manager1','1234','ed_manager','ED Manager',NULL,NULL,NULL)
 ON DUPLICATE KEY UPDATE
                      password=VALUES(password),
