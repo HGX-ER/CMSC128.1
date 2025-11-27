@@ -7,7 +7,6 @@ import { Progress } from './ui/progress';
 import { Textarea } from './ui/textarea';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { StageHistory } from './StageHistory';
-import { SatisfactionModal } from './SatisfactionModal';
 import { HospitalAnnouncements } from './HospitalAnnouncements';
 import { MedicalTrivia } from './MedicalTrivia';
 import { HealthTips } from './HealthTips';
@@ -18,7 +17,6 @@ import { Clock, Timer, Heart, Activity, Stethoscope, UserCheck, CheckCircle, Map
 
 export function PatientInterface({ patients, currentPatientId, getTotalTime, getCurrentStageTime, onAddSatisfactionFeedback, onAddRealtimeFeedback }) {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [satisfactionModal, setSatisfactionModal] = useState(null);
   const [realtimeComments, setRealtimeComments] = useState([]);
   const [patientComment, setPatientComment] = useState('');
   const [submittedComments, setSubmittedComments] = useState([]);
@@ -380,7 +378,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
         waiting_doctor: [
           { time: new Date(), message: "You're in the queue to see the doctor." },
           { time: new Date(), message: "The doctor will see you based on medical priority." },
-          { time: new Date(), message: "Please remain in the designated waiting area." }
+          { time: new Date(), message: "Please remain in the designated area." }
         ],
         consultation: [
           { time: new Date(), message: "The doctor is now seeing you." },
@@ -428,40 +426,6 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
 
     setRealtimeComments(getStageComments(patient.currentStage));
   }, [patient?.currentStage]);
-
-  // Check for newly completed stages that need satisfaction feedback
-  useEffect(() => {
-    if (!patient || !onAddSatisfactionFeedback) return;
-
-    const completedStagesWithoutFeedback = patient.stageHistory.filter(
-      (stage, index) => stage.endTime && !stage.satisfaction && 
-      ['waiting_triage', 'triage', 'waiting_registration', 'registration', 'waiting_doctor', 'consultation'].includes(stage.stage)
-    );
-
-    if (completedStagesWithoutFeedback.length > 0) {
-      const stage = completedStagesWithoutFeedback[0];
-      const stageIndex = patient.stageHistory.findIndex(s => s === stage);
-      const duration = stage.endTime ? 
-        Math.floor((stage.endTime.getTime() - stage.startTime.getTime()) / 1000 / 60) : 0;
-
-      setSatisfactionModal({
-        isOpen: true,
-        stageIndex,
-        stageName: stage.stage,
-        stageDisplayName: getStageDisplayName(stage.stage),
-        duration
-      });
-    }
-  }, [patient?.stageHistory, onAddSatisfactionFeedback]);
-
-  const handleSatisfactionSubmit = (feedback) => {
-    if (satisfactionModal && onAddSatisfactionFeedback) {
-      onAddSatisfactionFeedback(queueNumber, satisfactionModal.stageIndex, feedback);
-    }
-    setSatisfactionModal(null);
-  };
-
-  // Update the handleSubmitComment function in PatientInterface.jsx
 
 const handleSubmitComment = async () => {
   if (patientComment.trim() && commentSatisfaction > 0) {
@@ -665,53 +629,53 @@ const handleSubmitComment = async () => {
   };
 
 const getProgressPercentage = () => {
-    // This is the simple, linear path you provided
-    const trackedPath = [
-      'kiosk',
-      'waiting_triage',
-      'triage',
-      'waiting_registration',
-      'registration',
-      'waiting_doctor',
-      'consultation'
-    ];
+  // The 5 steps you want in order
+  const flow = [
+    "checkin",
+    "triage",
+    "registration",
+    "doctor",
+    "consultation"
+  ];
 
-    // Define all stages that mean the main progress is 100% complete
-    const completedStages = [
-        'waiting_admission',
-        'waiting_observation',
-        'waiting_discharge',
-        'admission_orders',
-        'awaiting_non_icu',
-        'awaiting_icu',
-        'discharge_documents',
-        'awaiting_departure',
-        'departed'
-    ];
+  // Map ALL backend stages into those 5 buckets
+  const stageMap = {
+    kiosk: "checkin",
+    arrived: "checkin",
+    waiting_triage: "triage",
+    in_triage: "triage",
+    triaged: "triage",
 
-    const currentStage = patient.currentStage;
-    const currentIndex = trackedPath.indexOf(currentStage);
-    
-// Case 1: The current stage is *in* the main path.
-    if (currentIndex !== -1) {
-      const totalSteps = trackedPath.length - 1;
-      if (totalSteps <= 0) return 100; // Failsafe
-      return Math.round((currentIndex / totalSteps) * 100);
-    }
+    waiting_registration: "registration",
+    in_registration: "registration",
+    registration: "registration",
+    registered: "registration",
 
-    // Case 2: The current stage is *after* the main path (e.g., 'waiting_discharge').
-    if (completedStages.includes(currentStage)) {
-      return 100;
-    }
-    
-    // Case 3 (Fallback): The stage is unknown.
-    // We can still check history as a last resort.
-    const hasCompletedPath = patient.stageHistory.some(
-        s => s.stage === 'consultation'
-    );
-    
-    return hasCompletedPath ? 100 : 0; // Default to 0 if we truly don't know
+    waiting_doctor: "doctor",
+    with_provider: "doctor",
+
+    consultation: "consultation",
+
+    // EVERYTHING AFTER CONSULTATION should stay at 100%
+    waiting_discharge: "consultation",
+    discharge_documents: "consultation",
+    awaiting_departure: "consultation",
+    departed: "consultation",
+    waiting_admission: "consultation",
+    admission_orders: "consultation",
+    awaiting_non_icu: "consultation",
+    awaiting_icu: "consultation"
   };
+
+  // Normalize stage
+  const stage = stageMap[patient.currentStage] || "checkin";
+
+  const index = flow.indexOf(stage);
+  const maxIndex = flow.length - 1;
+
+  return Math.round((index / maxIndex) * 100);
+};
+
 
   const getStageIcon = (stage) => {
     switch (stage) {
@@ -1247,18 +1211,6 @@ const getProgressPercentage = () => {
           {lastUpdated && <p>Data updated: {lastUpdated.toLocaleString()}</p>}
           <p>Page automatically updates every 5 seconds</p>
         </div>
-
-        {/* Satisfaction Feedback Modal */}
-        {satisfactionModal && (
-          <SatisfactionModal
-            isOpen={satisfactionModal.isOpen}
-            onClose={() => setSatisfactionModal(null)}
-            onSubmit={handleSatisfactionSubmit}
-            stageName={satisfactionModal.stageName}
-            stageDisplayName={satisfactionModal.stageDisplayName}
-            duration={satisfactionModal.duration}
-          />
-        )}
       </div>
     </div>
   );

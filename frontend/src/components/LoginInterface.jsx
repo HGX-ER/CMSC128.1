@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -64,6 +64,19 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
   const [generatedQueueNumber, setGeneratedQueueNumber] = useState("");
   const [showGenerator, setShowGenerator] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Reset form when component mounts (after logout)
+  useEffect(() => {
+    setUsername("");
+    setPassword("");
+    setQueueNumber("");
+    setError("");
+    setShowPassword(false);
+    setGeneratedQueueNumber("");
+    setShowGenerator(false);
+    setActiveTab("patient");
+    setIsGenerating(false);
+  }, []);
 
   const handleStaffSubmit = async (e) => {
     e.preventDefault();
