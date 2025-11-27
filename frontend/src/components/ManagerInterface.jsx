@@ -123,9 +123,7 @@ export function ManagerInterface({
   const fetchFeedback = async () => {
     try {
       setIsLoadingFeedback(true);
-      const response = await fetch('https://node-mysql-api-zsam.onrender.com/api/feedback', {
-        signal: AbortSignal.timeout(5000) // 5 second timeout
-      });
+      const response = await fetch('https://node-mysql-api-zsam.onrender.com/api/feedback');
       
       if (!response.ok) {
         throw new Error('Failed to fetch feedback');
@@ -189,7 +187,7 @@ export function ManagerInterface({
 
   // Listen for SSE events for real-time updates
   useEffect(() => {
-    if (!backendAvailable) return;
+    const eventSource = new EventSource('https://node-mysql-api-zsam.onrender.com/api/stream/events');
     
     let eventSource;
     try {
