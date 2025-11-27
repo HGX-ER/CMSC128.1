@@ -105,7 +105,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   try {
     console.log("🔄 Polling patient status for:", queueNumber);
     
-    const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
+    const response = await fetch(`https://node-mysql-api-zsam.onrender.com/api/patient/status/${queueNumber}`);
     
     if (!response.ok) {
       if (response.status === 404) {
@@ -193,7 +193,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     setIsLoading(true);
     console.log("📋 Fetching patient status for:", queueNumber);
     
-    const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
+    const response = await fetch(`https://node-mysql-api-zsam.onrender.com/api/patient/status/${queueNumber}`);
     
     if (!response.ok) {
       if (response.status === 404) {
@@ -276,7 +276,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   try {
     console.log("🔄 Manual refresh for:", queueNumber);
     
-    const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
+    const response = await fetch(`https://node-mysql-api-zsam.onrender.com/api/patient/status/${queueNumber}`);
     
     if (!response.ok) {
       throw new Error(`Failed to refresh patient status: ${response.status}`);
@@ -431,7 +431,7 @@ const handleSubmitComment = async () => {
   if (patientComment.trim() && commentSatisfaction > 0) {
     try {
       // Send feedback to backend
-      const response = await fetch('http://localhost:5000/api/feedback', {
+      const response = await fetch('https://node-mysql-api-zsam.onrender.com/api/feedback', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
