@@ -193,7 +193,7 @@ export function ManagerInterface({
     
     let eventSource;
     try {
-      eventSource = new EventSource('https://node-mysql-api-zsam.onrender.com/stream/events');
+      eventSource = new EventSource('https://node-mysql-api-zsam.onrender.com/api/stream/events');
       
       eventSource.addEventListener('message', (event) => {
         try {
