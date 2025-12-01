@@ -106,4 +106,56 @@ router.get('/feedback/:queueNumber', async (req, res) => {
     }
 });
 
+// POST: Mark feedback as read
+router.post('/feedback/read/:feedbackId', async (req, res) => {
+    try {
+        const { feedbackId } = req.params;
+
+        const [result] = await db.query(
+            `UPDATE patient_feedback 
+             SET is_read = TRUE, read_at = NOW()
+             WHERE id = ?`,
+            [feedbackId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Feedback not found' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Feedback marked as read'
+        });
+    } catch (error) {
+        console.error('❌ Error marking feedback as read:', error);
+        res.status(500).json({ error: 'Failed to mark feedback as read' });
+    }
+});
+
+// POST: Mark feedback as unread
+router.post('/feedback/unread/:feedbackId', async (req, res) => {
+    try {
+        const { feedbackId } = req.params;
+
+        const [result] = await db.query(
+            `UPDATE patient_feedback 
+             SET is_read = FALSE, read_at = NULL
+             WHERE id = ?`,
+            [feedbackId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Feedback not found' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Feedback marked as unread'
+        });
+    } catch (error) {
+        console.error('❌ Error marking feedback as unread:', error);
+        res.status(500).json({ error: 'Failed to mark feedback as unread' });
+    }
+});
+
 module.exports = router;

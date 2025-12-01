@@ -167,6 +167,12 @@ CREATE TABLE patient_feedback (
                                   INDEX idx_feedback_submitted (submitted_at)
 ) ENGINE=InnoDB;
 
+-- Add is_read tracking to patient_feedback table
+ALTER TABLE patient_feedback
+    ADD COLUMN is_read BOOLEAN DEFAULT FALSE AFTER submitted_at,
+    ADD COLUMN read_at DATETIME NULL AFTER is_read;
+
+-- Add index for efficient queries
+CREATE INDEX idx_feedback_is_read ON patient_feedback(is_read);
 
 ALTER TABLE encounters ADD COLUMN diagnosis TEXT NULL AFTER provider_start_time;
-
