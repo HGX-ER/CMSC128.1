@@ -155,24 +155,27 @@ CREATE TABLE patient_feedback (
                                   id INT AUTO_INCREMENT PRIMARY KEY,
                                   encounter_id INT NOT NULL,
                                   queue_number VARCHAR(32) NOT NULL,
+                                  patient_name VARCHAR(100) NULL,  -- ✅ ADDED
                                   rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
                                   comment TEXT,
                                   stage VARCHAR(64) NOT NULL,
                                   stage_display_name VARCHAR(128),
                                   submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                  is_read BOOLEAN DEFAULT FALSE,  -- ✅ ADDED (you already have this)
+                                  read_at DATETIME NULL,  -- ✅ ADDED (you already have this)
                                   CONSTRAINT fk_feedback_encounter FOREIGN KEY (encounter_id)
                                       REFERENCES encounters(id) ON DELETE CASCADE ON UPDATE CASCADE,
                                   INDEX idx_feedback_queue (queue_number),
                                   INDEX idx_feedback_encounter (encounter_id),
-                                  INDEX idx_feedback_submitted (submitted_at)
+                                  INDEX idx_feedback_submitted (submitted_at),
+                                  INDEX idx_feedback_is_read (is_read)  -- ✅ ADDED (for efficient queries)
 ) ENGINE=InnoDB;
 
--- Add is_read tracking to patient_feedback table
-ALTER TABLE patient_feedback
-    ADD COLUMN is_read BOOLEAN DEFAULT FALSE AFTER submitted_at,
-    ADD COLUMN read_at DATETIME NULL AFTER is_read;
+UPDATE patient_feedback pf
+    JOIN encounters e ON pf.encounter_id = e.id
+    JOIN patients p ON e.patient_id = p.id
+SET pf.patient_name = p.full_name
+WHERE pf.patient_name IS NULL;
 
--- Add index for efficient queries
-CREATE INDEX idx_feedback_is_read ON patient_feedback(is_read);
 
 ALTER TABLE encounters ADD COLUMN diagnosis TEXT NULL AFTER provider_start_time;

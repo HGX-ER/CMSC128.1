@@ -189,23 +189,26 @@ router.post('/doctor/encounters/:id/start', async (req, res) => {
 });
 
 // ---------- Complete consultation ----------
+// ---------- Complete consultation ----------
 router.patch('/doctor/encounters/:id/complete', async (req, res) => {
     const id = Number(req.params.id);
     const { diagnosis, disposition } = req.body || {};
+
     if (!id) return res.status(400).json({ error: 'Invalid encounter id' });
     if (!diagnosis || !disposition) {
         return res.status(400).json({ error: 'diagnosis and disposition are required' });
     }
 
-    const NEXT_STAGE_BY_DISPOSITION = {
-        'Discharge': 'discharge_documents',
-        'Observation': 'waiting_observation',
-        'Admission Non-ICU': 'awaiting_non_icu',
-        'Admission ICU': 'awaiting_icu',
+    // Map disposition to FINAL status (patient done)
+    const FINAL_STATUS_BY_DISPOSITION = {
+        'Discharge': 'departed',
+        'Observation': 'in_observation',
+        'Admission Non-ICU': 'admitted_non_icu',
+        'Admission ICU': 'admitted_icu',
     };
 
-    const nextStatus = NEXT_STAGE_BY_DISPOSITION[disposition];
-    if (!nextStatus) {
+    const finalStatus = FINAL_STATUS_BY_DISPOSITION[disposition];
+    if (!finalStatus) {
         return res.status(400).json({ error: `Unknown disposition: ${disposition}` });
     }
 
@@ -213,27 +216,61 @@ router.patch('/doctor/encounters/:id/complete', async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // Save status + diagnosis + disposition
+        // Update to final status and set depart_time (patient done)
         const [r] = await conn.query(
             `UPDATE encounters
-             SET status = ?, diagnosis = ?, disposition = ?, updated_at = NOW()
+             SET status = ?,
+                 diagnosis = ?,
+                 disposition = ?,
+                 depart_time = NOW(),
+                 updated_at = NOW()
              WHERE id = ?`,
-            [nextStatus, diagnosis, disposition, id]
+            [finalStatus, diagnosis, disposition, id]
         );
+
         if (!r.affectedRows) {
             await conn.rollback();
             return res.status(404).json({ error: 'Encounter not found' });
         }
 
-        // Log event
+        // Log dispositioned event
         await conn.query(
             `INSERT INTO encounter_events (encounter_id, type, at, payload)
              VALUES (?, 'dispositioned', NOW(), JSON_OBJECT('nextStatus', ?, 'diagnosis', ?, 'disposition', ?))`,
-            [id, nextStatus, diagnosis, disposition]
+            [id, finalStatus, diagnosis, disposition]
+        );
+
+        // Create completion event based on disposition
+        let completionEventType;
+        switch (disposition) {
+            case 'Discharge':
+                completionEventType = 'departed';
+                break;
+            case 'Observation':
+                completionEventType = 'transferred';
+                break;
+            case 'Admission Non-ICU':
+                completionEventType = 'transferred';
+                break;
+            case 'Admission ICU':
+                completionEventType = 'transferred';
+                break;
+            default:
+                completionEventType = 'departed';
+        }
+
+        await conn.query(
+            `INSERT INTO encounter_events (encounter_id, type, at, payload)
+             VALUES (?, ?, NOW(), JSON_OBJECT('disposition', ?))`,
+            [id, completionEventType, disposition]
         );
 
         await conn.commit();
-        res.json({ ok: true, nextStatus });
+
+        console.log(`✅ Consultation completed - Patient ${finalStatus}:`, id);
+
+        res.json({ ok: true, nextStatus: finalStatus });
+
     } catch (e) {
         await conn.rollback();
         console.error('PATCH /doctor/encounters/:id/complete error:', e);

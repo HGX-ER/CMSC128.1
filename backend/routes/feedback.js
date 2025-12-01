@@ -13,14 +13,16 @@ router.post('/feedback', async (req, res) => {
             });
         }
 
-        // Validate rating
         if (rating < 1 || rating > 5) {
             return res.status(400).json({ error: 'Rating must be between 1 and 5' });
         }
 
-        // Get encounter_id from queue_number
+        // Get encounter_id AND patient_name from queue_number
         const [encounters] = await db.query(
-            'SELECT id FROM encounters WHERE queue_number = ?',
+            `SELECT e.id, p.full_name AS patient_name
+             FROM encounters e
+                      JOIN patients p ON p.id = e.patient_id
+             WHERE e.queue_number = ?`,
             [queueNumber]
         );
 
@@ -29,28 +31,31 @@ router.post('/feedback', async (req, res) => {
         }
 
         const encounterId = encounters[0].id;
+        const patientName = encounters[0].patient_name;
 
-        // Insert feedback
+        // Insert feedback including patient_name
         const [result] = await db.query(
             `INSERT INTO patient_feedback
-             (encounter_id, queue_number, rating, comment, stage, stage_display_name, submitted_at)
-             VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-            [encounterId, queueNumber, rating, comment || null, stage, stageName || stage]
+             (encounter_id, queue_number, patient_name, rating, comment, stage, stage_display_name, submitted_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+            [encounterId, queueNumber, patientName, rating, comment || null, stage, stageName || stage]
         );
 
-        // Broadcast SSE event to ED Manager
+        // Optional SSE event, but keep snake_case if you use it on frontend
         const publishEvent = req.app.get('publishEvent');
         if (publishEvent) {
             publishEvent({
                 type: 'patient_feedback',
                 data: {
                     id: result.insertId,
-                    queueNumber,
+                    encounter_id: encounterId,
+                    queue_number: queueNumber,
+                    patient_name: patientName,
                     rating,
                     comment,
                     stage,
-                    stageName,
-                    submittedAt: new Date().toISOString()
+                    stage_display_name: stageName || stage,
+                    submitted_at: new Date().toISOString()
                 }
             });
         }

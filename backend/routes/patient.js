@@ -187,13 +187,39 @@ router.post("/patient/feedback", async (req, res) => {
 
         console.log("📝 Patient feedback received:", { queueNumber, rating, stage });
 
-        // Store feedback in database (you might want to create a patient_feedback table)
-        // For now, we'll just log it and send real-time update
+        // Get encounter ID and patient name from queue number
+        const [encounters] = await db.query(
+            `SELECT e.id, p.full_name
+             FROM encounters e
+                      JOIN patients p ON p.id = e.patient_id
+             WHERE e.queue_number = ?
+                 LIMIT 1`,
+            [queueNumber]
+        );
+
+        if (encounters.length === 0) {
+            return res.status(404).json({ error: "Queue number not found" });
+        }
+
+        const encounterId = encounters[0].id;
+        const patientName = encounters[0].full_name;
+
+        // Insert feedback into patient_feedback table (with patient name)
+        await db.query(
+            `INSERT INTO patientfeedback
+             (encounterid, queuenumber, patientname, rating, comment, stage, stagedisplayname, submittedat, isread)
+             VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), FALSE)`,
+            [encounterId, queueNumber, patientName, rating, comment || null, stage, stageName || null]
+        );
+
+        // Send real-time update to ED Manager via SSE
         const publishEvent = req.app.get("publishEvent");
         if (publishEvent) {
             publishEvent({
-                type: "patient_feedback",
-                queueNumber: queueNumber,
+                type: "patientfeedback",
+                encounterid: encounterId,
+                queuenumber: queueNumber,
+                patientname: patientName,
                 rating: rating,
                 comment: comment,
                 stage: stage,
@@ -204,14 +230,97 @@ router.post("/patient/feedback", async (req, res) => {
 
         res.json({
             success: true,
-            message: "Feedback received",
-            feedbackId: Date.now() // temporary ID
+            message: "Feedback received"
         });
 
     } catch (err) {
         console.error("❌ POST /patient/feedback error:", err);
-        res.status(500).json({ error: "Failed to submit feedback" });
+        res.status(500).json({
+            error: "Failed to submit feedback",
+            details: err.message
+        });
     }
 });
+
+/**
+ * PATCH /api/patient/depart/:queueNumber
+ * Manually mark a patient as departed (for nurses/staff)
+ */
+router.patch("/patient/depart/:queueNumber", async (req, res) => {
+    const queueNumber = (req.params.queueNumber || "").trim().toUpperCase();
+
+    if (!queueNumber) {
+        return res.status(400).json({ error: "Missing queue number" });
+    }
+
+    const conn = await db.getConnection();
+
+    try {
+        await conn.beginTransaction();
+
+        console.log("🚪 Manually marking patient as departed:", queueNumber);
+
+        // Get encounter ID and current status
+        const [encounters] = await conn.query(
+            `SELECT id, status FROM encounters WHERE queuenumber = ? LIMIT 1`,
+            [queueNumber]
+        );
+
+        if (encounters.length === 0) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Queue number not found' });
+        }
+
+        const encounterId = encounters[0].id;
+        const currentStatus = encounters[0].status;
+
+        // Update status to departed
+        await conn.query(
+            `UPDATE encounters 
+             SET status = 'departed', 
+                 departtime = NOW(), 
+                 updatedat = NOW() 
+             WHERE id = ?`,
+            [encounterId]
+        );
+
+        // Create departed event
+        await conn.query(
+            `INSERT INTO encounterevents (encounterid, type, at, payload) 
+             VALUES (?, 'departed', NOW(), JSON_OBJECT('previousstatus', ?))`,
+            [encounterId, currentStatus]
+        );
+
+        await conn.commit();
+
+        console.log("✅ Patient marked as departed:", queueNumber);
+
+        const publishEvent = req.app.get("publishEvent");
+        if (publishEvent) {
+            publishEvent({
+                type: "patientdeparted",
+                queuenumber: queueNumber,
+                encounterid: encounterId
+            });
+        }
+
+        res.json({
+            ok: true,
+            message: 'Patient marked as departed',
+            queuenumber: queueNumber
+        });
+
+    } catch (e) {
+        await conn.rollback();
+        console.error("❌ Error marking patient as departed:", e);
+        res.status(500).json({
+            error: 'Failed to mark as departed',
+            details: e.sqlMessage || e.message
+        });
+    } finally {
+        conn.release();
+    }
+});
+
 
 module.exports = router;
