@@ -5,9 +5,18 @@ import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { AlertTriangle, Clock, MessageCircle, Filter, RefreshCw, TrendingUp } from "lucide-react";
+import { AlertTriangle, Clock, MessageCircle, Filter, RefreshCw, TrendingUp, Bell, MessageSquare, BellRing, Check, X } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
 import { toast } from 'sonner';
+
+// Star component for ratings
+function Star({ className }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+    </svg>
+  );
+}
 
 const STAGE_LABELS = {
   kiosk: 'At Kiosk',
@@ -30,7 +39,7 @@ const STAGE_LABELS = {
 
 const ESI_COLORS = {
   1: "bg-red-600 text-white",
-  2: "bg-orange-500 text-white", 
+  2: "bg-orange-500 text-white",
   3: "bg-yellow-500 text-black",
   4: "bg-green-500 text-white",
   5: "bg-blue-500 text-white"
@@ -57,42 +66,102 @@ const SATISFACTION_EMOJIS = {
   5: { emoji: '😄', label: 'Very Satisfied', color: 'text-green-600' }
 };
 
-export function ManagerInterface({ 
-  patients, 
-  onUpdatePatient, 
-  onMoveToStage, 
-  onRemovePatient, 
-  getTotalTime,
-  getStageTime 
-}) {
+export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onRemovePatient, getTotalTime, getStageTime }) {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [esiFilter, setEsiFilter] = useState('all');
   const [timeOrder, setTimeOrder] = useState('none');
   const [viewedFeedbackCount, setViewedFeedbackCount] = useState(0);
-  
+
   // Backend feedback state
   const [backendFeedback, setBackendFeedback] = useState([]);
-  const [isLoadingFeedback, setIsLoadingFeedback] = useState(true);
+  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
   const [lastFeedbackUpdate, setLastFeedbackUpdate] = useState(null);
+  const [newFeedbackPatients, setNewFeedbackPatients] = useState(new Set());
+  const [backendAvailable, setBackendAvailable] = useState(false);
+
+  // Notification state
+  const [readFeedbackIds, setReadFeedbackIds] = useState(new Set());
+
+  // Notification sound
+  const [playNotificationSound] = useState(() => {
+    const audioContext = typeof AudioContext !== 'undefined' ? new AudioContext() : null;
+    return () => {
+      if (!audioContext) return;
+      try {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+      } catch (error) {
+        console.log('Audio notification not available');
+      }
+    };
+  });
 
   const activePatients = patients.filter(p => p.isActive && p.currentStage !== 'departed');
-  
+
   // Fetch feedback from backend
   const fetchFeedback = async () => {
     try {
       setIsLoadingFeedback(true);
-      const response = await fetch('http://localhost:5000/api/feedback');
-      
+      const response = await fetch('http://localhost:5000/api/feedback', {
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      });
+
       if (!response.ok) {
         throw new Error('Failed to fetch feedback');
       }
-      
+
       const data = await response.json();
-      setBackendFeedback(data.feedback || []);
+      const newFeedback = data.feedback || [];
+
+      // Mark backend as available
+      setBackendAvailable(true);
+
+      // Check for new feedback
+      if (backendFeedback.length > 0 && newFeedback.length > backendFeedback.length) {
+        const latestFeedback = newFeedback[0];
+        
+        // Show toast notification
+        toast.success('🔔 New patient feedback received!', {
+          description: `${latestFeedback.queue_number} rated ${latestFeedback.rating}/5 at ${latestFeedback.stage_display_name || latestFeedback.stage}`,
+          duration: 5000,
+        });
+
+        // Play notification sound
+        playNotificationSound();
+
+        // Add to blinking patients
+        setNewFeedbackPatients(prev => {
+          const updated = new Set(prev);
+          updated.add(latestFeedback.queue_number);
+          return updated;
+        });
+
+        // Remove from blinking after 10 seconds
+        setTimeout(() => {
+          setNewFeedbackPatients(prev => {
+            const updated = new Set(prev);
+            updated.delete(latestFeedback.queue_number);
+            return updated;
+          });
+        }, 10000);
+      }
+
+      setBackendFeedback(newFeedback);
       setLastFeedbackUpdate(new Date());
     } catch (error) {
-      console.error('Error fetching feedback:', error);
-      toast.error('Failed to load feedback');
+      // Silently mark backend as unavailable
+      setBackendAvailable(false);
+      if (backendAvailable) {
+        console.log('Backend not available - using local feedback only');
+      }
     } finally {
       setIsLoadingFeedback(false);
     }
@@ -101,34 +170,46 @@ export function ManagerInterface({
   // Initial fetch and polling
   useEffect(() => {
     fetchFeedback();
-    const interval = setInterval(fetchFeedback, 5000); // Poll every 5 seconds
+    const interval = setInterval(fetchFeedback, 10000); // Poll every 10 seconds
     return () => clearInterval(interval);
   }, []);
 
   // Listen for SSE events for real-time updates
   useEffect(() => {
-    const eventSource = new EventSource('http://localhost:5000/stream/events');
-    
-    eventSource.addEventListener('message', (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'patient_feedback') {
-          fetchFeedback();
-          toast.info('New patient feedback received!');
+    if (!backendAvailable) return;
+
+    let eventSource;
+    try {
+      eventSource = new EventSource('http://localhost:5000/stream/events');
+
+      eventSource.addEventListener('message', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'patient_feedback') {
+            fetchFeedback();
+          }
+        } catch (error) {
+          console.error('Error parsing SSE event:', error);
         }
-      } catch (error) {
-        console.error('Error parsing SSE event:', error);
+      });
+
+      eventSource.onerror = () => {
+        setBackendAvailable(false);
+        if (eventSource) {
+          eventSource.close();
+        }
+      };
+    } catch (error) {
+      console.log('SSE not available');
+    }
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
       }
-    });
-
-    eventSource.onerror = (error) => {
-      console.error('SSE connection error:', error);
-      eventSource.close();
     };
+  }, [backendAvailable]);
 
-    return () => eventSource.close();
-  }, []);
-  
   // Calculate total feedback count (backend + local)
   const totalFeedbackCount = useMemo(() => {
     const localCount = activePatients.reduce((sum, patient) => {
@@ -136,16 +217,16 @@ export function ManagerInterface({
     }, 0);
     return backendFeedback.length + localCount;
   }, [activePatients, backendFeedback.length]);
-  
+
   // Calculate new feedback count
   const newFeedbackCount = Math.max(0, totalFeedbackCount - viewedFeedbackCount);
-  
+
   // Filter patients by ESI level for whiteboard
   const getFilteredPatients = () => {
     if (esiFilter === 'all') return activePatients;
     return activePatients.filter(p => p.esiLevel && p.esiLevel.toString() === esiFilter);
   };
-  
+
   const filteredActivePatients = useMemo(() => {
     const arr = getFilteredPatients().slice();
     if (timeOrder === 'newest') {
@@ -155,7 +236,7 @@ export function ManagerInterface({
     }
     return arr;
   }, [patients, esiFilter, timeOrder]);
-  
+
   const getPatientsByStage = (stage) => {
     return activePatients.filter(p => p.currentStage === stage);
   };
@@ -182,7 +263,7 @@ export function ManagerInterface({
 
   const getStageAlerts = () => {
     const alerts = [];
-    
+
     // Time threshold alerts
     activePatients.forEach(patient => {
       const threshold = TIME_THRESHOLDS[patient.currentStage];
@@ -215,12 +296,9 @@ export function ManagerInterface({
   const feedbackStats = useMemo(() => {
     const allFeedback = backendFeedback;
     const total = allFeedback.length;
-    const average = total > 0 
-      ? (allFeedback.reduce((sum, f) => sum + f.rating, 0) / total).toFixed(1)
-      : 0;
+    const average = total > 0 ? (allFeedback.reduce((sum, f) => sum + f.rating, 0) / total).toFixed(1) : 0;
     const lowSatisfaction = allFeedback.filter(f => f.rating <= 2).length;
     const highSatisfaction = allFeedback.filter(f => f.rating >= 4).length;
-    
     return { total, average, lowSatisfaction, highSatisfaction };
   }, [backendFeedback]);
 
@@ -234,8 +312,67 @@ export function ManagerInterface({
     return SATISFACTION_EMOJIS[rating] || SATISFACTION_EMOJIS[3];
   };
 
+  // Calculate unread feedback count
+  const unreadFeedbackCount = useMemo(() => {
+    return backendFeedback.filter(f => !f.is_read && !readFeedbackIds.has(f.id)).length;
+  }, [backendFeedback, readFeedbackIds]);
+
+  // Get unread feedback items
+  const unreadFeedback = useMemo(() => {
+    return backendFeedback
+      .filter(f => !f.is_read && !readFeedbackIds.has(f.id))
+      .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))
+      .slice(0, 10); // Show latest 10 unread
+  }, [backendFeedback, readFeedbackIds]);
+
+  // Mark feedback as read
+  const markAsRead = async (feedbackId) => {
+    // save to UI immediately
+    setReadFeedbackIds(prev => {
+      const updated = new Set(prev);
+      updated.add(feedbackId);
+      return updated;
+    });
+
+    // save to backend
+    try {
+      await fetch(`http://localhost:5000/api/feedback/read/${feedbackId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+    } catch (err) {
+      console.error("Failed to mark feedback as read:", err);
+    }
+  };
+
+  // Mark feedback as unread
+  const markAsUnread = async (feedbackId) => {
+    setReadFeedbackIds(prev => {
+      const updated = new Set(prev);
+      updated.delete(feedbackId);
+      return updated;
+    });
+
+    try {
+      await fetch(`http://localhost:5000/api/feedback/unread/${feedbackId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+    } catch (err) {
+      console.error("Failed to mark feedback as unread:", err);
+    }
+  };
+
+  // Mark all as read
+  const markAllAsRead = () => {
+    const allIds = new Set(backendFeedback.map(f => f.id));
+    setReadFeedbackIds(allIds);
+    toast.success('All feedback marked as read');
+  };
+
   return (
     <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">ED Manager Dashboard</h1>
         <div className="flex items-center gap-3">
@@ -243,9 +380,15 @@ export function ManagerInterface({
             Active Patients: {activePatients.length}
           </Badge>
           {lastFeedbackUpdate && (
-            <span className="text-sm text-gray-500">
+            <Badge variant="outline" className="text-sm px-3 py-1">
+              <Bell className="w-3 h-3 mr-1" />
               Last updated: {lastFeedbackUpdate.toLocaleTimeString()}
-            </span>
+            </Badge>
+          )}
+          {unreadFeedbackCount > 0 && (
+            <Badge className="bg-red-500 text-white animate-pulse">
+              {unreadFeedbackCount} New Feedback
+            </Badge>
           )}
         </div>
       </div>
@@ -270,102 +413,36 @@ export function ManagerInterface({
         </Card>
       )}
 
+      {/* Tabs */}
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
-          <TabsTrigger
-            value="overview"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
+          <TabsTrigger value="overview" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Overview
           </TabsTrigger>
-          
-          <TabsTrigger
-            value="whiteboard"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
+          <TabsTrigger value="whiteboard" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Whiteboard
           </TabsTrigger>
-          
-          <TabsTrigger
-            value="stages"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
+          <TabsTrigger value="stages" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Stage Management
           </TabsTrigger>
-          
-          <TabsTrigger
-            value="feedback"
+          <TabsTrigger 
+            value="feedback" 
             onClick={() => setViewedFeedbackCount(totalFeedbackCount)}
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
+            className="relative flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Patient Feedback
             {newFeedbackCount > 0 && (
-              <Badge className="ml-1 bg-red-500 text-white px-2 py-0.5 text-xs">
-                {newFeedbackCount}
-              </Badge>
+              <span className="absolute right-2 top-1.5 w-3 h-3 bg-red-600 rounded-full animate-pulse"></span>
             )}
           </TabsTrigger>
         </TabsList>
 
+        {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
           {/* Stage Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {Object.entries(STAGE_LABELS).map(([stage, label]) => {
               const count = getPatientsByStage(stage).length;
               if (count === 0 && !['waiting_triage', 'waiting_registration', 'waiting_doctor', 'waiting_admission', 'waiting_observation', 'waiting_discharge'].includes(stage)) return null;
-              
               return (
                 <Card key={stage}>
                   <CardContent className="p-4 text-center">
@@ -390,7 +467,6 @@ export function ManagerInterface({
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -402,7 +478,6 @@ export function ManagerInterface({
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -414,7 +489,6 @@ export function ManagerInterface({
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -438,7 +512,7 @@ export function ManagerInterface({
                 {activePatients
                   .filter(p => p.name)
                   .slice(0, 10)
-                  .map((patient) => (
+                  .map(patient => (
                     <div key={patient.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                       <div>
                         <div className="font-medium">{patient.name}</div>
@@ -461,6 +535,7 @@ export function ManagerInterface({
           </Card>
         </TabsContent>
 
+        {/* Whiteboard Tab */}
         <TabsContent value="whiteboard" className="space-y-6">
           <Card>
             <CardHeader>
@@ -477,31 +552,31 @@ export function ManagerInterface({
                       <SelectItem value="1">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 bg-red-600 rounded-full"></div>
-                          ESI 1 (Critical)
+                          ESI 1 - Critical
                         </div>
                       </SelectItem>
                       <SelectItem value="2">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                          ESI 2 (Emergent)
+                          ESI 2 - Emergent
                         </div>
                       </SelectItem>
                       <SelectItem value="3">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                          ESI 3 (Urgent)
+                          ESI 3 - Urgent
                         </div>
                       </SelectItem>
                       <SelectItem value="4">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                          ESI 4 (Less Urgent)
+                          ESI 4 - Less Urgent
                         </div>
                       </SelectItem>
                       <SelectItem value="5">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                          ESI 5 (Non-Urgent)
+                          ESI 5 - Non-Urgent
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -536,6 +611,7 @@ export function ManagerInterface({
                     <TableHead>Diagnosis</TableHead>
                     <TableHead>Stage of Care</TableHead>
                     <TableHead>Stage Time</TableHead>
+                    <TableHead>Feedback</TableHead>
                     <TableHead>Alerts</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -543,62 +619,75 @@ export function ManagerInterface({
                 <TableBody>
                   {filteredActivePatients.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={12} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={13} className="text-center py-8 text-gray-500">
                         No patients found matching the selected ESI level filter.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredActivePatients.map((patient) => (
-                      <TableRow key={patient.id}>
-                        <TableCell>
-                          <Badge variant="outline" className="font-mono">
-                            {patient.id}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{patient.arrivalTime.toLocaleTimeString()}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{getTotalTime(patient)}m</Badge>
-                        </TableCell>
-                        <TableCell className="font-medium">{patient.name || 'Not registered'}</TableCell>
-                        <TableCell>{getPatientAge(patient)}</TableCell>
-                        <TableCell>{patient.sex || '-'}</TableCell>
-                        <TableCell className="max-w-xs truncate">{patient.chiefComplaint || '-'}</TableCell>
-                        <TableCell className="max-w-xs truncate">{patient.diagnosis || '-'}</TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <Badge variant="outline">{STAGE_LABELS[patient.currentStage]}</Badge>
-                            {patient.esiLevel && (
-                              <Badge className={ESI_COLORS[patient.esiLevel]}>
-                                ESI {patient.esiLevel}
-                              </Badge>
+                    filteredActivePatients.map(patient => {
+                      const hasNewFeedback = newFeedbackPatients.has(patient.id);
+                      const feedbackCount = backendFeedback.filter(f => f.queue_number === patient.id).length;
+                      
+                      return (
+                        <TableRow key={patient.id} className={hasNewFeedback ? 'animate-pulse bg-green-50' : ''}>
+                          <TableCell>
+                            <Badge variant="outline" className="font-mono">{patient.id}</Badge>
+                          </TableCell>
+                          <TableCell>{patient.arrivalTime.toLocaleTimeString()}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{getTotalTime(patient)}m</Badge>
+                          </TableCell>
+                          <TableCell className="font-medium">{patient.name || 'Not registered'}</TableCell>
+                          <TableCell>{getPatientAge(patient)}</TableCell>
+                          <TableCell>{patient.sex || '-'}</TableCell>
+                          <TableCell className="max-w-xs truncate">{patient.chiefComplaint || '-'}</TableCell>
+                          <TableCell className="max-w-xs truncate">{patient.diagnosis || '-'}</TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <Badge variant="outline">{STAGE_LABELS[patient.currentStage]}</Badge>
+                              {patient.esiLevel && (
+                                <Badge className={ESI_COLORS[patient.esiLevel]}>
+                                  ESI {patient.esiLevel}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={isOverThreshold(patient, patient.currentStage) ? 'destructive' : 'outline'}>
+                              {getStageTime(patient)}m
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {feedbackCount > 0 && (
+                              <div className="flex items-center gap-1">
+                                <MessageSquare className={`w-4 h-4 ${hasNewFeedback ? 'text-green-600 animate-bounce' : 'text-blue-600'}`} />
+                                <Badge 
+                                  variant="outline" 
+                                  className={hasNewFeedback ? 'bg-green-100 border-green-500 text-green-800 animate-pulse' : 'bg-blue-100 border-blue-500 text-blue-800'}
+                                >
+                                  {feedbackCount}
+                                </Badge>
+                              </div>
                             )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={isOverThreshold(patient, patient.currentStage) ? "destructive" : "outline"}>
-                            {getStageTime(patient)}m
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {(patient.esiLevel === 1 || patient.esiLevel === 2) && getTotalTime(patient) > 30 && (
-                            <AlertTriangle className="h-4 w-4 text-red-500" />
-                          )}
-                          {isOverThreshold(patient, patient.currentStage) && (
-                            <Clock className="h-4 w-4 text-orange-500" />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {patient.currentStage === 'awaiting_departure' && (
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleEndMonitoring(patient.id)}
-                            >
-                              End Monitoring
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))
+                          </TableCell>
+                          <TableCell>
+                            {(patient.esiLevel === 1 || patient.esiLevel === 2) && getTotalTime(patient) > 30 && (
+                              <AlertTriangle className="h-4 w-4 text-red-500" />
+                            )}
+                            {isOverThreshold(patient, patient.currentStage) && (
+                              <Clock className="h-4 w-4 text-orange-500" />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {patient.currentStage === 'awaiting_departure' && (
+                              <Button size="sm" onClick={() => handleEndMonitoring(patient.id)}>
+                                End Monitoring
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -606,6 +695,7 @@ export function ManagerInterface({
           </Card>
         </TabsContent>
 
+        {/* Stages Tab */}
         <TabsContent value="stages" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Object.entries(STAGE_LABELS).map(([stage, label]) => {
@@ -619,12 +709,10 @@ export function ManagerInterface({
                     <Badge variant="outline">{stagePatients.length} patients</Badge>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    {stagePatients.map((patient) => (
+                    {stagePatients.map(patient => (
                       <div key={patient.id} className="p-2 bg-gray-50 rounded text-sm">
                         <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="font-mono text-xs">
-                            {patient.id}
-                          </Badge>
+                          <Badge variant="outline" className="font-mono text-xs">{patient.id}</Badge>
                           <div className="font-medium">{patient.name || 'Not registered'}</div>
                         </div>
                         <div className="text-gray-600">
@@ -644,6 +732,7 @@ export function ManagerInterface({
           </div>
         </TabsContent>
 
+        {/* Feedback Tab */}
         <TabsContent value="feedback" className="space-y-6">
           {/* Feedback Header with Refresh */}
           <Card>
@@ -652,13 +741,13 @@ export function ManagerInterface({
                 <div>
                   <CardTitle>Real-Time Patient Feedback</CardTitle>
                   <p className="text-sm text-gray-600 mt-1">
-                    Patient satisfaction ratings and comments submitted during their ED visit
+                    Organized by patient - Click to view detailed feedback
                   </p>
                 </div>
                 <Button 
-                  onClick={fetchFeedback}
+                  onClick={fetchFeedback} 
                   disabled={isLoadingFeedback}
-                  variant="outline"
+                  variant="outline" 
                   size="sm"
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingFeedback ? 'animate-spin' : ''}`} />
@@ -667,104 +756,205 @@ export function ManagerInterface({
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4 max-h-[600px] overflow-y-auto">
-                {isLoadingFeedback && backendFeedback.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50 animate-pulse" />
-                    <p>Loading feedback...</p>
-                  </div>
-                ) : backendFeedback.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <MessageCircle className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                    <p>No patient feedback received yet</p>
-                    <p className="text-sm mt-1">Feedback will appear here as patients submit ratings</p>
-                  </div>
-                ) : (
-                  backendFeedback
-                    .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))
-                    .map((feedback) => {
-                      const satisfactionData = getSatisfactionEmoji(feedback.rating);
-                      
-                      // Color coding based on rating
-                      let bgColor = 'bg-yellow-50 border-yellow-200';
-                      let borderColor = 'border-l-yellow-500';
-                      
-                      if (feedback.rating <= 2) {
-                        bgColor = 'bg-red-50 border-red-200';
-                        borderColor = 'border-l-red-500';
-                      } else if (feedback.rating === 3) {
-                        bgColor = 'bg-orange-50 border-orange-200';
-                        borderColor = 'border-l-orange-500';
-                      } else if (feedback.rating === 4) {
-                        bgColor = 'bg-yellow-50 border-yellow-200';
-                        borderColor = 'border-l-yellow-500';
-                      } else if (feedback.rating === 5) {
-                        bgColor = 'bg-green-50 border-green-200';
-                        borderColor = 'border-l-green-500';
+              {isLoadingFeedback && backendFeedback.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50 animate-pulse" />
+                  <p>Loading feedback...</p>
+                </div>
+              ) : backendFeedback.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <MessageCircle className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                  <p>No patient feedback received yet</p>
+                  <p className="text-sm mt-1">Feedback will appear here as patients submit ratings</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Group feedback by patient */}
+                  {Object.entries(
+                    backendFeedback.reduce((acc, feedback) => {
+                      if (!acc[feedback.queue_number]) {
+                        acc[feedback.queue_number] = [];
                       }
-                      
-                      return (
-                        <Card key={feedback.id} className={`border-l-4 ${borderColor}`}>
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-3">
-                                  <Badge variant="outline" className="font-mono text-base px-3 py-1">
-                                    {feedback.queue_number}
-                                  </Badge>
-                                  <Badge className={getRatingBadge(feedback.rating)}>
-                                    {feedback.rating} / 5
-                                  </Badge>
-                                  <Badge variant="outline" className="text-sm">
-                                    {feedback.stage_display_name || feedback.stage}
-                                  </Badge>
-                                </div>
-                                
-                                {/* Emoji Face Display */}
-                                <div className="flex items-center gap-3 mb-2">
-                                  <span className="text-6xl">{satisfactionData.emoji}</span>
-                                  <div>
-                                    <p className={`text-lg font-semibold ${satisfactionData.color}`}>
-                                      {satisfactionData.label}
-                                    </p>
-                                    <p className="text-sm text-gray-600">
-                                      Rating: {feedback.rating} out of 5
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              <div className="flex items-center gap-2 text-sm text-gray-500">
-                                <Clock className="w-4 h-4" />
-                                {new Date(feedback.submitted_at).toLocaleString()}
-                              </div>
-                            </div>
+                      acc[feedback.queue_number].push(feedback);
+                      return acc;
+                    }, {})
+                  )
+                    .sort(([, feedbackA], [, feedbackB]) => {
+                      // Sort by most recent feedback
+                      const latestA = Math.max(...feedbackA.map(f => new Date(f.submitted_at).getTime()));
+                      const latestB = Math.max(...feedbackB.map(f => new Date(f.submitted_at).getTime()));
+                      return latestB - latestA;
+                    })
+                    .map(([queueNumber, patientFeedback]) => {
+                      const latestFeedback = patientFeedback.sort((a, b) => 
+                        new Date(b.submitted_at) - new Date(a.submitted_at)
+                      )[0];
+                      const hasNewFeedback = newFeedbackPatients.has(queueNumber);
+                      const avgRating = (patientFeedback.reduce((sum, f) => sum + f.rating, 0) / patientFeedback.length).toFixed(1);
+                      const avgEmoji = getSatisfactionEmoji(Math.round(avgRating));
 
-                            {feedback.comment && (
-                              <div className={`${bgColor} rounded-lg p-3 mt-2 border`}>
-                                <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                                  <MessageCircle className="w-4 h-4 inline mr-2 text-gray-600" />
-                                  {feedback.comment}
+                      return (
+                        <Card 
+                          key={queueNumber} 
+                          className={`border-l-4 transition-all ${
+                            hasNewFeedback 
+                              ? 'border-l-green-500 bg-green-50 shadow-lg animate-pulse' 
+                              : 'border-l-blue-500'
+                          }`}
+                        >
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <Badge variant="outline" className="font-mono text-lg px-4 py-1">
+                                    {queueNumber}
+                                  </Badge>
+                                  {latestFeedback.patient_name && (
+                                    <span className="font-semibold text-lg">
+                                      {latestFeedback.patient_name}
+                                    </span>
+                                  )}
+                                  {hasNewFeedback && (
+                                    <Badge className="bg-green-500 text-white animate-bounce">
+                                      <Bell className="w-3 h-3 mr-1" />
+                                      NEW MESSAGE
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-3xl">{avgEmoji.emoji}</span>
+                                    <div>
+                                      <p className="text-sm text-gray-600">Average Rating</p>
+                                      <p className="text-xl font-bold">{avgRating} / 5</p>
+                                    </div>
+                                  </div>
+                                  <div className="border-l pl-3 ml-3">
+                                    <p className="text-sm text-gray-600">Total Feedback</p>
+                                    <p className="text-xl font-bold">{patientFeedback.length}</p>
+                                  </div>
+                                  {latestFeedback.priority_esi && (
+                                    <Badge className={ESI_COLORS[latestFeedback.priority_esi]}>
+                                      ESI {latestFeedback.priority_esi}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                <p>Latest feedback:</p>
+                                <p className="font-medium">
+                                  {new Date(latestFeedback.submitted_at).toLocaleString()}
                                 </p>
                               </div>
-                            )}
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-3">
+                              {patientFeedback
+                                .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))
+                                .map((feedback, index) => {
+                                  const satisfactionData = getSatisfactionEmoji(feedback.rating);
+                                  const isRead = feedback.is_read || readFeedbackIds.has(feedback.id);
+                                  
+                                  let bgColor = 'bg-gray-50';
+                                  if (feedback.rating <= 2) bgColor = 'bg-red-50';
+                                  else if (feedback.rating === 3) bgColor = 'bg-orange-50';
+                                  else if (feedback.rating === 4) bgColor = 'bg-yellow-50';
+                                  else if (feedback.rating === 5) bgColor = 'bg-green-50';
 
-                            {feedback.patient_name && (
-                              <div className="mt-3 pt-3 border-t text-sm text-gray-600">
-                                <span className="font-medium">Patient:</span> {feedback.patient_name}
-                                {feedback.priority_esi && (
-                                  <span className="ml-3">
-                                    <span className="font-medium">ESI:</span> {feedback.priority_esi}
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                                  return (
+                                    <div 
+                                      key={feedback.id} 
+                                      className={`${bgColor} rounded-lg p-4 border ${
+                                        index === 0 && hasNewFeedback 
+                                          ? 'border-green-500 border-2' 
+                                          : 'border-gray-200'
+                                      }`}
+                                    >
+                                      <div className="flex items-start justify-between mb-2">
+                                        <div className="flex items-center gap-3">
+                                          <span className="text-4xl">{satisfactionData.emoji}</span>
+                                          <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <Badge className={getRatingBadge(feedback.rating)}>
+                                                {feedback.rating} / 5
+                                              </Badge>
+                                              <Badge variant="outline">
+                                                {feedback.stage_display_name || feedback.stage}
+                                              </Badge>
+                                              {index === 0 && hasNewFeedback && (
+                                                <Badge className="bg-green-500 text-white text-xs">
+                                                  NEW
+                                                </Badge>
+                                              )}
+                                            </div>
+                                            <p className={`font-semibold ${satisfactionData.color}`}>
+                                              {satisfactionData.label}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                                          <Clock className="w-3 h-3" />
+                                          {new Date(feedback.submitted_at).toLocaleString()}
+                                        </div>
+                                      </div>
+                                      {feedback.comment && (
+                                        <div className="mt-3 p-3 bg-white rounded border border-gray-200">
+                                          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                                            <MessageCircle className="w-4 h-4 inline mr-2 text-gray-600" />
+                                            {feedback.comment}
+                                          </p>
+                                        </div>
+                                      )}
+                                      <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                                        <div className="flex items-center gap-3">
+                                          {index === 0 && (
+                                            <Badge variant="outline" className="text-xs">
+                                              Latest Feedback
+                                            </Badge>
+                                          )}
+                                          <span>Feedback {patientFeedback.length - index}</span>
+                                          {isRead ? (
+                                            <Badge className="bg-gray-100 text-gray-600 text-xs">
+                                              <Check className="w-3 h-3 mr-1" />
+                                              Read
+                                            </Badge>
+                                          ) : (
+                                            <Badge className="bg-blue-100 text-blue-700 text-xs animate-pulse">
+                                              <BellRing className="w-3 h-3 mr-1" />
+                                              Unread
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          onClick={() => isRead ? markAsUnread(feedback.id) : markAsRead(feedback.id)}
+                                          className="h-6 text-xs"
+                                        >
+                                          {isRead ? (
+                                            <>
+                                              <X className="w-3 h-3 mr-1" />
+                                              Mark unread
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Check className="w-3 h-3 mr-1" />
+                                              Mark read
+                                            </>
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                            </div>
                           </CardContent>
                         </Card>
                       );
-                    })
-                )}
-              </div>
+                    })}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -805,19 +995,21 @@ export function ManagerInterface({
                     {Object.entries(
                       backendFeedback.reduce((acc, f) => {
                         const stage = f.stage_display_name || f.stage;
-                        if (!acc[stage]) acc[stage] = { sum: 0, count: 0 };
+                        if (!acc[stage]) {
+                          acc[stage] = { sum: 0, count: 0 };
+                        }
                         acc[stage].sum += f.rating;
                         acc[stage].count += 1;
                         return acc;
                       }, {})
                     )
-                      .sort((a, b) => (b[1].sum / b[1].count) - (a[1].sum / a[1].count))
+                      .sort(([, a], [, b]) => (b.sum / b.count) - (a.sum / a.count))
                       .map(([stage, data]) => {
                         const avg = (data.sum / data.count).toFixed(1);
                         const avgRating = Math.round(avg);
                         const emojiData = getSatisfactionEmoji(avgRating);
-                        const color = avg <= 2 ? 'text-red-600' : avg <= 3 ? 'text-orange-600' : 'text-green-600';
-                        
+                        const color = avg <= 2 ? 'text-red-600' : avg === 3 ? 'text-orange-600' : 'text-green-600';
+
                         return (
                           <div key={stage} className="flex justify-between items-center p-3 bg-white rounded border">
                             <div className="flex items-center gap-2">
