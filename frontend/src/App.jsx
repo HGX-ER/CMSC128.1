@@ -26,6 +26,7 @@ import {
   LogOut,
   User
 } from 'lucide-react';
+import { ShieldCheck } from "lucide-react";
 
 const ROLE_CONFIGS = {
   triage: {
@@ -333,13 +334,7 @@ export default function App() {
       
       case 'admin':
         return (
-          <AdminInterface
-            users={userManagement.users}
-            onAddUser={userManagement.addUser}
-            onUpdateUser={userManagement.updateUser}
-            onDeleteUser={userManagement.deleteUser}
-            onToggleUserStatus={userManagement.toggleUserStatus}
-          />
+          <AdminInterface/>
         );
       
       default:
