@@ -58,6 +58,7 @@ const whiteboardRoutes = require("./routes/whiteboard");
 const doctorsRoutes = require("./routes/doctors");
 const feedbackRoutes = require('./routes/feedback');
 const transferRouter = require('./routes/transfer');
+const adminRoutes = require('./routes/admin'); // ✅ NEW: Admin routes
 
 // Mount routes
 app.use("/api", authRoutes);
@@ -70,6 +71,7 @@ app.use('/api', whiteboardRoutes);
 app.use("/api", doctorsRoutes);
 app.use('/api', feedbackRoutes);
 app.use('/api', transferRouter);
+app.use('/api', adminRoutes); // ✅ NEW: Mount admin routes
 
 /* ===== Error handler ===== */
 app.use((err, req, res, next) => {

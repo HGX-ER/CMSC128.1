@@ -1,4 +1,5 @@
 -- schema.sql
+
 DROP DATABASE IF EXISTS testdb;
 CREATE DATABASE IF NOT EXISTS testdb;
 USE testdb;
@@ -8,12 +9,20 @@ CREATE TABLE users (
                        id INT AUTO_INCREMENT PRIMARY KEY,
                        username VARCHAR(50) NOT NULL UNIQUE,
                        password VARCHAR(255) NOT NULL,
-                       role ENUM('nurse','doctor','ed_manager') NOT NULL,
+                       role ENUM('nurse','doctor','ed_manager','admin') NOT NULL,
                        full_name VARCHAR(100) DEFAULT NULL,
                        specialty VARCHAR(100) DEFAULT NULL,
                        room VARCHAR(50) DEFAULT NULL,
-                       floor VARCHAR(50) DEFAULT NULL
+                       floor VARCHAR(50) DEFAULT NULL,
+                       email VARCHAR(255) DEFAULT NULL,
+                       phone VARCHAR(50) DEFAULT NULL,
+                       status ENUM('active','inactive') DEFAULT 'active',
+                       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
+
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_status ON users(status);
 
 -- PATIENTS
 CREATE TABLE patients (
@@ -30,10 +39,6 @@ CREATE TABLE patients (
 ) ENGINE=InnoDB;
 
 -- ENCOUNTERS
--- IMPORTANT CHANGES:
--- 1) status -> VARCHAR(32) (more flexible than ENUM while prototyping)
--- 2) diagnosis -> TEXT (frontend/route writes diagnosis)
--- 3) updated_at -> for bookkeeping
 CREATE TABLE encounters (
                             id INT AUTO_INCREMENT PRIMARY KEY,
                             patient_id INT NOT NULL,
@@ -50,23 +55,17 @@ CREATE TABLE encounters (
                             disposition VARCHAR(64) NULL,
                             depart_time DATETIME NULL,
                             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                            CONSTRAINT fk_enc_patient
-                                FOREIGN KEY (patient_id) REFERENCES patients(id)
-                                    ON DELETE CASCADE ON UPDATE CASCADE,
-                            CONSTRAINT fk_enc_doctor
-                                FOREIGN KEY (assigned_doctor) REFERENCES users(username)
-                                    ON DELETE SET NULL ON UPDATE CASCADE,
-                            CONSTRAINT fk_enc_nurse
-                                FOREIGN KEY (assigned_nurse) REFERENCES users(username)
-                                    ON DELETE SET NULL ON UPDATE CASCADE
+                            CONSTRAINT fk_enc_patient FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE ON UPDATE CASCADE,
+                            CONSTRAINT fk_enc_doctor FOREIGN KEY (assigned_doctor) REFERENCES users(username) ON DELETE SET NULL ON UPDATE CASCADE,
+                            CONSTRAINT fk_enc_nurse FOREIGN KEY (assigned_nurse) REFERENCES users(username) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
-CREATE INDEX idx_queue_number       ON encounters(queue_number);
-CREATE INDEX idx_patient_id         ON encounters(patient_id);
-CREATE INDEX idx_enc_status         ON encounters(status);
+CREATE INDEX idx_queue_number ON encounters(queue_number);
+CREATE INDEX idx_patient_id ON encounters(patient_id);
+CREATE INDEX idx_enc_status ON encounters(status);
 CREATE INDEX idx_enc_assigned_doctor ON encounters(assigned_doctor);
 CREATE INDEX idx_enc_assigned_nurse ON encounters(assigned_nurse);
-CREATE INDEX idx_enc_arrival_time   ON encounters(arrival_time);
+CREATE INDEX idx_enc_arrival_time ON encounters(arrival_time);
 
 -- OBSERVATIONS
 CREATE TABLE observations (
@@ -76,107 +75,88 @@ CREATE TABLE observations (
                               value VARCHAR(64),
                               unit VARCHAR(16),
                               recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                              CONSTRAINT fk_obs_enc
-                                  FOREIGN KEY (encounter_id) REFERENCES encounters(id)
-                                      ON DELETE CASCADE ON UPDATE CASCADE
+                              CONSTRAINT fk_obs_enc FOREIGN KEY (encounter_id) REFERENCES encounters(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB;
+
+CREATE INDEX idx_obs_encounter ON observations(encounter_id);
 
 -- ENCOUNTER EVENTS
 CREATE TABLE encounter_events (
                                   id INT AUTO_INCREMENT PRIMARY KEY,
                                   encounter_id INT NOT NULL,
-                                  type ENUM(
-                                      'arrived',
-                                      'registered',
-                                      'triaged',
-                                      'roomed',
-                                      'provider_started',
-                                      'results_ready',
-                                      'dispositioned',
-                                      'departed',
-                                      'transferred'
-                                      ) NOT NULL,
+                                  type ENUM('arrived','registered','triaged','roomed','provider_started','results_ready','dispositioned','departed','transferred') NOT NULL,
                                   at DATETIME NOT NULL,
                                   payload JSON,
-                                  CONSTRAINT fk_evt_enc
-                                      FOREIGN KEY (encounter_id) REFERENCES encounters(id)
-                                          ON DELETE CASCADE ON UPDATE CASCADE
+                                  CONSTRAINT fk_evt_enc FOREIGN KEY (encounter_id) REFERENCES encounters(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_encounter_event ON encounter_events(encounter_id, at);
 
--- SEED USERS
-INSERT INTO users (username, password, role, full_name, specialty, room, floor) VALUES
-                                                                                    ('nurse1','1234','nurse','Nurse Jane Flores',NULL,NULL,NULL),
-                                                                                    ('doc1','1234','doctor','Dr. Sarah Smith','Emergency Medicine','201','2nd Floor'),
-                                                                                    ('doc2','1234','doctor','Dr. Becky Jones','Emergency Medicine','201','2nd Floor'),
-                                                                                    ('manager1','1234','ed_manager','ED Manager',NULL,NULL,NULL),
-                                                                                    ('admin','1234','admin','Admin',NULL,NULL,NULL),
-ON DUPLICATE KEY UPDATE
-                     password=VALUES(password),
-                     role=VALUES(role),
-                     full_name=VALUES(full_name),
-                     specialty=VALUES(specialty),
-                     room=VALUES(room),
-                     floor=VALUES(floor);
-
--- SEED PATIENTS
-INSERT INTO patients (full_name, dob, sex, contact_number, emergency_contact, insurance_info, address) VALUES
-                                                                                                           ('Juan Dela Cruz','2001-01-15','Male','09171234567','Maria Cruz','PhilHealth','Manila'),
-                                                                                                           ('Maria Santos','1999-07-20','Female','09181234567','Jose Santos','Maxicare','Quezon City'),
-                                                                                                           ('Pedro Gomez','1988-03-10','Male','09191234567','Anna Gomez','Intellicare','Pasig')
-ON DUPLICATE KEY UPDATE
-                     full_name=VALUES(full_name),
-                     dob=VALUES(dob),
-                     sex=VALUES(sex),
-                     contact_number=VALUES(contact_number),
-                     emergency_contact=VALUES(emergency_contact),
-                     insurance_info=VALUES(insurance_info),
-                     address=VALUES(address);
-
--- SEED ENCOUNTERS
--- Doc queue has one patient already waiting for doc1
-INSERT INTO encounters (patient_id, queue_number, status, priority_esi, assigned_doctor, assigned_nurse, arrival_time)
-VALUES
-    (1,'ED001','waiting_doctor',4,'doc1','nurse1',NOW())
-ON DUPLICATE KEY UPDATE
-                     status=VALUES(status),
-                     priority_esi=VALUES(priority_esi),
-                     assigned_doctor=VALUES(assigned_doctor),
-                     assigned_nurse=VALUES(assigned_nurse),
-                     arrival_time=VALUES(arrival_time);
-
--- SEED OBSERVATIONS
-INSERT INTO observations (encounter_id, type, value, unit) VALUES
-                                                               ((SELECT id FROM encounters WHERE queue_number='ED001'),'complaint','Headache',NULL),
-                                                               ((SELECT id FROM encounters WHERE queue_number='ED001'),'bp_sys','130','mmHg'),
-                                                               ((SELECT id FROM encounters WHERE queue_number='ED001'),'bp_dia','80','mmHg');
 -- PATIENT FEEDBACK
 CREATE TABLE patient_feedback (
                                   id INT AUTO_INCREMENT PRIMARY KEY,
                                   encounter_id INT NOT NULL,
                                   queue_number VARCHAR(32) NOT NULL,
-                                  patient_name VARCHAR(100) NULL,  -- ✅ ADDED
+                                  patient_name VARCHAR(100) NULL,
                                   rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
                                   comment TEXT,
                                   stage VARCHAR(64) NOT NULL,
                                   stage_display_name VARCHAR(128),
                                   submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                  is_read BOOLEAN DEFAULT FALSE,  -- ✅ ADDED (you already have this)
-                                  read_at DATETIME NULL,  -- ✅ ADDED (you already have this)
-                                  CONSTRAINT fk_feedback_encounter FOREIGN KEY (encounter_id)
-                                      REFERENCES encounters(id) ON DELETE CASCADE ON UPDATE CASCADE,
-                                  INDEX idx_feedback_queue (queue_number),
-                                  INDEX idx_feedback_encounter (encounter_id),
-                                  INDEX idx_feedback_submitted (submitted_at),
-                                  INDEX idx_feedback_is_read (is_read)  -- ✅ ADDED (for efficient queries)
+                                  is_read BOOLEAN DEFAULT FALSE,
+                                  read_at DATETIME NULL,
+                                  CONSTRAINT fk_feedback_encounter FOREIGN KEY (encounter_id) REFERENCES encounters(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
-UPDATE patient_feedback pf
-    JOIN encounters e ON pf.encounter_id = e.id
-    JOIN patients p ON e.patient_id = p.id
-SET pf.patient_name = p.full_name
-WHERE pf.patient_name IS NULL;
+CREATE INDEX idx_feedback_queue ON patient_feedback(queue_number);
+CREATE INDEX idx_feedback_encounter ON patient_feedback(encounter_id);
+CREATE INDEX idx_feedback_submitted ON patient_feedback(submitted_at);
+CREATE INDEX idx_feedback_is_read ON patient_feedback(is_read);
 
+-- SEED USERS
+INSERT INTO users (username, password, role, full_name, specialty, room, floor, email, phone, status) VALUES
+                                                                                                          ('nurse1', '1234', 'nurse', 'Nurse Jane Flores', NULL, NULL, NULL, 'jane.flores@hospital.com', '09171111111', 'active'),
+                                                                                                          ('doc1', '1234', 'doctor', 'Dr. Sarah Smith', 'Emergency Medicine', '201', '2nd Floor', 'sarah.smith@hospital.com', '09172222222', 'active'),
+                                                                                                          ('doc2', '1234', 'doctor', 'Dr. Becky Jones', 'Emergency Medicine', '201', '2nd Floor', 'becky.jones@hospital.com', '09173333333', 'active'),
+                                                                                                          ('manager1', '1234', 'ed_manager', 'ED Manager', NULL, NULL, NULL, 'manager@hospital.com', '09174444444', 'active'),
+                                                                                                          ('admin', '1234', 'admin', 'System Administrator', NULL, NULL, NULL, 'admin@hospital.com', '09175555555', 'active')
+ON DUPLICATE KEY UPDATE
+                     password = VALUES(password),
+                     role = VALUES(role),
+                     full_name = VALUES(full_name),
+                     specialty = VALUES(specialty),
+                     room = VALUES(room),
+                     floor = VALUES(floor),
+                     email = VALUES(email),
+                     phone = VALUES(phone),
+                     status = VALUES(status);
 
-ALTER TABLE encounters ADD COLUMN diagnosis TEXT NULL AFTER provider_start_time;
+-- SEED PATIENTS
+INSERT INTO patients (full_name, dob, sex, contact_number, emergency_contact, insurance_info, address) VALUES
+                                                                                                           ('Juan Dela Cruz', '2001-01-15', 'Male', '09171234567', 'Maria Cruz', 'PhilHealth', 'Manila'),
+                                                                                                           ('Maria Santos', '1999-07-20', 'Female', '09181234567', 'Jose Santos', 'Maxicare', 'Quezon City'),
+                                                                                                           ('Pedro Gomez', '1988-03-10', 'Male', '09191234567', 'Anna Gomez', 'Intellicare', 'Pasig')
+ON DUPLICATE KEY UPDATE
+                     full_name = VALUES(full_name),
+                     dob = VALUES(dob),
+                     sex = VALUES(sex),
+                     contact_number = VALUES(contact_number),
+                     emergency_contact = VALUES(emergency_contact),
+                     insurance_info = VALUES(insurance_info),
+                     address = VALUES(address);
+
+-- SEED ENCOUNTERS
+INSERT INTO encounters (patient_id, queue_number, status, priority_esi, assigned_doctor, assigned_nurse, arrival_time)
+VALUES (1, 'ED001', 'waiting_doctor', 4, 'doc1', 'nurse1', NOW())
+ON DUPLICATE KEY UPDATE
+                     status = VALUES(status),
+                     priority_esi = VALUES(priority_esi),
+                     assigned_doctor = VALUES(assigned_doctor),
+                     assigned_nurse = VALUES(assigned_nurse),
+                     arrival_time = VALUES(arrival_time);
+
+-- SEED OBSERVATIONS
+INSERT INTO observations (encounter_id, type, value, unit) VALUES
+                                                               ((SELECT id FROM encounters WHERE queue_number = 'ED001'), 'complaint', 'Headache', NULL),
+                                                               ((SELECT id FROM encounters WHERE queue_number = 'ED001'), 'bp_sys', '130', 'mmHg'),
+                                                               ((SELECT id FROM encounters WHERE queue_number = 'ED001'), 'bp_dia', '80', 'mmHg');
