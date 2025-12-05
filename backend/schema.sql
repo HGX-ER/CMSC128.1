@@ -160,3 +160,16 @@ INSERT INTO observations (encounter_id, type, value, unit) VALUES
                                                                ((SELECT id FROM encounters WHERE queue_number = 'ED001'), 'complaint', 'Headache', NULL),
                                                                ((SELECT id FROM encounters WHERE queue_number = 'ED001'), 'bp_sys', '130', 'mmHg'),
                                                                ((SELECT id FROM encounters WHERE queue_number = 'ED001'), 'bp_dia', '80', 'mmHg');
+
+-- ICD-10 CODES
+CREATE TABLE encounter_icd_codes (
+                                     id INT AUTO_INCREMENT PRIMARY KEY,
+                                     encounter_id INT NOT NULL,
+                                     icd_code VARCHAR(10) NOT NULL,
+                                     icd_description TEXT,
+                                     recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                     CONSTRAINT fk_icd_encounter FOREIGN KEY (encounter_id) REFERENCES encounters(id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_icd_encounter ON encounter_icd_codes(encounter_id);
+CREATE INDEX idx_icd_code ON encounter_icd_codes(icd_code);

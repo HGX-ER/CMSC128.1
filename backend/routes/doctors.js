@@ -188,11 +188,10 @@ router.post('/doctor/encounters/:id/start', async (req, res) => {
     }
 });
 
-// ---------- Complete consultation ----------
-// ---------- Complete consultation ----------
+// ---------- Complete consultation with ICD-10 support ----------
 router.patch('/doctor/encounters/:id/complete', async (req, res) => {
     const id = Number(req.params.id);
-    const { diagnosis, disposition } = req.body || {};
+    const { diagnosis, disposition, icdCodes } = req.body || {};
 
     if (!id) return res.status(400).json({ error: 'Invalid encounter id' });
     if (!diagnosis || !disposition) {
@@ -231,6 +230,21 @@ router.patch('/doctor/encounters/:id/complete', async (req, res) => {
         if (!r.affectedRows) {
             await conn.rollback();
             return res.status(404).json({ error: 'Encounter not found' });
+        }
+
+        // Insert ICD-10 codes if provided
+        if (icdCodes && Array.isArray(icdCodes) && icdCodes.length > 0) {
+            // Delete existing codes first
+            await conn.query('DELETE FROM encounter_icd_codes WHERE encounter_id = ?', [id]);
+
+            // Insert new codes
+            const values = icdCodes.map(icd => [id, icd.code, icd.description || '']);
+            await conn.query(
+                'INSERT INTO encounter_icd_codes (encounter_id, icd_code, icd_description) VALUES ?',
+                [values]
+            );
+
+            console.log(`✅ Stored ${icdCodes.length} ICD-10 codes for encounter ${id}`);
         }
 
         // Log dispositioned event
@@ -299,7 +313,7 @@ router.post('/doctor/encounters/:id/transfer', async (req, res) => {
             `SELECT id, assigned_doctor, patient_id, status
              FROM encounters
              WHERE id = ?
-             FOR UPDATE`,
+                 FOR UPDATE`,
             [id]
         );
         if (!rows || rows.length === 0) {
@@ -321,8 +335,8 @@ router.post('/doctor/encounters/:id/transfer', async (req, res) => {
         await conn.query(
             `INSERT INTO encounter_events (encounter_id, type, at, payload)
              VALUES (?, 'transferred', NOW(), JSON_OBJECT(
-               'fromDoctor', ?, 'toDoctor', ?, 'note', ?, 'performedBy', ?
-             ))`,
+                     'fromDoctor', ?, 'toDoctor', ?, 'note', ?, 'performedBy', ?
+                                              ))`,
             [id, fromDoctor, toDoctor, note || null, performedBy]
         );
 

@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const db = require("./db");
+const { loadICD10 } = require('./services/icd10Service'); //loads the csv file
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -11,6 +12,10 @@ app.use(bodyParser.json());
 
 /* ===== SSE bus ===== */
 const sseClients = new Set();
+
+app.get("/", (req, res) => {
+    res.send("Backend is running!");
+});
 
 app.get("/stream/events", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
@@ -58,7 +63,8 @@ const whiteboardRoutes = require("./routes/whiteboard");
 const doctorsRoutes = require("./routes/doctors");
 const feedbackRoutes = require('./routes/feedback');
 const transferRouter = require('./routes/transfer');
-const adminRoutes = require('./routes/admin'); // ✅ NEW: Admin routes
+const adminRoutes = require('./routes/admin'); //admin route
+const icd10Routes = require('./routes/icd10'); // csv route
 
 // Mount routes
 app.use("/api", authRoutes);
@@ -71,7 +77,8 @@ app.use('/api', whiteboardRoutes);
 app.use("/api", doctorsRoutes);
 app.use('/api', feedbackRoutes);
 app.use('/api', transferRouter);
-app.use('/api', adminRoutes); // ✅ NEW: Mount admin routes
+app.use('/api', adminRoutes); //
+app.use('/api', icd10Routes);
 
 /* ===== Error handler ===== */
 app.use((err, req, res, next) => {
@@ -85,7 +92,14 @@ app.use("/api/*", (req, res) => {
     res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
 });
 
-/* ===== Start server ===== */
-app.listen(PORT, () => {
-    console.log(`🚀 Backend running on http://localhost:${PORT}`);
-});
+// ✅ REPLACE THE OLD app.listen() WITH THIS:
+loadICD10()
+    .then(() => {
+        app.listen(PORT, () => {
+            console.log(`🚀 Backend running on http://localhost:${PORT}`);
+        });
+    })
+    .catch((err) => {
+        console.error('❌ Failed to load ICD-10 data:', err);
+        process.exit(1);
+    });
