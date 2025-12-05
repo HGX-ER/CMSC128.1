@@ -12,47 +12,6 @@ import { toast } from 'sonner';
 import { Stethoscope, Activity, Search } from "lucide-react";
 import { Input } from "./ui/input";
 
-// Common ICD-10 codes for Emergency Department
-const ICD_10_CODES = [
-  { code: "A09.9", description: "Gastroenteritis and colitis of unspecified origin" },
-  { code: "B34.9", description: "Viral infection, unspecified" },
-  { code: "E11.9", description: "Type 2 diabetes mellitus without complications" },
-  { code: "G43.909", description: "Migraine, unspecified, not intractable, without status migrainosus" },
-  { code: "I10", description: "Essential (primary) hypertension" },
-  { code: "I21.9", description: "Acute myocardial infarction, unspecified" },
-  { code: "I50.9", description: "Heart failure, unspecified" },
-  { code: "I63.9", description: "Cerebral infarction, unspecified" },
-  { code: "J02.9", description: "Acute pharyngitis, unspecified" },
-  { code: "J06.9", description: "Acute upper respiratory infection, unspecified" },
-  { code: "J18.9", description: "Pneumonia, unspecified organism" },
-  { code: "J44.0", description: "Chronic obstructive pulmonary disease with acute lower respiratory infection" },
-  { code: "J44.1", description: "Chronic obstructive pulmonary disease with acute exacerbation" },
-  { code: "J45.901", description: "Unspecified asthma with acute exacerbation" },
-  { code: "K21.9", description: "Gastro-esophageal reflux disease without esophagitis" },
-  { code: "K52.9", description: "Noninfective gastroenteritis and colitis, unspecified" },
-  { code: "K80.20", description: "Calculus of gallbladder without cholecystitis without obstruction" },
-  { code: "M25.561", description: "Pain in right knee" },
-  { code: "M54.5", description: "Low back pain" },
-  { code: "N39.0", description: "Urinary tract infection, site not specified" },
-  { code: "R05.9", description: "Cough, unspecified" },
-  { code: "R06.02", description: "Shortness of breath" },
-  { code: "R07.9", description: "Chest pain, unspecified" },
-  { code: "R10.9", description: "Unspecified abdominal pain" },
-  { code: "R11.0", description: "Nausea" },
-  { code: "R11.2", description: "Nausea with vomiting, unspecified" },
-  { code: "R42", description: "Dizziness and giddiness" },
-  { code: "R50.9", description: "Fever, unspecified" },
-  { code: "R51.9", description: "Headache, unspecified" },
-  { code: "R55", description: "Syncope and collapse" },
-  { code: "S06.0X0A", description: "Concussion without loss of consciousness, initial encounter" },
-  { code: "S42.001A", description: "Fracture of unspecified part of right clavicle, initial encounter" },
-  { code: "S52.501A", description: "Unspecified fracture of the lower end of right radius, initial" },
-  { code: "S72.001A", description: "Fracture of unspecified part of neck of right femur, initial" },
-  { code: "S82.001A", description: "Unspecified fracture of right patella, initial encounter" },
-  { code: "T14.90", description: "Injury, unspecified" },
-  { code: "T78.40XA", description: "Allergy, unspecified, initial encounter" },
-];
-
 const ESI_COLORS = {
   1: "bg-red-600 text-white",
   2: "bg-orange-500 text-white",
@@ -72,11 +31,11 @@ function ageFromDOB(dob) {
 }
 
 export function DoctorInterface({
-  patients: _unused,             // we fetch our own
-  onUpdatePatient,               // optional callback to parent
-  onMoveToStage,                 // optional callback to parent
-  getTotalTime,                  // optional util
-  currentDoctorUsername,         // e.g., "dr.sarahsmith" or similar from DB
+  patients: _unused,
+  onUpdatePatient,
+  onMoveToStage,
+  getTotalTime,
+  currentDoctorUsername,
 }) {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [consultationOpen, setConsultationOpen] = useState(false);
@@ -88,10 +47,12 @@ export function DoctorInterface({
   const [transferNote, setTransferNote] = useState("");
   const [transferConfirm, setTransferConfirm] = useState(false);
   
-  // ICD-10 search states
+  // ✅ UPDATED: ICD-10 search states - now supports multiple codes
   const [icdSearchTerm, setIcdSearchTerm] = useState("");
-  const [selectedIcdCode, setSelectedIcdCode] = useState("");
+  const [selectedIcdCodes, setSelectedIcdCodes] = useState([]); // Changed from single string to array
   const [showIcdDropdown, setShowIcdDropdown] = useState(false);
+  const [icdResults, setIcdResults] = useState([]);
+  const [icdLoading, setIcdLoading] = useState(false);
 
   const [doctor, setDoctor] = useState({
     full_name: "",
@@ -101,7 +62,7 @@ export function DoctorInterface({
   });
   const [doctorPatients, setDoctorPatients] = useState([]);
 
-  // Fetch doctor profile + patients, with auto-refresh
+  // Fetch doctor profile + patients
   useEffect(() => {
     let stop = false;
 
@@ -138,7 +99,7 @@ export function DoctorInterface({
     };
   }, [currentDoctorUsername]);
 
-  // Load list of available doctors for transfer
+  // Load doctors for transfer
   useEffect(() => {
     let cancelled = false;
     const fetchDoctors = async () => {
@@ -147,7 +108,6 @@ export function DoctorInterface({
         if (!res.ok) return;
         const list = await res.json();
         if (cancelled) return;
-        // normalize: expect array of {username, full_name}
         const normalized = (list || []).map(d => ({ username: d.username || d.id || d.user || d.name, full_name: d.full_name || d.name || d.display_name }));
         setAvailableDoctors(normalized.filter(d => d.username !== currentDoctorUsername));
       } catch (e) {
@@ -158,6 +118,48 @@ export function DoctorInterface({
     fetchDoctors();
     return () => { cancelled = true; };
   }, [currentDoctorUsername]);
+
+  // Debounced ICD-10 search to backend
+  useEffect(() => {
+    if (!icdSearchTerm || icdSearchTerm.length < 2) {
+      setIcdResults([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      try {
+        setIcdLoading(true);
+        const res = await fetch(
+          `http://localhost:5000/api/icd10/search?q=${encodeURIComponent(icdSearchTerm)}`,
+          { signal: controller.signal }
+        );
+        if (!res.ok) {
+          setIcdResults([]);
+          return;
+        }
+        const data = await res.json();
+        setIcdResults(
+          (data || []).map((d) => ({
+            code: d.code,
+            description: d.shortDesc || d.longDesc || "",
+          }))
+        );
+      } catch (e) {
+        if (e.name !== "AbortError") {
+          console.warn("ICD-10 search failed", e);
+        }
+        setIcdResults([]);
+      } finally {
+        setIcdLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [icdSearchTerm]);
 
   // Groups for UI
   const waitingPatients = useMemo(
@@ -192,22 +194,27 @@ export function DoctorInterface({
   ];
   const randomMotivation = useMemo(() => {
     return motivationalPhrases[Math.floor(Math.random() * motivationalPhrases.length)];
-  }, []); 
+  }, []);
 
-  // Filter ICD codes based on search term
-  const filteredIcdCodes = ICD_10_CODES.filter((icd) => {
-    const searchLower = icdSearchTerm.toLowerCase();
-    return (
-      icd.code.toLowerCase().includes(searchLower) ||
-      icd.description.toLowerCase().includes(searchLower)
-    );
-  });
-
-  // Handle ICD code selection
+  // ✅ UPDATED: Handle ICD code selection - add to array
   const handleIcdCodeSelect = (icd) => {
-    setSelectedIcdCode(`${icd.code} - ${icd.description}`);
-    setIcdSearchTerm(`${icd.code} - ${icd.description}`);
+    setSelectedIcdCodes((prev) => {
+      // Avoid duplicates
+      if (prev.some((c) => c.code === icd.code)) {
+        toast.info('Code already selected');
+        return prev;
+      }
+      return [...prev, { code: icd.code, description: icd.description }];
+    });
+
+    // Clear search so user can search for another
+    setIcdSearchTerm("");
     setShowIcdDropdown(false);
+  };
+
+  // ✅ NEW: Remove ICD code
+  const removeIcdCode = (code) => {
+    setSelectedIcdCodes((prev) => prev.filter((c) => c.code !== code));
   };
 
   // Actions
@@ -222,7 +229,6 @@ export function DoctorInterface({
       );
       if (!res.ok) throw new Error("start failed");
 
-      // optimistically flip stage locally
       setDoctorPatients((prev) =>
         prev.map((p) =>
           p.id === selectedPatient ? { ...p, currentStage: "consultation" } : p
@@ -234,7 +240,7 @@ export function DoctorInterface({
       setDiagnosis("");
       setDisposition("");
       setIcdSearchTerm("");
-      setSelectedIcdCode("");
+      setSelectedIcdCodes([]); // ✅ Clear array
       setShowIcdDropdown(false);
     } catch (e) {
       console.error(e);
@@ -242,22 +248,31 @@ export function DoctorInterface({
     }
   };
 
-  const completeConsult = async () => {
-    if (!selectedPatient || !diagnosis || !disposition) return;
-    try {
-      const res = await fetch(
-        `http://localhost:5000/api/doctor/encounters/${selectedPatient}/complete`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ diagnosis, disposition }),
-        }
-      );
-      if (!res.ok) throw new Error("complete failed");
+const completeConsult = async () => {
+  if (!selectedPatient || !diagnosis || !disposition) return;
+  try {
+    const icdSummary = selectedIcdCodes.map((c) => `${c.code} - ${c.description}`).join("; ");
+    const diagnosisWithIcd =
+      selectedIcdCodes.length > 0
+        ? `${diagnosis}\n\nICD-10 Codes: ${icdSummary}`
+        : diagnosis;
 
-      onUpdatePatient?.(selectedPatient, { diagnosis, disposition });
+    const res = await fetch(
+      `http://localhost:5000/api/doctor/encounters/${selectedPatient}/complete`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          diagnosis: diagnosisWithIcd, 
+          disposition,
+          icdCodes: selectedIcdCodes  // Send as separate array
+        }),
+      }
+    );
+    if (!res.ok) throw new Error("complete failed");
 
-      // Refresh immediately
+      onUpdatePatient?.(selectedPatient, { diagnosis: diagnosisWithIcd, disposition });
+
       const list = await fetch(
         `http://localhost:5000/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
       ).then((r) => (r.ok ? r.json() : []));
@@ -274,7 +289,7 @@ export function DoctorInterface({
       setDisposition("");
       setConsultationStartTime(null);
       setIcdSearchTerm("");
-      setSelectedIcdCode("");
+      setSelectedIcdCodes([]); // ✅ Clear array
       setShowIcdDropdown(false);
     } catch (e) {
       console.error(e);
@@ -291,7 +306,7 @@ export function DoctorInterface({
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header with Doctor Info */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl">
@@ -312,7 +327,7 @@ export function DoctorInterface({
         </div>
       </div>
 
-      {/* Casual Location Card */}
+      {/* Location Card */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -336,7 +351,7 @@ export function DoctorInterface({
         </CardContent>
       </Card>
 
-      {/* Navigation Tabs */}
+      {/* Tabs */}
       <Tabs defaultValue="consultation" className="w-full">
         <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
           <TabsTrigger
@@ -382,7 +397,7 @@ export function DoctorInterface({
           </TabsTrigger>
         </TabsList>
 
-        {/* Patient Consultation Tab */}
+        {/* Consultation Tab */}
         <TabsContent value="consultation" className="mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Waiting Patients */}
@@ -416,7 +431,7 @@ export function DoctorInterface({
               </CardContent>
             </Card>
 
-            {/* Patient Profile & Actions */}
+            {/* Patient Details */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">👤 Patient Details</CardTitle>
@@ -424,7 +439,6 @@ export function DoctorInterface({
               <CardContent>
                 {selectedPatientData ? (
                   <div className="space-y-4">
-                    {/* Patient Details */}
                     <div className="p-4 bg-blue-50 rounded-lg space-y-3">
                       <div className="flex justify-between items-start">
                         <div>
@@ -459,7 +473,6 @@ export function DoctorInterface({
                       </div>
                     </div>
 
-                    {/* Room Information */}
                     <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -518,7 +531,7 @@ export function DoctorInterface({
               </CardContent>
             </Card>
 
-            {/* Completed Consultations */}
+            {/* Completed */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -560,7 +573,6 @@ export function DoctorInterface({
             </Card>
           </div>
 
-          {/* Information Note */}
           <Card className="border-blue-200 bg-blue-50 mt-6">
             <CardContent className="p-4">
               <p className="text-sm text-blue-800">
@@ -572,10 +584,9 @@ export function DoctorInterface({
           </Card>
         </TabsContent>
 
-        {/* Patient Status Tab */}
+        {/* Status Tab */}
         <TabsContent value="status" className="mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Active Consultations */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -635,7 +646,6 @@ export function DoctorInterface({
               </CardContent>
             </Card>
 
-            {/* Completed Today */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -742,9 +752,37 @@ export function DoctorInterface({
 
               {/* Consultation Form */}
               <div className="space-y-4">
-                {/* ICD-10 Code Search Dropdown */}
+                {/* ✅ ICD-10 Code Lookup - Multiple Codes Support */}
                 <div className="relative">
-                  <Label htmlFor="icdSearch" className="text-base font-medium">ICD-10 Code Lookup</Label>
+                  <Label htmlFor="icdSearch" className="text-base font-medium">
+                    ICD-10 Code Lookup
+                  </Label>
+
+                  {/* ✅ Selected codes as chips with description on next line */}
+                  {selectedIcdCodes.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      {selectedIcdCodes.map((icd) => (
+                        <div
+                          key={icd.code}
+                          className="px-3 py-2 text-xs bg-green-50 border border-green-300 rounded-md"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono font-semibold text-green-700">{icd.code}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeIcdCode(icd.code)}
+                              className="text-gray-500 hover:text-red-600 font-bold"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <div className="text-gray-700 mt-1">{icd.description}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Search input */}
                   <div className="relative mt-2">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <Input
@@ -760,59 +798,46 @@ export function DoctorInterface({
                       className="pl-10"
                     />
                   </div>
-                  
-                  {/* Dropdown Results */}
-                  {showIcdDropdown && icdSearchTerm && filteredIcdCodes.length > 0 && (
-                    <div 
+
+                  {/* Dropdown Results from Backend */}
+                  {showIcdDropdown && icdSearchTerm && (
+                    <div
                       className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
                       style={{ zIndex: 1000 }}
                     >
-                      {filteredIcdCodes.slice(0, 10).map((icd, index) => (
-                        <div
-                          key={index}
-                          onClick={() => handleIcdCodeSelect(icd)}
-                          className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                        >
-                          <div className="flex items-start gap-3">
-                            <Badge variant="outline" className="shrink-0 font-mono text-xs">
-                              {icd.code}
-                            </Badge>
-                            <p className="text-sm text-gray-700 flex-1">{icd.description}</p>
+                      {icdLoading ? (
+                        <div className="px-4 py-3 text-sm text-gray-500">Searching…</div>
+                      ) : icdResults.length > 0 ? (
+                        icdResults.slice(0, 20).map((icd, index) => (
+                          <div
+                            key={`${icd.code}-${index}`}
+                            onClick={() => handleIcdCodeSelect(icd)}
+                            className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                          >
+                            <div className="flex items-start gap-3">
+                              <Badge
+                                variant="outline"
+                                className="shrink-0 font-mono text-xs"
+                              >
+                                {icd.code}
+                              </Badge>
+                              <p className="text-sm text-gray-700 flex-1">
+                                {icd.description}
+                              </p>
+                            </div>
                           </div>
+                        ))
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                          No matching ICD-10 codes found
                         </div>
-                      ))}
+                      )}
                     </div>
                   )}
-                  
-                  {/* No results message */}
-                  {showIcdDropdown && icdSearchTerm && filteredIcdCodes.length === 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
-                      <p className="text-sm text-gray-500 text-center">No matching ICD-10 codes found</p>
-                    </div>
-                  )}
-                  
-                  {selectedIcdCode && (
-                    <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-green-800">Selected:</span>
-                        <span className="text-sm text-green-700">{selectedIcdCode}</span>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedIcdCode("");
-                          setIcdSearchTerm("");
-                        }}
-                        className="h-6 text-green-600 hover:text-green-800 hover:bg-green-100"
-                      >
-                        ✕ Clear
-                      </Button>
-                    </div>
-                  )}
-                  
-                  <p className="text-xs text-gray-500 mt-1">Optional: Search and select an ICD-10 code for standardized diagnosis coding</p>
+
+                  <p className="text-xs text-gray-500 mt-1">
+                    You can select multiple ICD-10 codes; click a chip's ✕ to remove it
+                  </p>
                 </div>
 
                 <div>
@@ -871,7 +896,7 @@ export function DoctorInterface({
                 </p>
               )}
 
-              {/* Transfer to another doctor - moved to bottom and highlighted */}
+              {/* Transfer Patient */}
               <div className="mt-6 p-4 rounded-lg border-2 border-red-300 bg-red-50">
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-semibold text-red-800">Transfer Patient</h3>
@@ -933,7 +958,6 @@ export function DoctorInterface({
                           if (!res.ok) throw new Error('Transfer failed');
 
                           toast.success('Patient transferred');
-                          // Refresh doctor patient list
                           const list = await fetch(
                             `http://localhost:5000/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
                           ).then((r) => (r.ok ? r.json() : []));
@@ -944,7 +968,6 @@ export function DoctorInterface({
                           }));
                           setDoctorPatients(normalized);
 
-                          // reset transfer UI and close dialog
                           setTransferDoctor("");
                           setTransferNote("");
                           setTransferConfirm(false);
@@ -960,7 +983,6 @@ export function DoctorInterface({
                     >
                       {transferConfirm ? 'Confirm Transfer' : 'Transfer'}
                     </Button>
-
                     <Button
                       variant="outline"
                       size="sm"
