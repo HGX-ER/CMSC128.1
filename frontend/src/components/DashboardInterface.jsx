@@ -13,8 +13,49 @@ import {
   DialogFooter,
 } from "./ui/dialog";
 import { Input } from "./ui/input";
-import { Edit, Calendar, Clock, X } from "lucide-react@0.487.0";
+import { Edit, Calendar, Clock, X, Search } from "lucide-react@0.487.0";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
+
+// Common ICD-10 codes for Emergency Department
+const ICD_10_CODES = [
+  { code: "A09.9", description: "Gastroenteritis and colitis of unspecified origin" },
+  { code: "B34.9", description: "Viral infection, unspecified" },
+  { code: "E11.9", description: "Type 2 diabetes mellitus without complications" },
+  { code: "G43.909", description: "Migraine, unspecified, not intractable, without status migrainosus" },
+  { code: "I10", description: "Essential (primary) hypertension" },
+  { code: "I21.9", description: "Acute myocardial infarction, unspecified" },
+  { code: "I50.9", description: "Heart failure, unspecified" },
+  { code: "I63.9", description: "Cerebral infarction, unspecified" },
+  { code: "J02.9", description: "Acute pharyngitis, unspecified" },
+  { code: "J06.9", description: "Acute upper respiratory infection, unspecified" },
+  { code: "J18.9", description: "Pneumonia, unspecified organism" },
+  { code: "J44.0", description: "Chronic obstructive pulmonary disease with acute lower respiratory infection" },
+  { code: "J44.1", description: "Chronic obstructive pulmonary disease with acute exacerbation" },
+  { code: "J45.901", description: "Unspecified asthma with acute exacerbation" },
+  { code: "K21.9", description: "Gastro-esophageal reflux disease without esophagitis" },
+  { code: "K52.9", description: "Noninfective gastroenteritis and colitis, unspecified" },
+  { code: "K80.20", description: "Calculus of gallbladder without cholecystitis without obstruction" },
+  { code: "M25.561", description: "Pain in right knee" },
+  { code: "M54.5", description: "Low back pain" },
+  { code: "N39.0", description: "Urinary tract infection, site not specified" },
+  { code: "R05.9", description: "Cough, unspecified" },
+  { code: "R06.02", description: "Shortness of breath" },
+  { code: "R07.9", description: "Chest pain, unspecified" },
+  { code: "R10.9", description: "Unspecified abdominal pain" },
+  { code: "R11.0", description: "Nausea" },
+  { code: "R11.2", description: "Nausea with vomiting, unspecified" },
+  { code: "R42", description: "Dizziness and giddiness" },
+  { code: "R50.9", description: "Fever, unspecified" },
+  { code: "R51.9", description: "Headache, unspecified" },
+  { code: "R55", description: "Syncope and collapse" },
+  { code: "S06.0X0A", description: "Concussion without loss of consciousness, initial encounter" },
+  { code: "S42.001A", description: "Fracture of unspecified part of right clavicle, initial encounter" },
+  { code: "S52.501A", description: "Unspecified fracture of the lower end of right radius, initial" },
+  { code: "S72.001A", description: "Fracture of unspecified part of neck of right femur, initial" },
+  { code: "S82.001A", description: "Unspecified fracture of right patella, initial encounter" },
+  { code: "T14.90", description: "Injury, unspecified" },
+  { code: "T78.40XA", description: "Allergy, unspecified, initial encounter" },
+];
 
 const STAGE_LABELS = {
   waiting_triage: 'Waiting for Triage',
@@ -43,13 +84,21 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [tempStart, setTempStart] = useState(shiftStart);
   const [tempEnd, setTempEnd] = useState(shiftEnd);
-  // Filters
-  const [filterDate, setFilterDate] = useState(null); // 'YYYY-MM-DD'
-  const [filterTime, setFilterTime] = useState(null); // 'HH:MM'
+  // Filters - Date and Time Ranges
+  const [fromDate, setFromDate] = useState(null); // 'YYYY-MM-DD'
+  const [toDate, setToDate] = useState(null); // 'YYYY-MM-DD'
+  const [fromTime, setFromTime] = useState(null); // 'HH:MM'
+  const [toTime, setToTime] = useState(null); // 'HH:MM'
   const [isDateDialogOpen, setIsDateDialogOpen] = useState(false);
   const [isTimeDialogOpen, setIsTimeDialogOpen] = useState(false);
-  const [tempFilterDate, setTempFilterDate] = useState('');
-  const [tempFilterTime, setTempFilterTime] = useState('');
+  const [tempFromDate, setTempFromDate] = useState('');
+  const [tempToDate, setTempToDate] = useState('');
+  const [tempFromTime, setTempFromTime] = useState('');
+  const [tempToTime, setTempToTime] = useState('');
+  
+  // ICD-10 search states
+  const [icdSearchTerm, setIcdSearchTerm] = useState("");
+  const [showIcdDropdown, setShowIcdDropdown] = useState(false);
 
   const formatShiftCode = (s, e) => `${s.replace(':', '')}H-${e.replace(':', '')}H`;
   const shiftTime = formatShiftCode(shiftStart, shiftEnd);
@@ -73,18 +122,37 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
     return nowMinutes >= startMinutes || nowMinutes < endMinutes;
   };
 
+  // Filter ICD codes based on search term
+  const filteredIcdCodes = ICD_10_CODES.filter((icd) => {
+    const searchLower = icdSearchTerm.toLowerCase();
+    return (
+      icd.code.toLowerCase().includes(searchLower) ||
+      icd.description.toLowerCase().includes(searchLower)
+    );
+  });
+
   const analytics = useMemo(() => {
     // Apply optional filters (date/time) before computing analytics
     const basePatients = patients.filter(p => {
-      if (filterDate) {
+      if (fromDate) {
         const pDate = p.arrivalTime.toISOString().slice(0, 10);
-        if (pDate !== filterDate) return false;
+        if (pDate < fromDate) return false;
       }
-      if (filterTime) {
-        const [fH, fM] = filterTime.split(':').map(Number);
+      if (toDate) {
+        const pDate = p.arrivalTime.toISOString().slice(0, 10);
+        if (pDate > toDate) return false;
+      }
+      if (fromTime) {
+        const [fH, fM] = fromTime.split(':').map(Number);
         const pH = p.arrivalTime.getHours();
         const pM = p.arrivalTime.getMinutes();
-        if (pH !== fH || pM !== fM) return false;
+        if (pH < fH || (pH === fH && pM < fM)) return false;
+      }
+      if (toTime) {
+        const [fH, fM] = toTime.split(':').map(Number);
+        const pH = p.arrivalTime.getHours();
+        const pM = p.arrivalTime.getMinutes();
+        if (pH > fH || (pH === fH && pM > fM)) return false;
       }
       return true;
     });
@@ -145,6 +213,22 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
       return acc;
     }, {});
 
+    // Top 10 diagnoses
+    const diagnosisCount = completedPatients.reduce((acc, patient) => {
+      if (patient.diagnosis) {
+        const diag = patient.diagnosis.trim();
+        if (diag) {
+          acc[diag] = (acc[diag] || 0) + 1;
+        }
+      }
+      return acc;
+    }, {});
+
+    const top10Diagnoses = Object.entries(diagnosisCount)
+      .map(([diagnosis, count]) => ({ diagnosis, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
     return {
       currentShiftTotal: currentShiftPatients.length,
       currentTotal: activePatients.length,
@@ -155,17 +239,15 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
       demographics,
       totalAdmissions: completedPatients.filter(p => p.disposition?.includes('Admission')).length,
       totalDischarges: completedPatients.filter(p => p.disposition === 'Discharge').length,
-      totalObservations: completedPatients.filter(p => p.disposition === 'Observation').length
+      totalObservations: completedPatients.filter(p => p.disposition === 'Observation').length,
+      top10Diagnoses
     };
   }, [patients, getTotalTime, shiftStart, shiftEnd, now]);
 
   return (
+
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <Badge variant="outline" className="text-lg px-4 py-2">
-          Current Shift: {shiftTime}
-        </Badge>
-
         <div className="flex items-center gap-3">
           <Badge className="bg-blue-100 text-blue-800 border border-blue-300 text-lg px-4 py-2">
             {(() => {
@@ -304,64 +386,195 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
           >
             Census
           </TabsTrigger>
+          
+          <TabsTrigger
+            value="diagnosis"
+            className="
+              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
+              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
+              hover:bg-blue-50 hover:text-blue-700
+              dark:hover:bg-gray-800 
+              data-[state=active]:!bg-blue-100
+              dark:data-[state=active]:!bg-blue-100 
+              data-[state=active]:!text-blue-800
+              dark:data-[state=active]:!text-blue-800
+              data-[state=active]:!border-blue-300
+              dark:data-[state=active]:!border-blue-300
+              data-[state=active]:shadow-lg
+              data-[state=active]:scale-[1.05]
+            "
+          >
+            <Search className="w-4 h-4" />
+            ICD-10 Codes
+          </TabsTrigger>
         </TabsList>
 
         {/* Centered filters below the tab buttons */}
         <div className="flex items-center justify-center gap-3 mt-3">
-          <Dialog open={isDateDialogOpen} onOpenChange={(v) => { setIsDateDialogOpen(v); if (v) setTempFilterDate(filterDate || ''); }}>
+          <Dialog open={isDateDialogOpen} onOpenChange={(v) => { 
+            setIsDateDialogOpen(v); 
+            if (v) { 
+              setTempFromDate(fromDate || ''); 
+              setTempToDate(toDate || '');
+            } 
+          }}> 
             <DialogTrigger asChild>
-              <Button variant={filterDate ? 'secondary' : 'outline'} size="sm" className="flex items-center">
+              <Button 
+                variant={(fromDate || toDate) ? 'secondary' : 'outline'} 
+                size="sm" 
+                className="flex items-center"
+              >
                 <Calendar className="w-4 h-4 mr-2" />
-                {filterDate ? `Date: ${filterDate}` : 'Filter by Date'}
+                {fromDate || toDate ? (
+                  <span>
+                    {fromDate || '...'} → {toDate || '...'}
+                  </span>
+                ) : (
+                  'Filter by Date Range'
+                )}
               </Button>
             </DialogTrigger>
 
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Filter by Date</DialogTitle>
-                <DialogDescription>Select a specific date to filter analytics.</DialogDescription>
+                <DialogTitle>Filter by Date Range</DialogTitle>
+                <DialogDescription>Select date range to filter analytics (from - to).</DialogDescription>
               </DialogHeader>
 
-              <div className="grid gap-2">
-                <Input type="date" value={tempFilterDate} onChange={(e) => setTempFilterDate(e.target.value)} />
+              <div className="grid gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">From Date</label>
+                  <Input 
+                    type="date" 
+                    value={tempFromDate} 
+                    onChange={(e) => setTempFromDate(e.target.value)} 
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">To Date</label>
+                  <Input 
+                    type="date" 
+                    value={tempToDate} 
+                    onChange={(e) => setTempToDate(e.target.value)} 
+                  />
+                </div>
               </div>
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsDateDialogOpen(false)}>Cancel</Button>
-                <Button variant="destructive" onClick={() => { setFilterDate(null); setTempFilterDate(''); setIsDateDialogOpen(false); }}>Clear</Button>
-                <Button onClick={() => { setFilterDate(tempFilterDate || null); setIsDateDialogOpen(false); }}>Apply</Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => { 
+                    setFromDate(null); 
+                    setToDate(null);
+                    setTempFromDate(''); 
+                    setTempToDate('');
+                    setIsDateDialogOpen(false); 
+                  }}
+                >
+                  Clear
+                </Button>
+                <Button onClick={() => { 
+                  setFromDate(tempFromDate || null); 
+                  setToDate(tempToDate || null);
+                  setIsDateDialogOpen(false); 
+                }}>
+                  Apply
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isTimeDialogOpen} onOpenChange={(v) => { setIsTimeDialogOpen(v); if (v) setTempFilterTime(filterTime || ''); }}>
+          <Dialog open={isTimeDialogOpen} onOpenChange={(v) => { 
+            setIsTimeDialogOpen(v); 
+            if (v) { 
+              setTempFromTime(fromTime || ''); 
+              setTempToTime(toTime || '');
+            } 
+          }}>
             <DialogTrigger asChild>
-              <Button variant={filterTime ? 'secondary' : 'outline'} size="sm" className="flex items-center">
+              <Button 
+                variant={(fromTime || toTime) ? 'secondary' : 'outline'} 
+                size="sm" 
+                className="flex items-center"
+              >
                 <Clock className="w-4 h-4 mr-2" />
-                {filterTime ? `Time: ${filterTime}` : 'Filter by Time'}
+                {fromTime || toTime ? (
+                  <span>
+                    {fromTime || '...'} → {toTime || '...'}
+                  </span>
+                ) : (
+                  'Filter by Time Range'
+                )}
               </Button>
             </DialogTrigger>
 
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Filter by Time</DialogTitle>
-                <DialogDescription>Select a specific time (HH:MM) to filter analytics by arrival time.</DialogDescription>
+                <DialogTitle>Filter by Time Range</DialogTitle>
+                <DialogDescription>Select time range (HH:MM) to filter analytics by arrival time (from - to).</DialogDescription>
               </DialogHeader>
 
-              <div className="grid gap-2">
-                <Input type="time" value={tempFilterTime} onChange={(e) => setTempFilterTime(e.target.value)} />
+              <div className="grid gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">From Time</label>
+                  <Input 
+                    type="time" 
+                    value={tempFromTime} 
+                    onChange={(e) => setTempFromTime(e.target.value)} 
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">To Time</label>
+                  <Input 
+                    type="time" 
+                    value={tempToTime} 
+                    onChange={(e) => setTempToTime(e.target.value)} 
+                  />
+                </div>
               </div>
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsTimeDialogOpen(false)}>Cancel</Button>
-                <Button variant="destructive" onClick={() => { setFilterTime(null); setTempFilterTime(''); setIsTimeDialogOpen(false); }}>Clear</Button>
-                <Button onClick={() => { setFilterTime(tempFilterTime || null); setIsTimeDialogOpen(false); }}>Apply</Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={() => { 
+                    setFromTime(null); 
+                    setToTime(null);
+                    setTempFromTime(''); 
+                    setTempToTime('');
+                    setIsTimeDialogOpen(false); 
+                  }}
+                >
+                  Clear
+                </Button>
+                <Button onClick={() => { 
+                  setFromTime(tempFromTime || null); 
+                  setToTime(tempToTime || null);
+                  setIsTimeDialogOpen(false); 
+                }}>
+                  Apply
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
 
-          <Button variant="ghost" size="sm" className="flex items-center" onClick={() => { setFilterDate(null); setFilterTime(null); setTempFilterDate(''); setTempFilterTime(''); }}>
-            <X className="w-4 h-4 mr-2" /> Clear Filters
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="flex items-center" 
+            onClick={() => { 
+              setFromDate(null); 
+              setToDate(null);
+              setFromTime(null); 
+              setToTime(null);
+              setTempFromDate(''); 
+              setTempToDate('');
+              setTempFromTime(''); 
+              setTempToTime('');
+            }}
+          >
+            <X className="w-4 h-4 mr-2" /> Clear All Filters
           </Button>
         </div>
 
@@ -531,6 +744,83 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
             </Card>
           </div>
 
+          {/* Top 10 Diagnosed Diseases */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                🏥 Top 10 Diagnosed Diseases
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {analytics.top10Diagnoses.length > 0 ? (
+                <div className="space-y-4">
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart 
+                      data={analytics.top10Diagnoses} 
+                      layout="vertical"
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis 
+                        type="category" 
+                        dataKey="diagnosis" 
+                        width={200}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#8884d8" />
+                    </BarChart>
+                  </ResponsiveContainer>
+
+                  {/* Detailed List */}
+                  <div className="mt-6">
+                    <h4 className="font-semibold text-gray-700 mb-3">Detailed Breakdown:</h4>
+                    <div className="grid grid-cols-1 gap-3">
+                      {analytics.top10Diagnoses.map((item, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 flex-1">
+                            <Badge 
+                              className={`
+                                ${index === 0 ? 'bg-yellow-500 text-white' : ''}
+                                ${index === 1 ? 'bg-gray-400 text-white' : ''}
+                                ${index === 2 ? 'bg-orange-600 text-white' : ''}
+                                ${index > 2 ? 'bg-blue-600 text-white' : ''}
+                              `}
+                            >
+                              #{index + 1}
+                            </Badge>
+                            <span className="text-sm font-medium text-gray-800 flex-1">
+                              {item.diagnosis}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge variant="outline" className="text-base font-semibold">
+                              {item.count} {item.count === 1 ? 'case' : 'cases'}
+                            </Badge>
+                            <div className="text-sm text-gray-500">
+                              {((item.count / patients.length) * 100).toFixed(1)}%
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-lg">No diagnosis data available</p>
+                  <p className="text-gray-400 text-sm mt-2">
+                    Diagnoses will appear here once doctors complete patient consultations
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -573,6 +863,162 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+        
+        <TabsContent value="diagnosis" className="space-y-6">
+          {/* ICD-10 Code Searchable Reference */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Search className="w-5 h-5" />
+                ICD-10 Code Reference Guide
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Search Input */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Search by ICD-10 code or description (e.g., 'R07.9' or 'chest pain')..."
+                    value={icdSearchTerm}
+                    onChange={(e) => {
+                      setIcdSearchTerm(e.target.value);
+                      setShowIcdDropdown(true);
+                    }}
+                    onFocus={() => setShowIcdDropdown(true)}
+                    className="pl-12 text-base py-6"
+                  />
+                </div>
+
+                {/* Results Display */}
+                <div className="mt-4">
+                  {icdSearchTerm === "" ? (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4 text-gray-700">
+                        Common ED ICD-10 Codes ({ICD_10_CODES.length} total)
+                      </h3>
+                      <div className="grid grid-cols-1 gap-3 max-h-[600px] overflow-y-auto">
+                        {ICD_10_CODES.map((icd, index) => (
+                          <div
+                            key={index}
+                            className="p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                          >
+                            <div className="flex items-start gap-4">
+                              <Badge variant="outline" className="shrink-0 font-mono text-sm px-3 py-1">
+                                {icd.code}
+                              </Badge>
+                              <p className="text-sm text-gray-700 flex-1">{icd.description}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : filteredIcdCodes.length > 0 ? (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4 text-gray-700">
+                        Search Results ({filteredIcdCodes.length} found)
+                      </h3>
+                      <div className="grid grid-cols-1 gap-3 max-h-[600px] overflow-y-auto">
+                        {filteredIcdCodes.map((icd, index) => (
+                          <div
+                            key={index}
+                            className="p-4 border-2 border-blue-300 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors"
+                          >
+                            <div className="flex items-start gap-4">
+                              <Badge className="shrink-0 font-mono text-sm px-3 py-1 bg-blue-600 text-white">
+                                {icd.code}
+                              </Badge>
+                              <p className="text-sm text-gray-800 flex-1 font-medium">{icd.description}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500 text-lg">No matching ICD-10 codes found</p>
+                      <p className="text-gray-400 text-sm mt-2">Try a different search term</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Stats Card */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
+              <CardContent className="p-6 text-center">
+                <div className="text-3xl font-bold text-blue-700">{ICD_10_CODES.length}</div>
+                <div className="text-sm text-blue-600 font-medium">Total ICD-10 Codes</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-gradient-to-br from-green-50 to-green-100">
+              <CardContent className="p-6 text-center">
+                <div className="text-3xl font-bold text-green-700">
+                  {ICD_10_CODES.filter(icd => icd.code.startsWith('R')).length}
+                </div>
+                <div className="text-sm text-green-600 font-medium">Symptom Codes (R series)</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100">
+              <CardContent className="p-6 text-center">
+                <div className="text-3xl font-bold text-purple-700">
+                  {ICD_10_CODES.filter(icd => icd.code.startsWith('S') || icd.code.startsWith('T')).length}
+                </div>
+                <div className="text-sm text-purple-600 font-medium">Injury Codes (S & T series)</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ICD-10 Categories */}
+          <Card>
+            <CardHeader>
+              <CardTitle>ICD-10 Code Categories in Database</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="font-semibold text-blue-900 mb-2">📋 Symptoms & Signs (R00-R99)</h4>
+                  <p className="text-sm text-blue-700">
+                    Chest pain, abdominal pain, fever, headache, dizziness, nausea, vomiting
+                  </p>
+                </div>
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <h4 className="font-semibold text-green-900 mb-2">🫁 Respiratory (J00-J99)</h4>
+                  <p className="text-sm text-green-700">
+                    Pneumonia, COPD, asthma, pharyngitis, upper respiratory infections
+                  </p>
+                </div>
+                <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                  <h4 className="font-semibold text-red-900 mb-2">❤️ Cardiovascular (I00-I99)</h4>
+                  <p className="text-sm text-red-700">
+                    MI, heart failure, hypertension, stroke, cerebral infarction
+                  </p>
+                </div>
+                <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                  <h4 className="font-semibold text-orange-900 mb-2">🦴 Injury & External Causes (S00-T98)</h4>
+                  <p className="text-sm text-orange-700">
+                    Fractures, concussion, allergies, trauma, injuries
+                  </p>
+                </div>
+                <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <h4 className="font-semibold text-purple-900 mb-2">🍽️ Digestive (K00-K95)</h4>
+                  <p className="text-sm text-purple-700">
+                    GERD, gastroenteritis, gallbladder disease, colitis
+                  </p>
+                </div>
+                <div className="p-4 bg-pink-50 rounded-lg border border-pink-200">
+                  <h4 className="font-semibold text-pink-900 mb-2">🧠 Nervous System (G00-G99)</h4>
+                  <p className="text-sm text-pink-700">
+                    Migraine headaches, neurological conditions
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

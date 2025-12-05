@@ -12,12 +12,7 @@ import { toast } from 'sonner';
 // Star component for ratings
 function Star({ className }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      className={className}
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
       <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
     </svg>
   );
@@ -44,7 +39,7 @@ const STAGE_LABELS = {
 
 const ESI_COLORS = {
   1: "bg-red-600 text-white",
-  2: "bg-orange-500 text-white", 
+  2: "bg-orange-500 text-white",
   3: "bg-yellow-500 text-black",
   4: "bg-green-500 text-white",
   5: "bg-blue-500 text-white"
@@ -71,30 +66,22 @@ const SATISFACTION_EMOJIS = {
   5: { emoji: '😄', label: 'Very Satisfied', color: 'text-green-600' }
 };
 
-export function ManagerInterface({ 
-  patients, 
-  onUpdatePatient, 
-  onMoveToStage, 
-  onRemovePatient, 
-  getTotalTime,
-  getStageTime 
-}) {
+export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onRemovePatient, getTotalTime, getStageTime }) {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [esiFilter, setEsiFilter] = useState('all');
   const [timeOrder, setTimeOrder] = useState('none');
   const [viewedFeedbackCount, setViewedFeedbackCount] = useState(0);
-  
+
   // Backend feedback state
   const [backendFeedback, setBackendFeedback] = useState([]);
   const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
   const [lastFeedbackUpdate, setLastFeedbackUpdate] = useState(null);
   const [newFeedbackPatients, setNewFeedbackPatients] = useState(new Set());
   const [backendAvailable, setBackendAvailable] = useState(false);
-  
+
   // Notification state
   const [readFeedbackIds, setReadFeedbackIds] = useState(new Set());
-  const [showNotificationPanel, setShowNotificationPanel] = useState(false);
-  
+
   // Notification sound
   const [playNotificationSound] = useState(() => {
     const audioContext = typeof AudioContext !== 'undefined' ? new AudioContext() : null;
@@ -118,45 +105,45 @@ export function ManagerInterface({
   });
 
   const activePatients = patients.filter(p => p.isActive && p.currentStage !== 'departed');
-  
+
   // Fetch feedback from backend
   const fetchFeedback = async () => {
     try {
       setIsLoadingFeedback(true);
-      const response = await fetch('https://node-mysql-api-zsam.onrender.com/api/feedback', {
+      const response = await fetch('http://localhost:5000/api/feedback', {
         signal: AbortSignal.timeout(5000) // 5 second timeout
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch feedback');
       }
-      
+
       const data = await response.json();
       const newFeedback = data.feedback || [];
-      
+
       // Mark backend as available
       setBackendAvailable(true);
-      
+
       // Check for new feedback
       if (backendFeedback.length > 0 && newFeedback.length > backendFeedback.length) {
         const latestFeedback = newFeedback[0];
         
         // Show toast notification
         toast.success('🔔 New patient feedback received!', {
-          description: `${latestFeedback.queue_number} rated ${latestFeedback.rating}/5 at ${latestFeedback.stage_display_name}`,
+          description: `${latestFeedback.queue_number} rated ${latestFeedback.rating}/5 at ${latestFeedback.stage_display_name || latestFeedback.stage}`,
           duration: 5000,
         });
-        
+
         // Play notification sound
         playNotificationSound();
-        
+
         // Add to blinking patients
         setNewFeedbackPatients(prev => {
           const updated = new Set(prev);
           updated.add(latestFeedback.queue_number);
           return updated;
         });
-        
+
         // Remove from blinking after 10 seconds
         setTimeout(() => {
           setNewFeedbackPatients(prev => {
@@ -166,7 +153,7 @@ export function ManagerInterface({
           });
         }, 10000);
       }
-      
+
       setBackendFeedback(newFeedback);
       setLastFeedbackUpdate(new Date());
     } catch (error) {
@@ -190,11 +177,11 @@ export function ManagerInterface({
   // Listen for SSE events for real-time updates
   useEffect(() => {
     if (!backendAvailable) return;
-    
+
     let eventSource;
     try {
-      eventSource = new EventSource('https://node-mysql-api-zsam.onrender.com/api/stream/events');
-      
+      eventSource = new EventSource('http://localhost:5000/stream/events');
+
       eventSource.addEventListener('message', (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -222,7 +209,7 @@ export function ManagerInterface({
       }
     };
   }, [backendAvailable]);
-  
+
   // Calculate total feedback count (backend + local)
   const totalFeedbackCount = useMemo(() => {
     const localCount = activePatients.reduce((sum, patient) => {
@@ -230,16 +217,16 @@ export function ManagerInterface({
     }, 0);
     return backendFeedback.length + localCount;
   }, [activePatients, backendFeedback.length]);
-  
+
   // Calculate new feedback count
   const newFeedbackCount = Math.max(0, totalFeedbackCount - viewedFeedbackCount);
-  
+
   // Filter patients by ESI level for whiteboard
   const getFilteredPatients = () => {
     if (esiFilter === 'all') return activePatients;
     return activePatients.filter(p => p.esiLevel && p.esiLevel.toString() === esiFilter);
   };
-  
+
   const filteredActivePatients = useMemo(() => {
     const arr = getFilteredPatients().slice();
     if (timeOrder === 'newest') {
@@ -249,7 +236,7 @@ export function ManagerInterface({
     }
     return arr;
   }, [patients, esiFilter, timeOrder]);
-  
+
   const getPatientsByStage = (stage) => {
     return activePatients.filter(p => p.currentStage === stage);
   };
@@ -276,7 +263,7 @@ export function ManagerInterface({
 
   const getStageAlerts = () => {
     const alerts = [];
-    
+
     // Time threshold alerts
     activePatients.forEach(patient => {
       const threshold = TIME_THRESHOLDS[patient.currentStage];
@@ -309,12 +296,9 @@ export function ManagerInterface({
   const feedbackStats = useMemo(() => {
     const allFeedback = backendFeedback;
     const total = allFeedback.length;
-    const average = total > 0 
-      ? (allFeedback.reduce((sum, f) => sum + f.rating, 0) / total).toFixed(1)
-      : 0;
+    const average = total > 0 ? (allFeedback.reduce((sum, f) => sum + f.rating, 0) / total).toFixed(1) : 0;
     const lowSatisfaction = allFeedback.filter(f => f.rating <= 2).length;
     const highSatisfaction = allFeedback.filter(f => f.rating >= 4).length;
-    
     return { total, average, lowSatisfaction, highSatisfaction };
   }, [backendFeedback]);
 
@@ -328,37 +312,15 @@ export function ManagerInterface({
     return SATISFACTION_EMOJIS[rating] || SATISFACTION_EMOJIS[3];
   };
 
-  // Function to load sample feedback for demo purposes
-  const loadSampleFeedback = () => {
-    // If backend is not available, use local sample data
-    setBackendFeedback(sampleFeedbackData);
-    setLastFeedbackUpdate(new Date());
-    setBackendAvailable(true);
-    
-    // Mark some patients as having new feedback (most recent ones)
-    const recentPatients = new Set(['001', '003', '005', '006', '010', '012']);
-    setNewFeedbackPatients(recentPatients);
-    
-    // Clear the "new" indicators after 10 seconds
-    setTimeout(() => {
-      setNewFeedbackPatients(new Set());
-    }, 10000);
-    
-    toast.success('✅ Sample feedback data loaded!', {
-      description: `${sampleFeedbackData.length} feedback entries from ${new Set(sampleFeedbackData.map(f => f.queue_number)).size} patients`,
-      duration: 3000,
-    });
-  };
-
   // Calculate unread feedback count
   const unreadFeedbackCount = useMemo(() => {
-    return backendFeedback.filter(f => !readFeedbackIds.has(f.id)).length;
+    return backendFeedback.filter(f => !f.is_read && !readFeedbackIds.has(f.id)).length;
   }, [backendFeedback, readFeedbackIds]);
 
   // Get unread feedback items
   const unreadFeedback = useMemo(() => {
     return backendFeedback
-      .filter(f => !readFeedbackIds.has(f.id))
+      .filter(f => !f.is_read && !readFeedbackIds.has(f.id))
       .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))
       .slice(0, 10); // Show latest 10 unread
   }, [backendFeedback, readFeedbackIds]);
@@ -374,38 +336,32 @@ export function ManagerInterface({
 
     // save to backend
     try {
-      await fetch(`https://node-mysql-api-zsam.onrender.com/api/feedback/read/${feedbackId}`, {
+      await fetch(`http://localhost:5000/api/feedback/read/${feedbackId}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        }
+        headers: { "Content-Type": "application/json" }
       });
     } catch (err) {
       console.error("Failed to mark feedback as read:", err);
     }
   };
 
-
   // Mark feedback as unread
-const markAsUnread = async (feedbackId) => {
-  setReadFeedbackIds(prev => {
-    const updated = new Set(prev);
-    updated.delete(feedbackId);
-    return updated;
-  });
-
-  try {
-    await fetch(`https://node-mysql-api-zsam.onrender.com/api/feedback/unread/${feedbackId}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      }
+  const markAsUnread = async (feedbackId) => {
+    setReadFeedbackIds(prev => {
+      const updated = new Set(prev);
+      updated.delete(feedbackId);
+      return updated;
     });
-  } catch (err) {
-    console.error("Failed to mark feedback as unread:", err);
-  }
-};
 
+    try {
+      await fetch(`http://localhost:5000/api/feedback/unread/${feedbackId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+    } catch (err) {
+      console.error("Failed to mark feedback as unread:", err);
+    }
+  };
 
   // Mark all as read
   const markAllAsRead = () => {
@@ -416,6 +372,7 @@ const markAsUnread = async (feedbackId) => {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">ED Manager Dashboard</h1>
         <div className="flex items-center gap-3">
@@ -423,9 +380,15 @@ const markAsUnread = async (feedbackId) => {
             Active Patients: {activePatients.length}
           </Badge>
           {lastFeedbackUpdate && (
-            <span className="text-sm text-gray-500">
+            <Badge variant="outline" className="text-sm px-3 py-1">
+              <Bell className="w-3 h-3 mr-1" />
               Last updated: {lastFeedbackUpdate.toLocaleTimeString()}
-            </span>
+            </Badge>
+          )}
+          {unreadFeedbackCount > 0 && (
+            <Badge className="bg-red-500 text-white animate-pulse">
+              {unreadFeedbackCount} New Feedback
+            </Badge>
           )}
         </div>
       </div>
@@ -450,99 +413,36 @@ const markAsUnread = async (feedbackId) => {
         </Card>
       )}
 
+      {/* Tabs */}
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
-          <TabsTrigger
-            value="overview"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
+          <TabsTrigger value="overview" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Overview
           </TabsTrigger>
-          
-          <TabsTrigger
-            value="whiteboard"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
+          <TabsTrigger value="whiteboard" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Whiteboard
           </TabsTrigger>
-          
-          <TabsTrigger
-            value="stages"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
+          <TabsTrigger value="stages" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Stage Management
           </TabsTrigger>
-          
-      <TabsTrigger
-        value="feedback"
-        onClick={() => setViewedFeedbackCount(totalFeedbackCount)}
-        className="relative flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]"
-      >
-        Patient Feedback
-
-        {newFeedbackCount > 0 && (
-          <span className="absolute right-2 top-1.5 w-3 h-3 bg-red-600 rounded-full animate-pulse"></span>
-        )}
-      </TabsTrigger>
+          <TabsTrigger 
+            value="feedback" 
+            onClick={() => setViewedFeedbackCount(totalFeedbackCount)}
+            className="relative flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
+            Patient Feedback
+            {newFeedbackCount > 0 && (
+              <span className="absolute right-2 top-1.5 w-3 h-3 bg-red-600 rounded-full animate-pulse"></span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
+        {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
           {/* Stage Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {Object.entries(STAGE_LABELS).map(([stage, label]) => {
               const count = getPatientsByStage(stage).length;
               if (count === 0 && !['waiting_triage', 'waiting_registration', 'waiting_doctor', 'waiting_admission', 'waiting_observation', 'waiting_discharge'].includes(stage)) return null;
-              
               return (
                 <Card key={stage}>
                   <CardContent className="p-4 text-center">
@@ -567,7 +467,6 @@ const markAsUnread = async (feedbackId) => {
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -579,7 +478,6 @@ const markAsUnread = async (feedbackId) => {
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -591,7 +489,6 @@ const markAsUnread = async (feedbackId) => {
                 </div>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -615,7 +512,7 @@ const markAsUnread = async (feedbackId) => {
                 {activePatients
                   .filter(p => p.name)
                   .slice(0, 10)
-                  .map((patient) => (
+                  .map(patient => (
                     <div key={patient.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                       <div>
                         <div className="font-medium">{patient.name}</div>
@@ -638,6 +535,7 @@ const markAsUnread = async (feedbackId) => {
           </Card>
         </TabsContent>
 
+        {/* Whiteboard Tab */}
         <TabsContent value="whiteboard" className="space-y-6">
           <Card>
             <CardHeader>
@@ -654,31 +552,31 @@ const markAsUnread = async (feedbackId) => {
                       <SelectItem value="1">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 bg-red-600 rounded-full"></div>
-                          ESI 1 (Critical)
+                          ESI 1 - Critical
                         </div>
                       </SelectItem>
                       <SelectItem value="2">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                          ESI 2 (Emergent)
+                          ESI 2 - Emergent
                         </div>
                       </SelectItem>
                       <SelectItem value="3">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                          ESI 3 (Urgent)
+                          ESI 3 - Urgent
                         </div>
                       </SelectItem>
                       <SelectItem value="4">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                          ESI 4 (Less Urgent)
+                          ESI 4 - Less Urgent
                         </div>
                       </SelectItem>
                       <SelectItem value="5">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                          ESI 5 (Non-Urgent)
+                          ESI 5 - Non-Urgent
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -726,16 +624,14 @@ const markAsUnread = async (feedbackId) => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredActivePatients.map((patient) => {
+                    filteredActivePatients.map(patient => {
                       const hasNewFeedback = newFeedbackPatients.has(patient.id);
                       const feedbackCount = backendFeedback.filter(f => f.queue_number === patient.id).length;
                       
                       return (
                         <TableRow key={patient.id} className={hasNewFeedback ? 'animate-pulse bg-green-50' : ''}>
                           <TableCell>
-                            <Badge variant="outline" className="font-mono">
-                              {patient.id}
-                            </Badge>
+                            <Badge variant="outline" className="font-mono">{patient.id}</Badge>
                           </TableCell>
                           <TableCell>{patient.arrivalTime.toLocaleTimeString()}</TableCell>
                           <TableCell>
@@ -757,7 +653,7 @@ const markAsUnread = async (feedbackId) => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={isOverThreshold(patient, patient.currentStage) ? "destructive" : "outline"}>
+                            <Badge variant={isOverThreshold(patient, patient.currentStage) ? 'destructive' : 'outline'}>
                               {getStageTime(patient)}m
                             </Badge>
                           </TableCell>
@@ -784,10 +680,7 @@ const markAsUnread = async (feedbackId) => {
                           </TableCell>
                           <TableCell>
                             {patient.currentStage === 'awaiting_departure' && (
-                              <Button 
-                                size="sm" 
-                                onClick={() => handleEndMonitoring(patient.id)}
-                              >
+                              <Button size="sm" onClick={() => handleEndMonitoring(patient.id)}>
                                 End Monitoring
                               </Button>
                             )}
@@ -802,6 +695,7 @@ const markAsUnread = async (feedbackId) => {
           </Card>
         </TabsContent>
 
+        {/* Stages Tab */}
         <TabsContent value="stages" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Object.entries(STAGE_LABELS).map(([stage, label]) => {
@@ -815,12 +709,10 @@ const markAsUnread = async (feedbackId) => {
                     <Badge variant="outline">{stagePatients.length} patients</Badge>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    {stagePatients.map((patient) => (
+                    {stagePatients.map(patient => (
                       <div key={patient.id} className="p-2 bg-gray-50 rounded text-sm">
                         <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="font-mono text-xs">
-                            {patient.id}
-                          </Badge>
+                          <Badge variant="outline" className="font-mono text-xs">{patient.id}</Badge>
                           <div className="font-medium">{patient.name || 'Not registered'}</div>
                         </div>
                         <div className="text-gray-600">
@@ -840,6 +732,7 @@ const markAsUnread = async (feedbackId) => {
           </div>
         </TabsContent>
 
+        {/* Feedback Tab */}
         <TabsContent value="feedback" className="space-y-6">
           {/* Feedback Header with Refresh */}
           <Card>
@@ -852,9 +745,9 @@ const markAsUnread = async (feedbackId) => {
                   </p>
                 </div>
                 <Button 
-                  onClick={fetchFeedback}
+                  onClick={fetchFeedback} 
                   disabled={isLoadingFeedback}
-                  variant="outline"
+                  variant="outline" 
                   size="sm"
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingFeedback ? 'animate-spin' : ''}`} />
@@ -899,7 +792,7 @@ const markAsUnread = async (feedbackId) => {
                       const hasNewFeedback = newFeedbackPatients.has(queueNumber);
                       const avgRating = (patientFeedback.reduce((sum, f) => sum + f.rating, 0) / patientFeedback.length).toFixed(1);
                       const avgEmoji = getSatisfactionEmoji(Math.round(avgRating));
-                      
+
                       return (
                         <Card 
                           key={queueNumber} 
@@ -961,23 +854,21 @@ const markAsUnread = async (feedbackId) => {
                                 .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))
                                 .map((feedback, index) => {
                                   const satisfactionData = getSatisfactionEmoji(feedback.rating);
+                                  const isRead = feedback.is_read || readFeedbackIds.has(feedback.id);
+                                  
                                   let bgColor = 'bg-gray-50';
-                                  
-                                  if (feedback.rating <= 2) {
-                                    bgColor = 'bg-red-50';
-                                  } else if (feedback.rating === 3) {
-                                    bgColor = 'bg-orange-50';
-                                  } else if (feedback.rating === 4) {
-                                    bgColor = 'bg-yellow-50';
-                                  } else if (feedback.rating === 5) {
-                                    bgColor = 'bg-green-50';
-                                  }
-                                  
+                                  if (feedback.rating <= 2) bgColor = 'bg-red-50';
+                                  else if (feedback.rating === 3) bgColor = 'bg-orange-50';
+                                  else if (feedback.rating === 4) bgColor = 'bg-yellow-50';
+                                  else if (feedback.rating === 5) bgColor = 'bg-green-50';
+
                                   return (
                                     <div 
                                       key={feedback.id} 
                                       className={`${bgColor} rounded-lg p-4 border ${
-                                        index === 0 && hasNewFeedback ? 'border-green-500 border-2' : 'border-gray-200'
+                                        index === 0 && hasNewFeedback 
+                                          ? 'border-green-500 border-2' 
+                                          : 'border-gray-200'
                                       }`}
                                     >
                                       <div className="flex items-start justify-between mb-2">
@@ -1007,7 +898,6 @@ const markAsUnread = async (feedbackId) => {
                                           {new Date(feedback.submitted_at).toLocaleString()}
                                         </div>
                                       </div>
-                                      
                                       {feedback.comment && (
                                         <div className="mt-3 p-3 bg-white rounded border border-gray-200">
                                           <p className="text-sm text-gray-700 whitespace-pre-wrap">
@@ -1016,7 +906,6 @@ const markAsUnread = async (feedbackId) => {
                                           </p>
                                         </div>
                                       )}
-                                      
                                       <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
                                         <div className="flex items-center gap-3">
                                           {index === 0 && (
@@ -1024,8 +913,8 @@ const markAsUnread = async (feedbackId) => {
                                               Latest Feedback
                                             </Badge>
                                           )}
-                                          <span>Feedback #{patientFeedback.length - index}</span>
-                                          {readFeedbackIds.has(feedback.id) ? (
+                                          <span>Feedback {patientFeedback.length - index}</span>
+                                          {isRead ? (
                                             <Badge className="bg-gray-100 text-gray-600 text-xs">
                                               <Check className="w-3 h-3 mr-1" />
                                               Read
@@ -1037,17 +926,13 @@ const markAsUnread = async (feedbackId) => {
                                             </Badge>
                                           )}
                                         </div>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => 
-                                            readFeedbackIds.has(feedback.id) 
-                                              ? markAsUnread(feedback.id) 
-                                              : markAsRead(feedback.id)
-                                          }
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          onClick={() => isRead ? markAsUnread(feedback.id) : markAsRead(feedback.id)}
                                           className="h-6 text-xs"
                                         >
-                                          {readFeedbackIds.has(feedback.id) ? (
+                                          {isRead ? (
                                             <>
                                               <X className="w-3 h-3 mr-1" />
                                               Mark unread
@@ -1110,19 +995,21 @@ const markAsUnread = async (feedbackId) => {
                     {Object.entries(
                       backendFeedback.reduce((acc, f) => {
                         const stage = f.stage_display_name || f.stage;
-                        if (!acc[stage]) acc[stage] = { sum: 0, count: 0 };
+                        if (!acc[stage]) {
+                          acc[stage] = { sum: 0, count: 0 };
+                        }
                         acc[stage].sum += f.rating;
                         acc[stage].count += 1;
                         return acc;
                       }, {})
                     )
-                      .sort((a, b) => (b[1].sum / b[1].count) - (a[1].sum / a[1].count))
+                      .sort(([, a], [, b]) => (b.sum / b.count) - (a.sum / a.count))
                       .map(([stage, data]) => {
                         const avg = (data.sum / data.count).toFixed(1);
                         const avgRating = Math.round(avg);
                         const emojiData = getSatisfactionEmoji(avgRating);
-                        const color = avg <= 2 ? 'text-red-600' : avg <= 3 ? 'text-orange-600' : 'text-green-600';
-                        
+                        const color = avg <= 2 ? 'text-red-600' : avg === 3 ? 'text-orange-600' : 'text-green-600';
+
                         return (
                           <div key={stage} className="flex justify-between items-center p-3 bg-white rounded border">
                             <div className="flex items-center gap-2">

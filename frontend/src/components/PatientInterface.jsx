@@ -105,7 +105,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   try {
     console.log("🔄 Polling patient status for:", queueNumber);
     
-    const response = await fetch(`https://node-mysql-api-zsam.onrender.com/api/patient/status/${queueNumber}`);
+    const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
     
     if (!response.ok) {
       if (response.status === 404) {
@@ -122,9 +122,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       'arrived': 'kiosk',
       'waiting_for_triage': 'waiting_triage',
       'in_triage': 'triage',
-      'triaged': 'waiting_registration',  // <-- CHANGED: triaged -> waiting_registration
-      'registration': 'registering',
-      'registered': 'registration',  // ✅ ADD THIS LINE
+      'triaged': 'waiting_registration',
       'waiting_for_registration': 'waiting_registration',
       'in_registration': 'registration',
       'waiting_for_provider': 'waiting_doctor',
@@ -137,8 +135,14 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       'awaiting_icu_bed': 'awaiting_icu',
       'discharge_in_progress': 'discharge_documents',
       'ready_to_depart': 'awaiting_departure',
-      'departed': 'departed'
+      'departed': 'departed',
+      
+      // ✅ NEW: Final statuses when doctor completes consultation
+      'in_observation': 'departed',        // Observation complete
+      'admitted_non_icu': 'departed',      // Admitted to ward complete
+      'admitted_icu': 'departed'           // Admitted to ICU complete
     };
+
 
     
     // Transform backend data to match frontend format
@@ -193,7 +197,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     setIsLoading(true);
     console.log("📋 Fetching patient status for:", queueNumber);
     
-    const response = await fetch(`https://node-mysql-api-zsam.onrender.com/api/patient/status/${queueNumber}`);
+    const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
     
     if (!response.ok) {
       if (response.status === 404) {
@@ -211,7 +215,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       'arrived': 'kiosk',
       'waiting_for_triage': 'waiting_triage',
       'in_triage': 'triage',
-      'triaged': 'waiting_registration',  // <-- CHANGED: triaged -> waiting_registration
+      'triaged': 'waiting_registration',
       'waiting_for_registration': 'waiting_registration',
       'in_registration': 'registration',
       'waiting_for_provider': 'waiting_doctor',
@@ -224,8 +228,14 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       'awaiting_icu_bed': 'awaiting_icu',
       'discharge_in_progress': 'discharge_documents',
       'ready_to_depart': 'awaiting_departure',
-      'departed': 'departed'
+      'departed': 'departed',
+      
+      // ✅ NEW: Final statuses when doctor completes consultation
+      'in_observation': 'departed',        // Observation complete
+      'admitted_non_icu': 'departed',      // Admitted to ward complete
+      'admitted_icu': 'departed'           // Admitted to ICU complete
     };
+
     
     // Transform backend data to match frontend format
     const transformedPatient = {
@@ -276,7 +286,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   try {
     console.log("🔄 Manual refresh for:", queueNumber);
     
-    const response = await fetch(`https://node-mysql-api-zsam.onrender.com/api/patient/status/${queueNumber}`);
+    const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
     
     if (!response.ok) {
       throw new Error(`Failed to refresh patient status: ${response.status}`);
@@ -289,7 +299,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       'arrived': 'kiosk',
       'waiting_for_triage': 'waiting_triage',
       'in_triage': 'triage',
-      'triaged': 'waiting_registration',  // <-- CHANGED: triaged -> waiting_registration
+      'triaged': 'waiting_registration',
       'waiting_for_registration': 'waiting_registration',
       'in_registration': 'registration',
       'waiting_for_provider': 'waiting_doctor',
@@ -302,8 +312,14 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       'awaiting_icu_bed': 'awaiting_icu',
       'discharge_in_progress': 'discharge_documents',
       'ready_to_depart': 'awaiting_departure',
-      'departed': 'departed'
+      'departed': 'departed',
+      
+      // ✅ NEW: Final statuses when doctor completes consultation
+      'in_observation': 'departed',        // Observation complete
+      'admitted_non_icu': 'departed',      // Admitted to ward complete
+      'admitted_icu': 'departed'           // Admitted to ICU complete
     };
+
     
     // Transform backend data to match frontend format
     const transformedPatient = {
@@ -431,7 +447,7 @@ const handleSubmitComment = async () => {
   if (patientComment.trim() && commentSatisfaction > 0) {
     try {
       // Send feedback to backend
-      const response = await fetch('https://node-mysql-api-zsam.onrender.com/api/feedback', {
+      const response = await fetch('http://localhost:5000/api/feedback', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -628,53 +644,62 @@ const handleSubmitComment = async () => {
     }
   };
 
-const getProgressPercentage = () => {
-  // The 5 steps you want in order
-  const flow = [
-    "checkin",
-    "triage",
-    "registration",
-    "doctor",
-    "consultation"
-  ];
+  const getProgressPercentage = () => {
+    // Expand to 6 steps to properly track discharge completion
+    const flow = [
+      "checkin",
+      "triage",
+      "registration",
+      "doctor",
+      "consultation",
+      "departed"
+    ];
 
-  // Map ALL backend stages into those 5 buckets
-  const stageMap = {
-    kiosk: "checkin",
-    arrived: "checkin",
-    waiting_triage: "triage",
-    in_triage: "triage",
-    triaged: "triage",
+    // Map ALL backend stages
+    const stageMap = {
+      kiosk: "checkin",
+      arrived: "checkin",
+      waiting_triage: "triage",
+      in_triage: "triage",
+      triaged: "triage",
 
-    waiting_registration: "registration",
-    in_registration: "registration",
-    registration: "registration",
-    registered: "registration",
+      waiting_registration: "registration",
+      in_registration: "registration",
+      registration: "registration",
+      registered: "registration",
 
-    waiting_doctor: "doctor",
-    with_provider: "doctor",
+      waiting_doctor: "doctor",
+      with_provider: "doctor",
 
-    consultation: "consultation",
+      consultation: "consultation",
 
-    // EVERYTHING AFTER CONSULTATION should stay at 100%
-    waiting_discharge: "consultation",
-    discharge_documents: "consultation",
-    awaiting_departure: "consultation",
-    departed: "consultation",
-    waiting_admission: "consultation",
-    admission_orders: "consultation",
-    awaiting_non_icu: "consultation",
-    awaiting_icu: "consultation"
+      // Discharge stages - NOT departed yet (83%)
+      waiting_discharge: "consultation",
+      discharge_documents: "consultation",
+      awaiting_departure: "consultation",
+      
+      // Admission stages - also 83%
+      waiting_admission: "consultation",
+      admission_orders: "consultation",
+      awaiting_non_icu: "consultation",
+      awaiting_icu: "consultation",
+
+      // Only 100% when ACTUALLY completed
+      departed: "departed",
+      in_observation: "departed",
+      admitted_non_icu: "departed",
+      admitted_icu: "departed"
+    };
+
+    // Normalize stage
+    const stage = stageMap[patient.currentStage] || "checkin";
+
+    const index = flow.indexOf(stage);
+    const maxIndex = flow.length - 1;
+
+    return Math.round((index / maxIndex) * 100);
   };
 
-  // Normalize stage
-  const stage = stageMap[patient.currentStage] || "checkin";
-
-  const index = flow.indexOf(stage);
-  const maxIndex = flow.length - 1;
-
-  return Math.round((index / maxIndex) * 100);
-};
 
 
   const getStageIcon = (stage) => {

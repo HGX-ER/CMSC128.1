@@ -1039,7 +1039,7 @@ sys|schema||mysql.sys|localhost|TRIGGER|G</Grants>
     <schema id="292" parent="1" name="testdb">
       <AutoIntrospectionLevel>3</AutoIntrospectionLevel>
       <LastIntrospectionLevel>3</LastIntrospectionLevel>
-      <LastIntrospectionLocalTimestamp>2025-11-19.14:19:28</LastIntrospectionLocalTimestamp>
+      <LastIntrospectionLocalTimestamp>2025-12-05.00:42:50</LastIntrospectionLocalTimestamp>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </schema>
     <user id="293" parent="1" name="mysql.infoschema">
@@ -1102,7 +1102,7 @@ sys|schema||mysql.sys|localhost|TRIGGER|G</Grants>
     <column id="306" parent="298" name="type">
       <NotNull>1</NotNull>
       <Position>3</Position>
-      <StoredType>enum(&apos;arrived&apos;, &apos;registered&apos;, &apos;triaged&apos;, &apos;roomed&apos;, &apos;provider_started&apos;, &apos;results_ready&apos;, &apos;dispositioned&apos;, &apos;departed&apos;)|0e</StoredType>
+      <StoredType>enum(&apos;arrived&apos;, &apos;registered&apos;, &apos;triaged&apos;, &apos;roomed&apos;, &apos;provider_started&apos;, &apos;results_ready&apos;, &apos;dispositioned&apos;, &apos;departed&apos;, &apos;transferred&apos;)|0e</StoredType>
     </column>
     <column id="307" parent="298" name="at">
       <NotNull>1</NotNull>
@@ -1307,7 +1307,7 @@ at</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <index id="349" parent="300" name="fk_obs_enc">
+    <index id="349" parent="300" name="idx_obs_encounter">
       <ColNames>encounter_id</ColNames>
       <Type>btree</Type>
     </index>
@@ -1336,173 +1336,222 @@ at</ColNames>
       <Position>3</Position>
       <StoredType>varchar(32)|0s</StoredType>
     </column>
-    <column id="355" parent="301" name="rating">
-      <NotNull>1</NotNull>
+    <column id="355" parent="301" name="patient_name">
       <Position>4</Position>
+      <StoredType>varchar(100)|0s</StoredType>
+    </column>
+    <column id="356" parent="301" name="rating">
+      <NotNull>1</NotNull>
+      <Position>5</Position>
       <StoredType>int|0s</StoredType>
     </column>
-    <column id="356" parent="301" name="comment">
-      <Position>5</Position>
+    <column id="357" parent="301" name="comment">
+      <Position>6</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="357" parent="301" name="stage">
+    <column id="358" parent="301" name="stage">
       <NotNull>1</NotNull>
-      <Position>6</Position>
+      <Position>7</Position>
       <StoredType>varchar(64)|0s</StoredType>
     </column>
-    <column id="358" parent="301" name="stage_display_name">
-      <Position>7</Position>
+    <column id="359" parent="301" name="stage_display_name">
+      <Position>8</Position>
       <StoredType>varchar(128)|0s</StoredType>
     </column>
-    <column id="359" parent="301" name="submitted_at">
+    <column id="360" parent="301" name="submitted_at">
       <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
-      <Position>8</Position>
+      <Position>9</Position>
       <StoredType>datetime|0s</StoredType>
     </column>
-    <foreign-key id="360" parent="301" name="fk_feedback_encounter">
+    <column id="361" parent="301" name="is_read">
+      <DefaultExpression>0</DefaultExpression>
+      <Position>10</Position>
+      <StoredType>tinyint(1)|0s</StoredType>
+    </column>
+    <column id="362" parent="301" name="read_at">
+      <Position>11</Position>
+      <StoredType>datetime|0s</StoredType>
+    </column>
+    <foreign-key id="363" parent="301" name="fk_feedback_encounter">
       <ColNames>encounter_id</ColNames>
       <OnDelete>cascade</OnDelete>
       <OnUpdate>cascade</OnUpdate>
       <RefColNames>id</RefColNames>
       <RefTableName>encounters</RefTableName>
     </foreign-key>
-    <index id="361" parent="301" name="PRIMARY">
+    <index id="364" parent="301" name="PRIMARY">
       <ColNames>id</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <index id="362" parent="301" name="idx_feedback_encounter">
+    <index id="365" parent="301" name="idx_feedback_encounter">
       <ColNames>encounter_id</ColNames>
       <Type>btree</Type>
     </index>
-    <index id="363" parent="301" name="idx_feedback_queue">
+    <index id="366" parent="301" name="idx_feedback_queue">
       <ColNames>queue_number</ColNames>
       <Type>btree</Type>
     </index>
-    <index id="364" parent="301" name="idx_feedback_submitted">
+    <index id="367" parent="301" name="idx_feedback_submitted">
       <ColNames>submitted_at</ColNames>
       <Type>btree</Type>
     </index>
-    <key id="365" parent="301" name="PRIMARY">
+    <index id="368" parent="301" name="idx_feedback_is_read">
+      <ColNames>is_read</ColNames>
+      <Type>btree</Type>
+    </index>
+    <key id="369" parent="301" name="PRIMARY">
       <NameSurrogate>1</NameSurrogate>
       <Primary>1</Primary>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
     </key>
-    <column id="366" parent="302" name="id">
+    <column id="370" parent="302" name="id">
       <AutoIncrement>4</AutoIncrement>
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>int|0s</StoredType>
     </column>
-    <column id="367" parent="302" name="mrn">
+    <column id="371" parent="302" name="mrn">
       <Position>2</Position>
       <StoredType>varchar(32)|0s</StoredType>
     </column>
-    <column id="368" parent="302" name="full_name">
+    <column id="372" parent="302" name="full_name">
       <NotNull>1</NotNull>
       <Position>3</Position>
       <StoredType>varchar(100)|0s</StoredType>
     </column>
-    <column id="369" parent="302" name="dob">
+    <column id="373" parent="302" name="dob">
       <Position>4</Position>
       <StoredType>date|0s</StoredType>
     </column>
-    <column id="370" parent="302" name="sex">
+    <column id="374" parent="302" name="sex">
       <Position>5</Position>
       <StoredType>varchar(10)|0s</StoredType>
     </column>
-    <column id="371" parent="302" name="contact_number">
+    <column id="375" parent="302" name="contact_number">
       <Position>6</Position>
       <StoredType>varchar(32)|0s</StoredType>
     </column>
-    <column id="372" parent="302" name="emergency_contact">
+    <column id="376" parent="302" name="emergency_contact">
       <Position>7</Position>
       <StoredType>varchar(64)|0s</StoredType>
     </column>
-    <column id="373" parent="302" name="insurance_info">
+    <column id="377" parent="302" name="insurance_info">
       <Position>8</Position>
       <StoredType>varchar(64)|0s</StoredType>
     </column>
-    <column id="374" parent="302" name="address">
+    <column id="378" parent="302" name="address">
       <Position>9</Position>
       <StoredType>varchar(128)|0s</StoredType>
     </column>
-    <column id="375" parent="302" name="created_at">
+    <column id="379" parent="302" name="created_at">
       <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
       <Position>10</Position>
       <StoredType>datetime|0s</StoredType>
     </column>
-    <index id="376" parent="302" name="PRIMARY">
+    <index id="380" parent="302" name="PRIMARY">
       <ColNames>id</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <index id="377" parent="302" name="mrn">
+    <index id="381" parent="302" name="mrn">
       <ColNames>mrn</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <key id="378" parent="302" name="PRIMARY">
+    <key id="382" parent="302" name="PRIMARY">
       <NameSurrogate>1</NameSurrogate>
       <Primary>1</Primary>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
     </key>
-    <key id="379" parent="302" name="mrn">
+    <key id="383" parent="302" name="mrn">
       <UnderlyingIndexName>mrn</UnderlyingIndexName>
     </key>
-    <column id="380" parent="303" name="id">
-      <AutoIncrement>4</AutoIncrement>
+    <column id="384" parent="303" name="id">
+      <AutoIncrement>6</AutoIncrement>
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>int|0s</StoredType>
     </column>
-    <column id="381" parent="303" name="username">
+    <column id="385" parent="303" name="username">
       <NotNull>1</NotNull>
       <Position>2</Position>
       <StoredType>varchar(50)|0s</StoredType>
     </column>
-    <column id="382" parent="303" name="password">
+    <column id="386" parent="303" name="password">
       <NotNull>1</NotNull>
       <Position>3</Position>
       <StoredType>varchar(255)|0s</StoredType>
     </column>
-    <column id="383" parent="303" name="role">
+    <column id="387" parent="303" name="role">
       <NotNull>1</NotNull>
       <Position>4</Position>
-      <StoredType>enum(&apos;nurse&apos;, &apos;doctor&apos;, &apos;ed_manager&apos;)|0e</StoredType>
+      <StoredType>enum(&apos;nurse&apos;, &apos;doctor&apos;, &apos;ed_manager&apos;, &apos;admin&apos;)|0e</StoredType>
     </column>
-    <column id="384" parent="303" name="full_name">
+    <column id="388" parent="303" name="full_name">
       <Position>5</Position>
       <StoredType>varchar(100)|0s</StoredType>
     </column>
-    <column id="385" parent="303" name="specialty">
+    <column id="389" parent="303" name="specialty">
       <Position>6</Position>
       <StoredType>varchar(100)|0s</StoredType>
     </column>
-    <column id="386" parent="303" name="room">
+    <column id="390" parent="303" name="room">
       <Position>7</Position>
       <StoredType>varchar(50)|0s</StoredType>
     </column>
-    <column id="387" parent="303" name="floor">
+    <column id="391" parent="303" name="floor">
       <Position>8</Position>
       <StoredType>varchar(50)|0s</StoredType>
     </column>
-    <index id="388" parent="303" name="PRIMARY">
+    <column id="392" parent="303" name="email">
+      <Position>9</Position>
+      <StoredType>varchar(255)|0s</StoredType>
+    </column>
+    <column id="393" parent="303" name="phone">
+      <Position>10</Position>
+      <StoredType>varchar(50)|0s</StoredType>
+    </column>
+    <column id="394" parent="303" name="status">
+      <DefaultExpression>&apos;active&apos;</DefaultExpression>
+      <Position>11</Position>
+      <StoredType>enum(&apos;active&apos;, &apos;inactive&apos;)|0e</StoredType>
+    </column>
+    <column id="395" parent="303" name="created_at">
+      <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
+      <Position>12</Position>
+      <StoredType>datetime|0s</StoredType>
+    </column>
+    <column id="396" parent="303" name="updated_at">
+      <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
+      <OnUpdate>CURRENT_TIMESTAMP</OnUpdate>
+      <Position>13</Position>
+      <StoredType>datetime|0s</StoredType>
+    </column>
+    <index id="397" parent="303" name="PRIMARY">
       <ColNames>id</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <index id="389" parent="303" name="username">
+    <index id="398" parent="303" name="username">
       <ColNames>username</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <key id="390" parent="303" name="PRIMARY">
+    <index id="399" parent="303" name="idx_users_role">
+      <ColNames>role</ColNames>
+      <Type>btree</Type>
+    </index>
+    <index id="400" parent="303" name="idx_users_status">
+      <ColNames>status</ColNames>
+      <Type>btree</Type>
+    </index>
+    <key id="401" parent="303" name="PRIMARY">
       <NameSurrogate>1</NameSurrogate>
       <Primary>1</Primary>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
     </key>
-    <key id="391" parent="303" name="username">
+    <key id="402" parent="303" name="username">
       <UnderlyingIndexName>username</UnderlyingIndexName>
     </key>
   </database-model>

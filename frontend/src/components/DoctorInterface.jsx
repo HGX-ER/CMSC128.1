@@ -9,7 +9,49 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { DoctorPatientCard } from "./DoctorPatientCard";
 import { toast } from 'sonner';
-import { Stethoscope, Activity } from "lucide-react";
+import { Stethoscope, Activity, Search } from "lucide-react";
+import { Input } from "./ui/input";
+
+// Common ICD-10 codes for Emergency Department
+const ICD_10_CODES = [
+  { code: "A09.9", description: "Gastroenteritis and colitis of unspecified origin" },
+  { code: "B34.9", description: "Viral infection, unspecified" },
+  { code: "E11.9", description: "Type 2 diabetes mellitus without complications" },
+  { code: "G43.909", description: "Migraine, unspecified, not intractable, without status migrainosus" },
+  { code: "I10", description: "Essential (primary) hypertension" },
+  { code: "I21.9", description: "Acute myocardial infarction, unspecified" },
+  { code: "I50.9", description: "Heart failure, unspecified" },
+  { code: "I63.9", description: "Cerebral infarction, unspecified" },
+  { code: "J02.9", description: "Acute pharyngitis, unspecified" },
+  { code: "J06.9", description: "Acute upper respiratory infection, unspecified" },
+  { code: "J18.9", description: "Pneumonia, unspecified organism" },
+  { code: "J44.0", description: "Chronic obstructive pulmonary disease with acute lower respiratory infection" },
+  { code: "J44.1", description: "Chronic obstructive pulmonary disease with acute exacerbation" },
+  { code: "J45.901", description: "Unspecified asthma with acute exacerbation" },
+  { code: "K21.9", description: "Gastro-esophageal reflux disease without esophagitis" },
+  { code: "K52.9", description: "Noninfective gastroenteritis and colitis, unspecified" },
+  { code: "K80.20", description: "Calculus of gallbladder without cholecystitis without obstruction" },
+  { code: "M25.561", description: "Pain in right knee" },
+  { code: "M54.5", description: "Low back pain" },
+  { code: "N39.0", description: "Urinary tract infection, site not specified" },
+  { code: "R05.9", description: "Cough, unspecified" },
+  { code: "R06.02", description: "Shortness of breath" },
+  { code: "R07.9", description: "Chest pain, unspecified" },
+  { code: "R10.9", description: "Unspecified abdominal pain" },
+  { code: "R11.0", description: "Nausea" },
+  { code: "R11.2", description: "Nausea with vomiting, unspecified" },
+  { code: "R42", description: "Dizziness and giddiness" },
+  { code: "R50.9", description: "Fever, unspecified" },
+  { code: "R51.9", description: "Headache, unspecified" },
+  { code: "R55", description: "Syncope and collapse" },
+  { code: "S06.0X0A", description: "Concussion without loss of consciousness, initial encounter" },
+  { code: "S42.001A", description: "Fracture of unspecified part of right clavicle, initial encounter" },
+  { code: "S52.501A", description: "Unspecified fracture of the lower end of right radius, initial" },
+  { code: "S72.001A", description: "Fracture of unspecified part of neck of right femur, initial" },
+  { code: "S82.001A", description: "Unspecified fracture of right patella, initial encounter" },
+  { code: "T14.90", description: "Injury, unspecified" },
+  { code: "T78.40XA", description: "Allergy, unspecified, initial encounter" },
+];
 
 const ESI_COLORS = {
   1: "bg-red-600 text-white",
@@ -45,6 +87,11 @@ export function DoctorInterface({
   const [transferDoctor, setTransferDoctor] = useState("");
   const [transferNote, setTransferNote] = useState("");
   const [transferConfirm, setTransferConfirm] = useState(false);
+  
+  // ICD-10 search states
+  const [icdSearchTerm, setIcdSearchTerm] = useState("");
+  const [selectedIcdCode, setSelectedIcdCode] = useState("");
+  const [showIcdDropdown, setShowIcdDropdown] = useState(false);
 
   const [doctor, setDoctor] = useState({
     full_name: "",
@@ -61,7 +108,7 @@ export function DoctorInterface({
     async function load() {
       try {
         const prof = await fetch(
-          `https://node-mysql-api-zsam.onrender.com/api/doctor/${encodeURIComponent(currentDoctorUsername)}`
+          `http://localhost:5000/api/doctor/${encodeURIComponent(currentDoctorUsername)}`
         ).then((r) => (r.ok ? r.json() : null));
         if (!stop && prof) setDoctor(prof);
       } catch (e) {
@@ -70,7 +117,7 @@ export function DoctorInterface({
 
       try {
         const list = await fetch(
-          `https://node-mysql-api-zsam.onrender.com/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
+          `http://localhost:5000/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
         ).then((r) => (r.ok ? r.json() : []));
         const normalized = (list || []).map((p) => ({
           ...p,
@@ -96,7 +143,7 @@ export function DoctorInterface({
     let cancelled = false;
     const fetchDoctors = async () => {
       try {
-        const res = await fetch('https://node-mysql-api-zsam.onrender.com/api/doctors');
+        const res = await fetch('http://localhost:5000/api/doctors');
         if (!res.ok) return;
         const list = await res.json();
         if (cancelled) return;
@@ -147,6 +194,22 @@ export function DoctorInterface({
     return motivationalPhrases[Math.floor(Math.random() * motivationalPhrases.length)];
   }, []); 
 
+  // Filter ICD codes based on search term
+  const filteredIcdCodes = ICD_10_CODES.filter((icd) => {
+    const searchLower = icdSearchTerm.toLowerCase();
+    return (
+      icd.code.toLowerCase().includes(searchLower) ||
+      icd.description.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Handle ICD code selection
+  const handleIcdCodeSelect = (icd) => {
+    setSelectedIcdCode(`${icd.code} - ${icd.description}`);
+    setIcdSearchTerm(`${icd.code} - ${icd.description}`);
+    setShowIcdDropdown(false);
+  };
+
   // Actions
   const handleSelectPatient = (id) => setSelectedPatient(id);
 
@@ -154,7 +217,7 @@ export function DoctorInterface({
     if (!selectedPatient) return;
     try {
       const res = await fetch(
-        `https://node-mysql-api-zsam.onrender.com/api/doctor/encounters/${selectedPatient}/start`,
+        `http://localhost:5000/api/doctor/encounters/${selectedPatient}/start`,
         { method: "POST", headers: { "Content-Type": "application/json" } }
       );
       if (!res.ok) throw new Error("start failed");
@@ -168,6 +231,11 @@ export function DoctorInterface({
 
       setConsultationOpen(true);
       setConsultationStartTime(new Date());
+      setDiagnosis("");
+      setDisposition("");
+      setIcdSearchTerm("");
+      setSelectedIcdCode("");
+      setShowIcdDropdown(false);
     } catch (e) {
       console.error(e);
       alert("Failed to start consultation.");
@@ -178,7 +246,7 @@ export function DoctorInterface({
     if (!selectedPatient || !diagnosis || !disposition) return;
     try {
       const res = await fetch(
-        `https://node-mysql-api-zsam.onrender.com/api/doctor/encounters/${selectedPatient}/complete`,
+        `http://localhost:5000/api/doctor/encounters/${selectedPatient}/complete`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -191,7 +259,7 @@ export function DoctorInterface({
 
       // Refresh immediately
       const list = await fetch(
-        `https://node-mysql-api-zsam.onrender.com/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
+        `http://localhost:5000/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
       ).then((r) => (r.ok ? r.json() : []));
       const normalized = (list || []).map((p) => ({
         ...p,
@@ -205,6 +273,9 @@ export function DoctorInterface({
       setDiagnosis("");
       setDisposition("");
       setConsultationStartTime(null);
+      setIcdSearchTerm("");
+      setSelectedIcdCode("");
+      setShowIcdDropdown(false);
     } catch (e) {
       console.error(e);
       alert("Failed to complete consultation.");
@@ -446,6 +517,47 @@ export function DoctorInterface({
                 )}
               </CardContent>
             </Card>
+
+            {/* Completed Consultations */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  ✅ Completed Today
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 max-h-[500px] overflow-y-auto">
+                {completedPatients.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No completed consultations yet</p>
+                    <p className="text-sm text-gray-400 mt-1">They'll show up here once you're done</p>
+                  </div>
+                ) : (
+                  completedPatients.map((patient) => (
+                    <div key={patient.id} className="p-3 border border-green-200 rounded-lg bg-green-50">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium text-green-900">{patient.name || patient.full_name}</div>
+                          <Badge className="bg-green-600 text-white text-xs">
+                            Done
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-green-700">
+                          {ageFromDOB(patient.dateOfBirth)} • {patient.sex}
+                        </div>
+                        <div className="text-xs text-green-600 bg-white p-2 rounded border border-green-200">
+                          <p><strong>Disposition:</strong> {patient.disposition}</p>
+                        </div>
+                        {patient.esiLevel && (
+                          <Badge className={ESI_COLORS[patient.esiLevel]}>
+                            ESI {patient.esiLevel}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Information Note */}
@@ -630,6 +742,79 @@ export function DoctorInterface({
 
               {/* Consultation Form */}
               <div className="space-y-4">
+                {/* ICD-10 Code Search Dropdown */}
+                <div className="relative">
+                  <Label htmlFor="icdSearch" className="text-base font-medium">ICD-10 Code Lookup</Label>
+                  <div className="relative mt-2">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      id="icdSearch"
+                      type="text"
+                      placeholder="Search by code or description (e.g., 'R07.9' or 'chest pain')..."
+                      value={icdSearchTerm}
+                      onChange={(e) => {
+                        setIcdSearchTerm(e.target.value);
+                        setShowIcdDropdown(true);
+                      }}
+                      onFocus={() => setShowIcdDropdown(true)}
+                      className="pl-10"
+                    />
+                  </div>
+                  
+                  {/* Dropdown Results */}
+                  {showIcdDropdown && icdSearchTerm && filteredIcdCodes.length > 0 && (
+                    <div 
+                      className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                      style={{ zIndex: 1000 }}
+                    >
+                      {filteredIcdCodes.slice(0, 10).map((icd, index) => (
+                        <div
+                          key={index}
+                          onClick={() => handleIcdCodeSelect(icd)}
+                          className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                        >
+                          <div className="flex items-start gap-3">
+                            <Badge variant="outline" className="shrink-0 font-mono text-xs">
+                              {icd.code}
+                            </Badge>
+                            <p className="text-sm text-gray-700 flex-1">{icd.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* No results message */}
+                  {showIcdDropdown && icdSearchTerm && filteredIcdCodes.length === 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
+                      <p className="text-sm text-gray-500 text-center">No matching ICD-10 codes found</p>
+                    </div>
+                  )}
+                  
+                  {selectedIcdCode && (
+                    <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-green-800">Selected:</span>
+                        <span className="text-sm text-green-700">{selectedIcdCode}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedIcdCode("");
+                          setIcdSearchTerm("");
+                        }}
+                        className="h-6 text-green-600 hover:text-green-800 hover:bg-green-100"
+                      >
+                        ✕ Clear
+                      </Button>
+                    </div>
+                  )}
+                  
+                  <p className="text-xs text-gray-500 mt-1">Optional: Search and select an ICD-10 code for standardized diagnosis coding</p>
+                </div>
+
                 <div>
                   <Label htmlFor="diagnosis" className="text-base font-medium">
                     Clinical Diagnosis *
@@ -646,8 +831,6 @@ export function DoctorInterface({
                     Include primary diagnosis and any relevant differential diagnoses
                   </p>
                 </div>
-
-                {/* Transfer UI moved to bottom of the dialog */}
 
                 <div>
                   <Label htmlFor="disposition" className="text-base font-medium">
@@ -741,7 +924,7 @@ export function DoctorInterface({
                         }
 
                         try {
-                          const res = await fetch(`https://node-mysql-api-zsam.onrender.com/api/doctor/encounters/${selectedPatient}/transfer`, {
+                          const res = await fetch(`http://localhost:5000/api/doctor/encounters/${selectedPatient}/transfer`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ toDoctor: transferDoctor, note: transferNote })
@@ -752,7 +935,7 @@ export function DoctorInterface({
                           toast.success('Patient transferred');
                           // Refresh doctor patient list
                           const list = await fetch(
-                            `https://node-mysql-api-zsam.onrender.com/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
+                            `http://localhost:5000/api/doctor/${encodeURIComponent(currentDoctorUsername)}/patients`
                           ).then((r) => (r.ok ? r.json() : []));
                           const normalized = (list || []).map((p) => ({
                             ...p,

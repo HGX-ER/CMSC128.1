@@ -142,7 +142,7 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
       address: registrationData.address
     };
 
-    const response = await fetch(`https://node-mysql-api-zsam.onrender.com/api/registration/patient/${registrationQueueNumber}`, {
+    const response = await fetch(`http://localhost:5000/api/registration/patient/${registrationQueueNumber}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -191,15 +191,6 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
 
   return (
     <div className="p-6 space-y-6">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <Badge variant="outline" className="text-lg px-4 py-2" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Users style={{ width: '1rem', height: '1rem' }} />
-            Waiting: {waitingPatients.length}
-          </Badge>
-        </div>
-      </div>
-
       <Tabs defaultValue="pending-logins" className="w-full">
         <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
           <TabsTrigger

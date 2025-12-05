@@ -51,6 +51,12 @@ const ROLE_INFO = {
     color: "bg-orange-100 text-orange-800",
     icon: User,
   },
+    admin: {
+    title: "Administrator Portal",
+    description: "User management and system administration",
+    color: "bg-gray-100 text-gray-800",
+    icon: Shield,
+  },
 };
 
 export function LoginInterface({ onLogin, onQueueLogin }) {
@@ -113,7 +119,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
     try {
       console.log("Attempting to generate queue number...");
       
-      const response = await fetch("https://node-mysql-api-zsam.onrender.com/api/registration/new", {
+      const response = await fetch("http://localhost:5000/api/registration/new", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

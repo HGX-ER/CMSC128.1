@@ -15,7 +15,7 @@ export function useEventBus(onEvent) {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    const url = 'https://node-mysql-api-zsam.onrender.com/api/stream/events'; // not under /api
+    const url = 'http://localhost:5000/stream/events'; // not under /api
     let es;
 
     const open = () => {

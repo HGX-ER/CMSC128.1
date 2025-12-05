@@ -55,7 +55,7 @@ export function NurseInterface({
   useEffect(() => {
     const loadDoctors = async () => {
       try {
-        const res = await fetch('https://node-mysql-api-zsam.onrender.com/api/doctors');
+        const res = await fetch('http://localhost:5000/api/doctors');
         if (!res.ok) throw new Error('No /api/doctors');
         const list = await res.json();
         const normalized = Array.isArray(list) ? list.map(normalizeDoctor) : [];
@@ -71,7 +71,7 @@ export function NurseInterface({
   useEffect(() => {
     const fetchUpdatedPatients = async () => {
       try {
-        const response = await fetch("https://node-mysql-api-zsam.onrender.com/api/board");
+        const response = await fetch("http://localhost:5000/api/board");
         if (!response.ok) throw new Error("Failed to fetch updated patient data");
         const data = await response.json();
         if (Array.isArray(data)) onUpdatePatient(null, data);
@@ -125,7 +125,7 @@ export function NurseInterface({
   const handleAssignDoctor = async () => {
     if (selectedPatient && selectedDoctor) {
       try {
-        const res = await fetch("https://node-mysql-api-zsam.onrender.com/api/board/assign-doctor", {
+        const res = await fetch("http://localhost:5000/api/board/assign-doctor", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -155,7 +155,7 @@ export function NurseInterface({
 
     // Try backend; fall back to local handler
     try {
-      const res = await fetch("https://node-mysql-api-zsam.onrender.com/api/board/adjust-stage-time", {
+      const res = await fetch("http://localhost:5000/api/board/adjust-stage-time", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -175,7 +175,7 @@ export function NurseInterface({
 
   const handleAssignNurse = async (patient) => {
     try {
-      await fetch("https://node-mysql-api-zsam.onrender.com/api/board/assign-nurse", {
+      await fetch("http://localhost:5000/api/board/assign-nurse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -228,9 +228,6 @@ export function NurseInterface({
 
   return (
     <div className="p-6 space-y-6">
-      <div className="mb-6 text-center">
-        <h2 className="text-2xl font-bold text-blue-600">Hello, Nurse {nurseName} 👋</h2>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card><CardContent className="p-4"><Users className="w-5 h-5 text-blue-500 mb-2"/><div className="text-2xl font-bold">{activeEarlyStagePatients.length}</div><p className="text-sm text-gray-600">Active Patients</p></CardContent></Card>
@@ -301,25 +298,6 @@ export function NurseInterface({
             Doctor Assignment
           </TabsTrigger>
 
-          <TabsTrigger
-            value="time-adjustment"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
-            Time Management
-          </TabsTrigger>
       </TabsList>
 
 
@@ -436,54 +414,6 @@ export function NurseInterface({
                       </div>
                     )}
                   </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="time-adjustment" className="mt-6">
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Timer className="w-5 h-5" />Time Management</CardTitle></CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {activeEarlyStagePatients.map((p) => (
-                  <div key={p.id} className="p-4 border-2 rounded-lg bg-gray-50 hover:shadow-md cursor-pointer" onClick={() => setSelectedPatient(p)}>
-                    <div className="flex items-center justify-between">
-                      <div><div className="font-semibold">{p.full_name || `Patient ${p.id}`}</div><div className="text-sm text-gray-600">Stage: {STAGE_DISPLAY_NAMES[p.currentStage]}</div></div>
-                      <div className="text-sm text-gray-600">{getCurrentStageTime(p)}m</div>
-                    </div>
-                  </div>
-                ))}
-
-                {selectedPatient && (
-                  <div className="p-4 border border-blue-300 bg-blue-50 rounded-lg">
-                    <h4 className="font-semibold mb-2">Adjust Time for {selectedPatient.full_name || selectedPatient.id}</h4>
-                    <div className="grid grid-cols-2 gap-4 mb-3">
-                      <div><Label>Hours</Label><Input type="number" min="0" max="23" value={timeAdjustment.hours} onChange={(e) => setTimeAdjustment({ ...timeAdjustment, hours: parseInt(e.target.value) || 0 })} /></div>
-                      <div><Label>Minutes</Label><Input type="number" min="0" max="59" value={timeAdjustment.minutes} onChange={(e) => setTimeAdjustment({ ...timeAdjustment, minutes: parseInt(e.target.value) || 0 })} /></div>
-                    </div>
-
-                    <Dialog open={adjustTimeDialogOpen} onOpenChange={setAdjustTimeDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button disabled={timeAdjustment.hours === 0 && timeAdjustment.minutes === 0} className="w-full">
-                          <Edit className="w-4 h-4 mr-2" />Apply Adjustment
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Confirm Adjustment</DialogTitle>
-                          <DialogDescription>
-                            Subtract {timeAdjustment.hours}h {timeAdjustment.minutes}m from {selectedPatient.full_name || selectedPatient.id}’s stage time?
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="flex gap-2 pt-4">
-                          <Button variant="outline" onClick={() => setAdjustTimeDialogOpen(false)} className="flex-1">Cancel</Button>
-                          <Button onClick={handleAdjustTime} className="flex-1">Confirm</Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
                 )}
               </div>
             </CardContent>

@@ -48,5 +48,15 @@ export const DEMO_USERS = {
       name: 'Lisa Wilson',
       department: 'ED Management'
     }
+  },
+  'admin.admin': {
+    password: 'admin123',
+    user: {
+      id: '6',
+      username: 'admin.admin',
+      role: 'admin',
+      name: 'Admin User'
+    }
   }
-};
+}
+
