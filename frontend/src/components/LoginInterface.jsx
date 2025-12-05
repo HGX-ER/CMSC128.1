@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -65,6 +65,19 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
   const [showGenerator, setShowGenerator] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Reset form when component mounts (after logout)
+  useEffect(() => {
+    setUsername("");
+    setPassword("");
+    setQueueNumber("");
+    setError("");
+    setShowPassword(false);
+    setGeneratedQueueNumber("");
+    setShowGenerator(false);
+    setActiveTab("patient");
+    setIsGenerating(false);
+  }, []);
+
   const handleStaffSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -100,7 +113,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
     try {
       console.log("Attempting to generate queue number...");
       
-      const response = await fetch("https://cmsc1281-production.up.railway.app/api/registration/new", {
+      const response = await fetch("https://node-mysql-api-zsam.onrender.com/api/registration/new", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

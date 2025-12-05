@@ -1,7 +1,19 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Button } from "./ui/button";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Edit, Calendar, Clock, X } from "lucide-react@0.487.0";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 
 const STAGE_LABELS = {
@@ -22,19 +34,74 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'
 
 export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
   const now = new Date();
-  const dayShift = now.getHours() >= 8 && now.getHours() < 20;
-  const currentShift = dayShift ? '0700H-1500H' : '0700H-1500H';
+  const initialIsDay = now.getHours() >= 8 && now.getHours() < 20;
+  const initialStart = initialIsDay ? '07:00' : '19:00';
+  const initialEnd = initialIsDay ? '15:00' : '07:00';
+
+  const [shiftStart, setShiftStart] = useState(initialStart); // 'HH:MM'
+  const [shiftEnd, setShiftEnd] = useState(initialEnd); // 'HH:MM'
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [tempStart, setTempStart] = useState(shiftStart);
+  const [tempEnd, setTempEnd] = useState(shiftEnd);
+  // Filters
+  const [filterDate, setFilterDate] = useState(null); // 'YYYY-MM-DD'
+  const [filterTime, setFilterTime] = useState(null); // 'HH:MM'
+  const [isDateDialogOpen, setIsDateDialogOpen] = useState(false);
+  const [isTimeDialogOpen, setIsTimeDialogOpen] = useState(false);
+  const [tempFilterDate, setTempFilterDate] = useState('');
+  const [tempFilterTime, setTempFilterTime] = useState('');
+
+  const formatShiftCode = (s, e) => `${s.replace(':', '')}H-${e.replace(':', '')}H`;
+  const shiftTime = formatShiftCode(shiftStart, shiftEnd);
+
+  const isDayShift = (() => {
+    const sHour = parseInt(shiftStart.slice(0, 2), 10);
+    return sHour >= 7 && sHour < 19;
+  })();
+
+  const isNowInShift = (s, e, nowDate) => {
+    const [sH, sM] = s.split(':').map(Number);
+    const [eH, eM] = e.split(':').map(Number);
+    const startMinutes = sH * 60 + sM;
+    const endMinutes = eH * 60 + eM;
+    const nowMinutes = nowDate.getHours() * 60 + nowDate.getMinutes();
+
+    if (startMinutes <= endMinutes) {
+      return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+    }
+    // overnight shift
+    return nowMinutes >= startMinutes || nowMinutes < endMinutes;
+  };
 
   const analytics = useMemo(() => {
-    const activePatients = patients.filter(p => p.isActive && p.currentStage !== 'departed');
-    const completedPatients = patients.filter(p => !p.isActive || p.currentStage === 'departed');
+    // Apply optional filters (date/time) before computing analytics
+    const basePatients = patients.filter(p => {
+      if (filterDate) {
+        const pDate = p.arrivalTime.toISOString().slice(0, 10);
+        if (pDate !== filterDate) return false;
+      }
+      if (filterTime) {
+        const [fH, fM] = filterTime.split(':').map(Number);
+        const pH = p.arrivalTime.getHours();
+        const pM = p.arrivalTime.getMinutes();
+        if (pH !== fH || pM !== fM) return false;
+      }
+      return true;
+    });
+
+    const activePatients = basePatients.filter(p => p.isActive && p.currentStage !== 'departed');
+    const completedPatients = basePatients.filter(p => !p.isActive || p.currentStage === 'departed');
 
     // Current shift patients
-    const shiftStart = dayShift
-      ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0)
-      : new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getHours() < 8 ? 1 : 0), 20, 0, 0);
+    const computeShiftStartDate = (start, nowDate) => {
+      const [sH, sM] = start.split(":").map(Number);
+      const sd = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate(), sH, sM, 0);
+      if (sd > nowDate) sd.setDate(sd.getDate() - 1);
+      return sd;
+    };
 
-    const currentShiftPatients = patients.filter(p => p.arrivalTime >= shiftStart);
+    const shiftStartDate = computeShiftStartDate(shiftStart, now);
+    const currentShiftPatients = patients.filter(p => p.arrivalTime >= shiftStartDate);
 
     // Stage counts
     const stageCounts = Object.keys(STAGE_LABELS).map(stage => ({
@@ -49,7 +116,7 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
 
     // Hourly distribution
     const hourlyData = Array.from({ length: 24 }, (_, hour) => {
-      const hourPatients = patients.filter(p => p.arrivalTime.getHours() === hour);
+      const hourPatients = basePatients.filter(p => p.arrivalTime.getHours() === hour);
       return {
         hour: `${hour.toString().padStart(2, '0')}:00`,
         patients: hourPatients.length,
@@ -90,38 +157,69 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
       totalDischarges: completedPatients.filter(p => p.disposition === 'Discharge').length,
       totalObservations: completedPatients.filter(p => p.disposition === 'Observation').length
     };
-  }, [patients, getTotalTime, dayShift, now]);
+  }, [patients, getTotalTime, shiftStart, shiftEnd, now]);
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <Badge variant="outline" className="text-lg px-4 py-2">
-          Current Shift: {currentShift}
+          Current Shift: {shiftTime}
         </Badge>
 
         <div className="flex items-center gap-3">
           <Badge className="bg-blue-100 text-blue-800 border border-blue-300 text-lg px-4 py-2">
             {(() => {
-              const [start, end] = currentShift.split("-");
               const formatTime = (t) => {
-                const hours = parseInt(t.slice(0, 2), 10);
-                const minutes = t.slice(2, 4);
+                const [hoursStr, minutes] = t.split(":");
+                const hours = parseInt(hoursStr, 10);
                 const suffix = hours >= 12 ? "PM" : "AM";
                 const formattedHour = hours % 12 || 12;
                 return `${formattedHour}:${minutes} ${suffix}`;
               };
-              return `${formatTime(start)} – ${formatTime(end)}`;
+              return `${formatTime(shiftStart)} – ${formatTime(shiftEnd)}`;
             })()}
           </Badge>
 
           <Badge
-            className={`text-lg px-4 py-2 ${currentShift === "0700H-1500H"
+            className={`text-lg px-4 py-2 ${isDayShift
                 ? "bg-yellow-100 text-yellow-800 border border-yellow-300"
                 : "bg-indigo-100 text-indigo-800 border border-indigo-300"
               }`}
           >
-            {currentShift === "0700H-1500H" ? "Day Shift" : "Night Shift"}
+            {isDayShift ? "Day Shift" : "Night Shift"}
           </Badge>
+
+          <div>
+            <Dialog open={isDialogOpen} onOpenChange={(v) => { setIsDialogOpen(v); if (v) { setTempStart(shiftStart); setTempEnd(shiftEnd); } }}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="ml-2">
+                  <Edit className="w-4 h-4 mr-2" /> Edit
+                </Button>
+              </DialogTrigger>
+
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Shift Time</DialogTitle>
+                  <DialogDescription>
+                    <div>Day interval: 07:00 AM – 03:59 PM</div>
+                    <div>Night interval: 04:00 PM – 06:59 AM</div>
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="grid gap-2">
+                  <label className="text-sm">Start</label>
+                  <Input type="time" value={tempStart} onChange={(e) => setTempStart(e.target.value)} />
+                  <label className="text-sm">End</label>
+                  <Input type="time" value={tempEnd} onChange={(e) => setTempEnd(e.target.value)} />
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={() => { setShiftStart(tempStart || initialStart); setShiftEnd(tempEnd || initialEnd); setIsDialogOpen(false); }}>Save</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </div>
 
@@ -207,6 +305,65 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
             Census
           </TabsTrigger>
         </TabsList>
+
+        {/* Centered filters below the tab buttons */}
+        <div className="flex items-center justify-center gap-3 mt-3">
+          <Dialog open={isDateDialogOpen} onOpenChange={(v) => { setIsDateDialogOpen(v); if (v) setTempFilterDate(filterDate || ''); }}>
+            <DialogTrigger asChild>
+              <Button variant={filterDate ? 'secondary' : 'outline'} size="sm" className="flex items-center">
+                <Calendar className="w-4 h-4 mr-2" />
+                {filterDate ? `Date: ${filterDate}` : 'Filter by Date'}
+              </Button>
+            </DialogTrigger>
+
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Filter by Date</DialogTitle>
+                <DialogDescription>Select a specific date to filter analytics.</DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-2">
+                <Input type="date" value={tempFilterDate} onChange={(e) => setTempFilterDate(e.target.value)} />
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDateDialogOpen(false)}>Cancel</Button>
+                <Button variant="destructive" onClick={() => { setFilterDate(null); setTempFilterDate(''); setIsDateDialogOpen(false); }}>Clear</Button>
+                <Button onClick={() => { setFilterDate(tempFilterDate || null); setIsDateDialogOpen(false); }}>Apply</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isTimeDialogOpen} onOpenChange={(v) => { setIsTimeDialogOpen(v); if (v) setTempFilterTime(filterTime || ''); }}>
+            <DialogTrigger asChild>
+              <Button variant={filterTime ? 'secondary' : 'outline'} size="sm" className="flex items-center">
+                <Clock className="w-4 h-4 mr-2" />
+                {filterTime ? `Time: ${filterTime}` : 'Filter by Time'}
+              </Button>
+            </DialogTrigger>
+
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Filter by Time</DialogTitle>
+                <DialogDescription>Select a specific time (HH:MM) to filter analytics by arrival time.</DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-2">
+                <Input type="time" value={tempFilterTime} onChange={(e) => setTempFilterTime(e.target.value)} />
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsTimeDialogOpen(false)}>Cancel</Button>
+                <Button variant="destructive" onClick={() => { setFilterTime(null); setTempFilterTime(''); setIsTimeDialogOpen(false); }}>Clear</Button>
+                <Button onClick={() => { setFilterTime(tempFilterTime || null); setIsTimeDialogOpen(false); }}>Apply</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Button variant="ghost" size="sm" className="flex items-center" onClick={() => { setFilterDate(null); setFilterTime(null); setTempFilterDate(''); setTempFilterTime(''); }}>
+            <X className="w-4 h-4 mr-2" /> Clear Filters
+          </Button>
+        </div>
 
         <TabsContent value="realtime" className="space-y-6">
           {/* Key Metrics */}

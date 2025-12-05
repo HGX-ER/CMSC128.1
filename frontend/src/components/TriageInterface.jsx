@@ -23,7 +23,7 @@ export function TriageInterface({ onBack }) {
     const fetchPatients = async () => {
       try {
         setLoading(true);
-        const res = await fetch("https://cmsc1281-production.up.railway.app/api/triage");
+        const res = await fetch("https://node-mysql-api-zsam.onrender.com/api/triage");
         if (!res.ok) throw new Error("Failed to fetch triage patients");
         const data = await res.json();
         setWaitingPatients(data);
@@ -132,7 +132,7 @@ export function TriageInterface({ onBack }) {
                       onClick={async () => {
                         try {
                           await fetch(
-                            `https://cmsc1281-production.up.railway.app/api/triage/encounters/${selectedPatient.encounter_id}/triage`,
+                            `https://node-mysql-api-zsam.onrender.com/api/triage/encounters/${selectedPatient.encounter_id}/triage`,
                             {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
