@@ -104,9 +104,7 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
     }
   };
 
-
-
-  const handleRegisterPatient = async () => {
+const handleRegisterPatient = async () => {
   try {
     const patient = patients.find(p => p.id === registrationQueueNumber);
     if (!patient) {
@@ -131,7 +129,6 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
       }
     }
 
-    // ✅ Send the update to backend
     const payload = {
       name: registrationData.name,
       dateOfBirth: registrationData.dateOfBirth,
@@ -139,7 +136,8 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
       contactNumber: registrationData.contactNumber,
       emergencyContact: registrationData.emergencyContact,
       insuranceInfo: registrationData.insuranceInfo,
-      address: registrationData.address
+      address: registrationData.address,
+      chiefComplaint: registrationData.chiefComplaint
     };
 
     const response = await fetch(`http://localhost:5000/api/registration/patient/${registrationQueueNumber}`, {
@@ -155,17 +153,19 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
 
     console.log("✅ Registration saved to backend:", payload);
 
-    // ✅ Update frontend state
-    onUpdatePatient(patient.id, {
-      ...payload,
-      age: calculatedAge,
-      isRegistered: true
+    // ✅ Update frontend - backend status='registered' maps to 'waiting_doctor'
+    onUpdatePatient(patient.id, { 
+      ...payload, 
+      age: calculatedAge, 
+      isRegistered: true 
     });
-    onMoveToStage(patient.id, "waiting_doctor");
 
-    alert("✅ Registration completed and saved to backend!");
+    // ✅ This is correct now! Backend sets status='registered' → maps to 'waiting_doctor'
+    // Don't manually call onMoveToStage, let the data reload handle it
 
-    // Reset registration form
+    alert("✅ Registration completed! Patient ready for doctor assignment.");
+
+    // Reset form
     setRegistrationQueueNumber('');
     setRegistrationData({
       name: '',
@@ -183,6 +183,7 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
     alert("Error saving registration. Check backend logs.");
   }
 };
+
 
 
   const findPatientByQueueNumber = (queueNumber) => {

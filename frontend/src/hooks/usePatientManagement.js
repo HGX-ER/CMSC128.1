@@ -1,4 +1,5 @@
 // frontend/src/hooks/usePatientManagement.js
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../lib/api';
 import { useEventBus } from './useEventBus';
@@ -15,48 +16,90 @@ export function usePatientManagement() {
     for (const p of list) byId.current.set(p.id, p);
   };
 
-  const convertStatusToStage = (status) => {
-    switch (status) {
-      case 'arrived': return 'waiting_triage';
-      case 'registered': return 'waiting_doctor';
-      case 'triaged': return 'waiting_registration'; // tweak if your flow differs
-      case 'roomed': return 'consultation';
-      case 'provider_started': return 'consultation';
-      case 'dispositioned': return 'disposition';
-      case 'departed': return 'departed';
-      default: return 'kiosk';
-    }
-  };
-
+  // ✅ Load from /whiteboard endpoint with complete patient data
   const loadBoard = useCallback(async () => {
     try {
-      const { data } = await api.get('/board');
+      const { data } = await api.get('/whiteboard');
+      
+      console.log('📊 Loaded whiteboard data:', data);
+      
       const mapped = data.map((row) => ({
         id: row.queue_number,
-        name: `${row.first_name ?? ''} ${row.last_name ?? ''}`.trim() || `Patient ${row.queue_number}`,
-        esiLevel: row.priority_esi ?? null,
-        currentStage: convertStatusToStage(row.status),
-        arrivalTime: new Date(Date.now() - (row.waiting_min ?? 0) * 60000),
-        stageHistory: [{ stage: 'kiosk', startTime: new Date(Date.now() - (row.waiting_min ?? 0) * 60000) }],
-        isActive: row.status !== 'departed',
+        encounterId: row.encounter_id,
+        patientId: row.patient_id,
+        
+        // Patient demographics
+        name: row.full_name || row.name || `Patient ${row.queue_number}`,
+        age: row.age,
+        sex: row.sex,
+        dateOfBirth: row.dateOfBirth ? new Date(row.dateOfBirth) : null,
+        
+        // ✅ Use currentStage directly from backend (already mapped)
+        currentStage: row.currentStage,
+        
+        // ESI and assignments
+        esiLevel: row.esiLevel ?? null,
+        assignedDoctor: row.assignedDoctor,
+        assignedNurse: row.assignedNurse,
+        
+        // Timestamps
+        arrivalTime: row.arrivalTime ? new Date(row.arrivalTime) : new Date(),
+        triageTime: row.triageTime ? new Date(row.triageTime) : null,
+        roomTime: row.roomTime ? new Date(row.roomTime) : null,
+        providerStartTime: row.providerStartTime ? new Date(row.providerStartTime) : null,
+        
+        // Clinical data
+        chiefComplaint: row.chiefComplaint,
+        diagnosis: row.diagnosis,
+        disposition: row.disposition,
+        
+        // Stage history for time tracking
+        stageHistory: [{
+          stage: row.currentStage,
+          startTime: row.arrivalTime ? new Date(row.arrivalTime) : new Date()
+        }],
+        
+        // Status flags
+        isActive: row.isActive !== false,
+        isRegistered: row.full_name && row.full_name !== 'New Patient',
       }));
+      
       sync(mapped);
       setPatients(mapped);
-    } catch {
-      // board optional on first load
+    } catch (error) {
+      console.error('❌ Error loading whiteboard:', error);
     }
   }, []);
 
-  useEffect(() => { loadBoard(); }, [loadBoard]);
+  // ✅ ADDED: Initial load + auto-refresh every 5 seconds
+  useEffect(() => { 
+    loadBoard();
+    
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing whiteboard...');
+      loadBoard();
+    }, 5000); // Refresh every 5 seconds
+    
+    return () => clearInterval(interval);
+  }, [loadBoard]);
 
-  // Refresh when the server fires SSE events
+  // ✅ UPDATED: Refresh when the server fires SSE events
   useEventBus((evt) => {
+    console.log('🔔 SSE Event received:', evt?.type);
+    
     if (
       evt?.type === 'encounter.created' ||
       evt?.type === 'encounter.registered' ||
       evt?.type === 'encounter.triaged' ||
-      evt?.type === 'encounter.departed'
+      evt?.type === 'encounter.departed' ||
+      evt?.type === 'patient_registered' ||
+      evt?.type === 'queue_generated' ||
+      evt?.type === 'stage_change' ||
+      evt?.type === 'patient_roomed' ||
+      evt?.type === 'provider_started' ||
+      evt?.type === 'status_updated'
     ) {
+      console.log('🔄 Reloading due to event:', evt?.type);
       loadBoard();
     }
   });
@@ -65,6 +108,7 @@ export function usePatientManagement() {
     try {
       const { data } = await api.post('/registration/new', {});
       const queue = data.queueNumber;
+      
       const newP = {
         id: queue,
         name: '',
@@ -74,13 +118,18 @@ export function usePatientManagement() {
         stageHistory: [{ stage: 'kiosk', startTime: now() }],
         isActive: true,
       };
+      
       const updated = [newP, ...patients];
       sync(updated);
       setPatients(updated);
+      
+      // Reload to get accurate data from backend
+      setTimeout(loadBoard, 300);
+      
       return queue;
     } catch (e) {
-      // fallback client-only id if backend route not available
       const queue = `ED${new Date().toISOString().replace(/\D/g, '').slice(2,12)}${Math.floor(Math.random()*90+10)}`;
+      
       const newP = {
         id: queue,
         name: '',
@@ -90,12 +139,13 @@ export function usePatientManagement() {
         stageHistory: [{ stage: 'kiosk', startTime: now() }],
         isActive: true,
       };
+      
       const updated = [newP, ...patients];
       sync(updated);
       setPatients(updated);
       return queue;
     }
-  }, [patients]);
+  }, [patients, loadBoard]);
 
   const updatePatient = useCallback((id, patch) => {
     setPatients((prev) => {
@@ -103,30 +153,40 @@ export function usePatientManagement() {
       sync(next);
       return next;
     });
-  }, []);
+    
+    // ✅ ADDED: Reload after update to sync with backend
+    setTimeout(loadBoard, 300);
+  }, [loadBoard]);
 
   const movePatientToStage = useCallback((id, stage) => {
     setPatients((prev) => {
       const next = prev.map((p) => {
         if (p.id !== id) return p;
+        
         const hist = [...p.stageHistory];
         if (hist.length && !hist[hist.length - 1].endTime) {
           hist[hist.length - 1] = { ...hist[hist.length - 1], endTime: now() };
         }
         hist.push({ stage, startTime: now() });
+        
         return { ...p, currentStage: stage, stageHistory: hist };
       });
       sync(next);
       return next;
     });
-  }, []);
+    
+    // ✅ ADDED: Reload after stage change
+    setTimeout(loadBoard, 300);
+  }, [loadBoard]);
 
   const adjustStageTime = useCallback((id, stageIndex, newStartTime) => {
     setPatients((prev) => {
       const next = prev.map((p) => {
         if (p.id !== id) return p;
+        
         const hist = [...p.stageHistory];
         if (hist[stageIndex]) hist[stageIndex] = { ...hist[stageIndex], startTime: newStartTime };
+        
         return { ...p, stageHistory: hist };
       });
       sync(next);
@@ -163,10 +223,12 @@ export function usePatientManagement() {
     setPatients((prev) => {
       const next = prev.map((p) => {
         if (p.id !== id) return p;
+        
         const hist = [...p.stageHistory];
         if (hist[stageIndex]) {
           hist[stageIndex] = { ...hist[stageIndex], satisfaction: feedback };
         }
+        
         return { ...p, stageHistory: hist };
       });
       sync(next);
@@ -174,14 +236,16 @@ export function usePatientManagement() {
     });
   }, []);
 
-  // Expose backend helpers if components want to call directly
+  // ✅ UPDATED: Reload after backend operations
   const completeRegistration = useCallback(async (queue_number, registrationData) => {
     await api.put(`/registration/patient/${queue_number}`, registrationData);
-  }, []);
+    setTimeout(loadBoard, 300);
+  }, [loadBoard]);
 
   const submitTriage = useCallback(async (encounterId, { esi, complaint, vitals }) => {
     await api.post(`/encounters/${encounterId}/triage`, { esi, complaint, vitals });
-  }, []);
+    setTimeout(loadBoard, 300);
+  }, [loadBoard]);
 
   return useMemo(() => ({
     patients,
@@ -194,7 +258,6 @@ export function usePatientManagement() {
     getCurrentStageTime,
     getPatientStageTime,
     addSatisfactionFeedback,
-
     completeRegistration,
     submitTriage,
   }), [

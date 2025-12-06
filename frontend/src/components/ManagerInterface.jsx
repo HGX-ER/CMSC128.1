@@ -1,3 +1,5 @@
+// frontend/src/components/ManagerInterface.jsx
+
 import { useState, useMemo, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -71,6 +73,9 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
   const [esiFilter, setEsiFilter] = useState('all');
   const [timeOrder, setTimeOrder] = useState('none');
   const [viewedFeedbackCount, setViewedFeedbackCount] = useState(0);
+  
+  // ✅ ADDED: Toggle for showing departed patients
+  const [showDeparted, setShowDeparted] = useState(false);
 
   // Backend feedback state
   const [backendFeedback, setBackendFeedback] = useState([]);
@@ -104,7 +109,14 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
     };
   });
 
-  const activePatients = patients.filter(p => p.isActive && p.currentStage !== 'departed');
+// ✅ CORRECT: Show ALL patients when showDeparted is true
+const activePatients = showDeparted 
+  ? patients  // Show ALL patients including departed
+  : patients.filter(p => p.currentStage !== 'departed'); // Hide departed only
+
+  
+  // ✅ ADDED: Separate list for departed patients
+  const departedPatients = patients.filter(p => p.currentStage === 'departed' || !p.isActive);
 
   // Fetch feedback from backend
   const fetchFeedback = async () => {
@@ -127,7 +139,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
       // Check for new feedback
       if (backendFeedback.length > 0 && newFeedback.length > backendFeedback.length) {
         const latestFeedback = newFeedback[0];
-        
+
         // Show toast notification
         toast.success('🔔 New patient feedback received!', {
           description: `${latestFeedback.queue_number} rated ${latestFeedback.rating}/5 at ${latestFeedback.stage_display_name || latestFeedback.stage}`,
@@ -235,9 +247,13 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
       arr.sort((a, b) => new Date(a.arrivalTime) - new Date(b.arrivalTime));
     }
     return arr;
-  }, [patients, esiFilter, timeOrder]);
+  }, [patients, esiFilter, timeOrder, showDeparted]);
 
   const getPatientsByStage = (stage) => {
+    // ✅ UPDATED: Include departed in count if showing departed
+    if (stage === 'departed') {
+      return departedPatients;
+    }
     return activePatients.filter(p => p.currentStage === stage);
   };
 
@@ -419,16 +435,20 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
           <TabsTrigger value="overview" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Overview
           </TabsTrigger>
+
           <TabsTrigger value="whiteboard" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Whiteboard
           </TabsTrigger>
+
           <TabsTrigger value="stages" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Stage Management
           </TabsTrigger>
+
           <TabsTrigger 
             value="feedback" 
             onClick={() => setViewedFeedbackCount(totalFeedbackCount)}
-            className="relative flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
+            className="relative flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05"
+          >
             Patient Feedback
             {newFeedbackCount > 0 && (
               <span className="absolute right-2 top-1.5 w-3 h-3 bg-red-600 rounded-full animate-pulse"></span>
@@ -442,12 +462,21 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {Object.entries(STAGE_LABELS).map(([stage, label]) => {
               const count = getPatientsByStage(stage).length;
-              if (count === 0 && !['waiting_triage', 'waiting_registration', 'waiting_doctor', 'waiting_admission', 'waiting_observation', 'waiting_discharge'].includes(stage)) return null;
+              
+              // ✅ UPDATED: Always show departed count
+              if (count === 0 && stage !== 'departed' && !['waiting_triage', 'waiting_registration', 'waiting_doctor', 'waiting_admission', 'waiting_observation', 'waiting_discharge'].includes(stage)) {
+                return null;
+              }
+
               return (
-                <Card key={stage}>
+                <Card key={stage} className={stage === 'departed' ? 'bg-gray-100 border-gray-300' : ''}>
                   <CardContent className="p-4 text-center">
-                    <div className="text-2xl font-bold">{count}</div>
-                    <div className="text-sm text-gray-600">{label}</div>
+                    <div className={`text-2xl font-bold ${stage === 'departed' ? 'text-gray-600' : ''}`}>
+                      {count}
+                    </div>
+                    <div className={`text-sm ${stage === 'departed' ? 'text-gray-500' : 'text-gray-600'}`}>
+                      {label}
+                    </div>
                   </CardContent>
                 </Card>
               );
@@ -467,6 +496,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                 </div>
               </CardContent>
             </Card>
+
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -478,6 +508,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                 </div>
               </CardContent>
             </Card>
+
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -485,10 +516,13 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                     <p className="text-sm text-gray-600">Low Satisfaction</p>
                     <p className="text-2xl font-bold mt-1 text-red-600">{feedbackStats.lowSatisfaction}</p>
                   </div>
-                  <span className="text-4xl">😠</span>
+                  <div>
+                    <span className="text-4xl">😕</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -496,7 +530,9 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                     <p className="text-sm text-gray-600">High Satisfaction</p>
                     <p className="text-2xl font-bold mt-1 text-green-600">{feedbackStats.highSatisfaction}</p>
                   </div>
-                  <span className="text-4xl">😄</span>
+                  <div>
+                    <span className="text-4xl">😄</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -512,7 +548,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                 {activePatients
                   .filter(p => p.name)
                   .slice(0, 10)
-                  .map(patient => (
+                  .map((patient) => (
                     <div key={patient.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                       <div>
                         <div className="font-medium">{patient.name}</div>
@@ -542,6 +578,26 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
               <div className="flex items-center justify-between">
                 <CardTitle>Patient Whiteboard</CardTitle>
                 <div className="flex items-center gap-3">
+                  {/* ✅ ADDED: Toggle for departed patients */}
+                  <Button
+                    variant={showDeparted ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowDeparted(!showDeparted)}
+                    className="flex items-center gap-2"
+                  >
+                    {showDeparted ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Showing Departed
+                      </>
+                    ) : (
+                      <>
+                        <X className="w-4 h-4" />
+                        Hide Departed
+                      </>
+                    )}
+                  </Button>
+
                   <Filter className="w-4 h-4 text-gray-600" />
                   <Select value={esiFilter} onValueChange={setEsiFilter}>
                     <SelectTrigger className="w-[200px]">
@@ -581,6 +637,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                       </SelectItem>
                     </SelectContent>
                   </Select>
+
                   <Select value={timeOrder} onValueChange={setTimeOrder}>
                     <SelectTrigger className="w-[180px]">
                       <SelectValue placeholder="Order by time" />
@@ -591,8 +648,14 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                       <SelectItem value="oldest">Oldest First</SelectItem>
                     </SelectContent>
                   </Select>
+
                   <Badge variant="outline" className="text-sm">
                     {filteredActivePatients.length} patients
+                    {showDeparted && departedPatients.length > 0 && (
+                      <span className="ml-2 text-gray-500">
+                        ({departedPatients.length} departed)
+                      </span>
+                    )}
                   </Badge>
                 </div>
               </div>
@@ -624,27 +687,49 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredActivePatients.map(patient => {
+                    filteredActivePatients.map((patient) => {
                       const hasNewFeedback = newFeedbackPatients.has(patient.id);
                       const feedbackCount = backendFeedback.filter(f => f.queue_number === patient.id).length;
                       
+                      // ✅ ADDED: Gray out departed patients
+                      const isDeparted = patient.currentStage === 'departed';
+
                       return (
-                        <TableRow key={patient.id} className={hasNewFeedback ? 'animate-pulse bg-green-50' : ''}>
+                        <TableRow 
+                          key={patient.id} 
+                          className={`
+                            ${hasNewFeedback ? 'animate-pulse bg-green-50' : ''}
+                            ${isDeparted ? 'bg-gray-100 opacity-60' : ''}
+                          `}
+                        >
                           <TableCell>
-                            <Badge variant="outline" className="font-mono">{patient.id}</Badge>
+                            <Badge variant="outline" className={`font-mono ${isDeparted ? 'bg-gray-200' : ''}`}>
+                              {patient.id}
+                            </Badge>
                           </TableCell>
                           <TableCell>{patient.arrivalTime.toLocaleTimeString()}</TableCell>
                           <TableCell>
                             <Badge variant="outline">{getTotalTime(patient)}m</Badge>
                           </TableCell>
-                          <TableCell className="font-medium">{patient.name || 'Not registered'}</TableCell>
+                          <TableCell className="font-medium">
+                            {patient.name || 'Not registered'}
+                          </TableCell>
                           <TableCell>{getPatientAge(patient)}</TableCell>
                           <TableCell>{patient.sex || '-'}</TableCell>
-                          <TableCell className="max-w-xs truncate">{patient.chiefComplaint || '-'}</TableCell>
-                          <TableCell className="max-w-xs truncate">{patient.diagnosis || '-'}</TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {patient.chiefComplaint || '-'}
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {patient.diagnosis || '-'}
+                          </TableCell>
                           <TableCell>
                             <div className="space-y-1">
-                              <Badge variant="outline">{STAGE_LABELS[patient.currentStage]}</Badge>
+                              <Badge 
+                                variant={isDeparted ? "secondary" : "outline"}
+                                className={isDeparted ? "bg-gray-300 text-gray-700" : ""}
+                              >
+                                {STAGE_LABELS[patient.currentStage]}
+                              </Badge>
                               {patient.esiLevel && (
                                 <Badge className={ESI_COLORS[patient.esiLevel]}>
                                   ESI {patient.esiLevel}
@@ -653,7 +738,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={isOverThreshold(patient, patient.currentStage) ? 'destructive' : 'outline'}>
+                            <Badge variant={isOverThreshold(patient, patient.currentStage) ? "destructive" : "outline"}>
                               {getStageTime(patient)}m
                             </Badge>
                           </TableCell>
@@ -679,10 +764,16 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                             )}
                           </TableCell>
                           <TableCell>
-                            {patient.currentStage === 'awaiting_departure' && (
-                              <Button size="sm" onClick={() => handleEndMonitoring(patient.id)}>
+                            {!isDeparted && patient.currentStage === 'awaiting_departure' && (
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleEndMonitoring(patient.id)}
+                              >
                                 End Monitoring
                               </Button>
+                            )}
+                            {isDeparted && (
+                              <span className="text-gray-400 text-sm">Completed</span>
                             )}
                           </TableCell>
                         </TableRow>
@@ -709,10 +800,12 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                     <Badge variant="outline">{stagePatients.length} patients</Badge>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    {stagePatients.map(patient => (
+                    {stagePatients.map((patient) => (
                       <div key={patient.id} className="p-2 bg-gray-50 rounded text-sm">
                         <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="font-mono text-xs">{patient.id}</Badge>
+                          <Badge variant="outline" className="font-mono text-xs">
+                            {patient.id}
+                          </Badge>
                           <div className="font-medium">{patient.name || 'Not registered'}</div>
                         </div>
                         <div className="text-gray-600">
@@ -745,9 +838,9 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                   </p>
                 </div>
                 <Button 
-                  onClick={fetchFeedback} 
+                  onClick={fetchFeedback}
                   disabled={isLoadingFeedback}
-                  variant="outline" 
+                  variant="outline"
                   size="sm"
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingFeedback ? 'animate-spin' : ''}`} />
@@ -795,7 +888,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
 
                       return (
                         <Card 
-                          key={queueNumber} 
+                          key={queueNumber}
                           className={`border-l-4 transition-all ${
                             hasNewFeedback 
                               ? 'border-l-green-500 bg-green-50 shadow-lg animate-pulse' 
@@ -810,9 +903,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                                     {queueNumber}
                                   </Badge>
                                   {latestFeedback.patient_name && (
-                                    <span className="font-semibold text-lg">
-                                      {latestFeedback.patient_name}
-                                    </span>
+                                    <span className="font-semibold text-lg">{latestFeedback.patient_name}</span>
                                   )}
                                   {hasNewFeedback && (
                                     <Badge className="bg-green-500 text-white animate-bounce">
@@ -842,9 +933,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                               </div>
                               <div className="text-sm text-gray-500">
                                 <p>Latest feedback:</p>
-                                <p className="font-medium">
-                                  {new Date(latestFeedback.submitted_at).toLocaleString()}
-                                </p>
+                                <p className="font-medium">{new Date(latestFeedback.submitted_at).toLocaleString()}</p>
                               </div>
                             </div>
                           </CardHeader>
@@ -855,7 +944,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                                 .map((feedback, index) => {
                                   const satisfactionData = getSatisfactionEmoji(feedback.rating);
                                   const isRead = feedback.is_read || readFeedbackIds.has(feedback.id);
-                                  
+
                                   let bgColor = 'bg-gray-50';
                                   if (feedback.rating <= 2) bgColor = 'bg-red-50';
                                   else if (feedback.rating === 3) bgColor = 'bg-orange-50';
@@ -898,6 +987,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                                           {new Date(feedback.submitted_at).toLocaleString()}
                                         </div>
                                       </div>
+
                                       {feedback.comment && (
                                         <div className="mt-3 p-3 bg-white rounded border border-gray-200">
                                           <p className="text-sm text-gray-700 whitespace-pre-wrap">
@@ -906,6 +996,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                                           </p>
                                         </div>
                                       )}
+
                                       <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
                                         <div className="flex items-center gap-3">
                                           {index === 0 && (
@@ -926,9 +1017,9 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                                             </Badge>
                                           )}
                                         </div>
-                                        <Button 
-                                          variant="ghost" 
-                                          size="sm" 
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
                                           onClick={() => isRead ? markAsUnread(feedback.id) : markAsRead(feedback.id)}
                                           className="h-6 text-xs"
                                         >
@@ -966,11 +1057,11 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  {[1, 2, 3, 4, 5].map(rating => {
+                  {[1, 2, 3, 4, 5].map((rating) => {
                     const count = backendFeedback.filter(f => f.rating === rating).length;
                     const percentage = ((count / backendFeedback.length) * 100).toFixed(1);
                     const satisfactionData = getSatisfactionEmoji(rating);
-                    
+
                     return (
                       <div key={rating} className="text-center p-4 bg-gray-50 rounded-lg">
                         <div className="flex items-center justify-center mb-2">
@@ -1008,7 +1099,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                         const avg = (data.sum / data.count).toFixed(1);
                         const avgRating = Math.round(avg);
                         const emojiData = getSatisfactionEmoji(avgRating);
-                        const color = avg <= 2 ? 'text-red-600' : avg === 3 ? 'text-orange-600' : 'text-green-600';
+                        const color = avg < 2 ? 'text-red-600' : avg < 3 ? 'text-orange-600' : 'text-green-600';
 
                         return (
                           <div key={stage} className="flex justify-between items-center p-3 bg-white rounded border">
@@ -1032,9 +1123,7 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
                 <div className="mt-6">
                   <h3 className="font-semibold mb-3">Overall Satisfaction</h3>
                   <div className="flex items-center justify-center gap-4 p-6 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg">
-                    <span className="text-8xl">
-                      {getSatisfactionEmoji(Math.round(feedbackStats.average)).emoji}
-                    </span>
+                    <span className="text-8xl">{getSatisfactionEmoji(Math.round(feedbackStats.average)).emoji}</span>
                     <div>
                       <p className="text-4xl font-bold text-gray-800">{feedbackStats.average}</p>
                       <p className="text-lg text-gray-600">out of 5.0</p>

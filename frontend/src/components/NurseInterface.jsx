@@ -28,8 +28,6 @@ const STAGE_DISPLAY_NAMES = {
   departed: 'Departed'
 };
 
-// Keep names/usernames exactly as the backend provides.
-// No forced renames, no local fallbacks.
 const normalizeDoctor = (raw) => ({
   username: raw?.username || raw?.user?.username || raw?.id || "",
   name: raw?.name || raw?.user?.name || raw?.full_name || "",
@@ -45,13 +43,32 @@ export function NurseInterface({
   onAdjustStageTime,
   nurseName
 }) {
-  const [availableDoctors, setAvailableDoctors] = useState([]); // ← only DB
+  const [availableDoctors, setAvailableDoctors] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [selectedDoctor, setSelectedDoctor] = useState('');
   const [adjustTimeDialogOpen, setAdjustTimeDialogOpen] = useState(false);
   const [timeAdjustment, setTimeAdjustment] = useState({ hours: 0, minutes: 0 });
 
-  // Load doctors from backend (no local injection)
+  // ✅ Helper function to get patient age
+  const getPatientAge = (patient) => {
+    if (patient.age) return `${patient.age}y`;
+    
+    if (patient.dateOfBirth) {
+      const birthDate = new Date(patient.dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return `${age}y`;
+    }
+    
+    return 'Unknown';
+  };
+
+  // Load doctors from backend
   useEffect(() => {
     const loadDoctors = async () => {
       try {
@@ -61,47 +78,38 @@ export function NurseInterface({
         const normalized = Array.isArray(list) ? list.map(normalizeDoctor) : [];
         setAvailableDoctors(normalized);
       } catch {
-        setAvailableDoctors([]); // if API fails, show none (no fake dr.smith)
+        setAvailableDoctors([]);
       }
     };
     loadDoctors();
   }, []);
 
-  // Auto-refresh from backend so names and stages reflect live data
-  useEffect(() => {
-    const fetchUpdatedPatients = async () => {
-      try {
-        const response = await fetch("http://localhost:5000/api/board");
-        if (!response.ok) throw new Error("Failed to fetch updated patient data");
-        const data = await response.json();
-        if (Array.isArray(data)) onUpdatePatient(null, data);
-      } catch (err) {
-        console.error("❌ Error fetching latest board data:", err);
-      }
-    };
-    fetchUpdatedPatients();
-    const interval = setInterval(fetchUpdatedPatients, 5000);
-    return () => clearInterval(interval);
-  }, [onUpdatePatient]);
-
-  // Auto-assign nurse on first sighting (kept as-is)
+  // Auto-assign nurse on first sighting
   useEffect(() => {
     if (patients && nurseName) {
       patients.forEach((p) => {
-        if (!p.assignedNurse && (p.full_name || p.name)) handleAssignNurse(p);
+        if (!p.assignedNurse && (p.full_name || p.name)) {
+          handleAssignNurse(p);
+        }
       });
     }
   }, [patients, nurseName]);
 
-  const activeEarlyStagePatients = patients
-    .filter(p => p.isActive)
-    // Hide anything after registration phase
-    .filter(p => ![
-      'waiting_doctor','consultation','waiting_admission','waiting_observation','waiting_discharge',
-      'admission_orders','awaiting_non_icu','awaiting_icu','discharge_documents','awaiting_departure','departed'
-    ].includes(p.currentStage));
+  const activeEarlyStagePatients = (patients || [])
+    .filter(p => p.isActive !== false)
+    .filter(p => {
+      const stage = p.currentStage || '';
+      return [
+        'kiosk',
+        'waiting_triage',
+        'triage', 
+        'waiting_registration',
+        'registration',
+        'waiting_doctor'
+      ].includes(stage);
+    });
 
-  const patientsNeedingDoctorAssignment = patients
+  const patientsNeedingDoctorAssignment = (patients || [])
     .filter(p => p.isActive)
     .filter(p => !p.assignedDoctor && ['waiting_doctor', 'consultation'].includes(p.currentStage));
 
@@ -137,7 +145,6 @@ export function NurseInterface({
       } catch (e) {
         console.warn("assign-doctor fallback to local state:", e);
       }
-      // Reflect immediately in UI
       onUpdatePatient(selectedPatient.id, { assignedDoctor: selectedDoctor });
       setSelectedPatient(null);
       setSelectedDoctor('');
@@ -153,7 +160,6 @@ export function NurseInterface({
     const adjustmentMs = (timeAdjustment.hours * 60 + timeAdjustment.minutes) * 60 * 1000;
     const newStart = new Date(new Date(currentStage.startTime).getTime() - adjustmentMs);
 
-    // Try backend; fall back to local handler
     try {
       const res = await fetch("http://localhost:5000/api/board/adjust-stage-time", {
         method: "POST",
@@ -228,95 +234,141 @@ export function NurseInterface({
 
   return (
     <div className="p-6 space-y-6">
-
+      {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><CardContent className="p-4"><Users className="w-5 h-5 text-blue-500 mb-2"/><div className="text-2xl font-bold">{activeEarlyStagePatients.length}</div><p className="text-sm text-gray-600">Active Patients</p></CardContent></Card>
-        <Card><CardContent className="p-4"><UserPlus className="w-5 h-5 text-orange-500 mb-2"/><div className="text-2xl font-bold">{patientsNeedingDoctorAssignment.length}</div><p className="text-sm text-gray-600">Need Doctor Assignment</p></CardContent></Card>
-        <Card><CardContent className="p-4"><Clock className="w-5 h-5 text-green-500 mb-2"/><div className="text-2xl font-bold">{activeEarlyStagePatients.filter((p) => p.currentStage.startsWith('waiting')).length}</div><p className="text-sm text-gray-600">Patients Waiting</p></CardContent></Card>
-        <Card><CardContent className="p-4"><Stethoscope className="w-5 h-5 text-purple-500 mb-2"/><div className="text-2xl font-bold">{patients.filter((p) => p.isActive && p.assignedDoctor).length}</div><p className="text-sm text-gray-600">Assigned to Doctors</p></CardContent></Card>
+        <Card>
+          <CardContent className="p-4">
+            <Users className="w-5 h-5 text-blue-500 mb-2"/>
+            <div className="text-2xl font-bold">{activeEarlyStagePatients.length}</div>
+            <p className="text-sm text-gray-600">Active Patients</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <UserPlus className="w-5 h-5 text-orange-500 mb-2"/>
+            <div className="text-2xl font-bold">{patientsNeedingDoctorAssignment.length}</div>
+            <p className="text-sm text-gray-600">Need Doctor Assignment</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <Clock className="w-5 h-5 text-green-500 mb-2"/>
+            <div className="text-2xl font-bold">
+              {activeEarlyStagePatients.filter((p) => p.currentStage?.startsWith('waiting')).length}
+            </div>
+            <p className="text-sm text-gray-600">Patients Waiting</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <Stethoscope className="w-5 h-5 text-purple-500 mb-2"/>
+            <div className="text-2xl font-bold">
+              {patients.filter((p) => p.isActive && p.assignedDoctor).length}
+            </div>
+            <p className="text-sm text-gray-600">Assigned to Doctors</p>
+          </CardContent>
+        </Card>
       </div>
 
+      {/* Tabs */}
       <Tabs defaultValue="patient-list" className="w-full">
         <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
           <TabsTrigger
             value="patient-list"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
+            className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-[1.05]"
           >
             Patient Management
           </TabsTrigger>
-
           <TabsTrigger
             value="doctor-workload"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
+            className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-[1.05]"
           >
             Doctor Workload
           </TabsTrigger>
-
           <TabsTrigger
             value="doctor-assignment"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
+            className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-[1.05]"
           >
             Doctor Assignment
           </TabsTrigger>
+        </TabsList>
 
-      </TabsList>
-
-
+        {/* Patient Management Tab */}
         <TabsContent value="patient-list" className="mt-6">
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" />Active Patients</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Active Patients
+              </CardTitle>
+            </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {activeEarlyStagePatients.map((patient) => (
-                  <div key={patient.id} className={`p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${getPatientPriorityColor(patient)}`} onClick={() => setSelectedPatient(patient)}>
+                  <div 
+                    key={patient.id} 
+                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${getPatientPriorityColor(patient)}`} 
+                    onClick={() => setSelectedPatient(patient)}
+                  >
                     <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-semibold text-gray-900">{patient.full_name?.trim() ? patient.full_name : patient.name || `Patient ${patient.queue_number || patient.id}`}</div>
-                        <div className="text-sm text-gray-600">Queue: {patient.queue_number || patient.id} • Age: {patient.age || 'N/A'}</div>
+                      <div className="flex-1">
+                        {/* Patient Name */}
+                        <div className="font-semibold text-lg text-gray-900 mb-1">
+                          {patient.full_name?.trim() ? patient.full_name : patient.name || `Patient ${patient.queue_number || patient.id}`}
+                        </div>
+                        
+                        {/* Demographics - Queue, Age, Sex */}
+                        <div className="text-sm text-gray-600 mb-2">
+                          <span className="font-mono font-semibold">Queue: {patient.queue_number || patient.id}</span>
+                          {' • '}
+                          <span>{getPatientAge(patient)}</span>
+                          {patient.sex && (
+                            <>
+                              {' • '}
+                              <span>{patient.sex}</span>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Chief Complaint */}
+                        {patient.chiefComplaint && (
+                          <div className="text-sm text-gray-700 mb-2">
+                            <strong className="text-gray-900">CC:</strong> {patient.chiefComplaint}
+                          </div>
+                        )}
+
+                        {/* Assigned Doctor */}
+                        {patient.assignedDoctor && (
+                          <div className="text-sm text-blue-700 flex items-center gap-1">
+                            <Stethoscope className="w-3 h-3" />
+                            <span>Dr. {patient.assignedDoctor}</span>
+                          </div>
+                        )}
                       </div>
+
+                      {/* Badges */}
                       <div className="flex items-center gap-2">
-                        {patient.esiLevel && (<Badge className={getESIBadgeColor(patient.esiLevel)}>ESI {patient.esiLevel}</Badge>)}
-                        <Badge className={getStageBadgeColor(patient.currentStage)}>{STAGE_DISPLAY_NAMES[patient.currentStage]}</Badge>
+                        {patient.esiLevel && (
+                          <Badge className={getESIBadgeColor(patient.esiLevel)}>
+                            ESI {patient.esiLevel}
+                          </Badge>
+                        )}
+                        <Badge className={getStageBadgeColor(patient.currentStage)}>
+                          {STAGE_DISPLAY_NAMES[patient.currentStage]}
+                        </Badge>
                       </div>
+                    </div>
+
+                    {/* Time Information */}
+                    <div className="flex items-center gap-4 mt-3 text-sm text-gray-600 border-t pt-2">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        Total: {formatTime(getTotalTime(patient))}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Timer className="w-4 h-4" />
+                        Stage: {formatTime(getCurrentStageTime(patient))}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -324,21 +376,69 @@ export function NurseInterface({
             </CardContent>
           </Card>
 
+          {/* Selected Patient Details */}
           {selectedPatient && (
-            <Card className="mt-6">
-              <CardHeader><CardTitle>Patient Details - {selectedPatient.full_name?.trim() ? selectedPatient.full_name : selectedPatient.name || selectedPatient.queue_number || selectedPatient.id}</CardTitle></CardHeader>
-              <CardContent>
-                <p><strong>Queue:</strong> {selectedPatient.queue_number || selectedPatient.id}</p>
-                <p><strong>ESI Level:</strong> {selectedPatient.esiLevel ? `Level ${selectedPatient.esiLevel}` : 'Not assigned'}</p>
-                <p><strong>Total Time:</strong> {formatTime(getTotalTime(selectedPatient))}</p>
+            <Card className="mt-6 border-blue-500">
+              <CardHeader>
+                <CardTitle>
+                  Patient Details - {selectedPatient.full_name?.trim() ? selectedPatient.full_name : selectedPatient.name || selectedPatient.queue_number || selectedPatient.id}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Queue Number</p>
+                    <p className="font-semibold font-mono">{selectedPatient.queue_number || selectedPatient.id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">ESI Level</p>
+                    <p className="font-semibold">
+                      {selectedPatient.esiLevel ? `Level ${selectedPatient.esiLevel}` : 'Not assigned'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Age</p>
+                    <p className="font-semibold">{getPatientAge(selectedPatient)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Sex</p>
+                    <p className="font-semibold">{selectedPatient.sex || 'Unknown'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Total Time</p>
+                    <p className="font-semibold">{formatTime(getTotalTime(selectedPatient))}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Current Stage Time</p>
+                    <p className="font-semibold">{formatTime(getCurrentStageTime(selectedPatient))}</p>
+                  </div>
+                </div>
+                {selectedPatient.chiefComplaint && (
+                  <div>
+                    <p className="text-sm text-gray-600">Chief Complaint</p>
+                    <p className="font-semibold">{selectedPatient.chiefComplaint}</p>
+                  </div>
+                )}
+                {selectedPatient.assignedDoctor && (
+                  <div>
+                    <p className="text-sm text-gray-600">Assigned Doctor</p>
+                    <p className="font-semibold">Dr. {selectedPatient.assignedDoctor}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
         </TabsContent>
 
+        {/* Doctor Workload Tab */}
         <TabsContent value="doctor-workload" className="mt-6">
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Stethoscope className="w-5 h-5" />Doctor Workload Overview</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Stethoscope className="w-5 h-5" />
+                Doctor Workload Overview
+              </CardTitle>
+            </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {availableDoctors.map((doctor) => {
@@ -349,16 +449,23 @@ export function NurseInterface({
                     <Card key={doctor.username} className={`border-2 ${loadStatus.bgColor}`}>
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <div><div className="font-semibold">{doctor.name}</div><div className="text-sm text-gray-600">{doctor.specialty}</div></div>
+                          <div>
+                            <div className="font-semibold">{doctor.name}</div>
+                            <div className="text-sm text-gray-600">{doctor.specialty}</div>
+                          </div>
                           <div className={`text-2xl font-bold ${loadStatus.color}`}>{patientCount}</div>
                         </div>
                         {doctorPatients.map((p) => (
                           <div key={p.id} className="text-sm bg-white/50 p-2 rounded mt-1 flex justify-between">
                             <span>{p.full_name || p.name}</span>
-                            <Badge className={getStageBadgeColor(p.currentStage)} variant="outline">{STAGE_DISPLAY_NAMES[p.currentStage]}</Badge>
+                            <Badge className={getStageBadgeColor(p.currentStage)} variant="outline">
+                              {STAGE_DISPLAY_NAMES[p.currentStage]}
+                            </Badge>
                           </div>
                         ))}
-                        {doctorPatients.length === 0 && (<div className="text-center text-sm text-gray-500 mt-2">No current patients</div>)}
+                        {doctorPatients.length === 0 && (
+                          <div className="text-center text-sm text-gray-500 mt-2">No current patients</div>
+                        )}
                       </CardContent>
                     </Card>
                   );
@@ -368,9 +475,15 @@ export function NurseInterface({
           </Card>
         </TabsContent>
 
+        {/* Doctor Assignment Tab */}
         <TabsContent value="doctor-assignment" className="mt-6">
           <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><UserPlus className="w-5 h-5" />Doctor Assignment</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserPlus className="w-5 h-5" />
+                Doctor Assignment
+              </CardTitle>
+            </CardHeader>
             <CardContent>
               <div className="space-y-6">
                 {patientsNeedingDoctorAssignment.length === 0 ? (
@@ -383,11 +496,17 @@ export function NurseInterface({
                     <div className="space-y-3">
                       <h3 className="font-semibold text-lg">Patients Needing Doctor Assignment</h3>
                       {patientsNeedingDoctorAssignment.map((patient) => (
-                        <div key={patient.id} className="p-4 border-2 rounded-lg cursor-pointer border-orange-300 bg-orange-50 hover:shadow-md" onClick={() => setSelectedPatient(patient)}>
+                        <div 
+                          key={patient.id} 
+                          className="p-4 border-2 rounded-lg cursor-pointer border-orange-300 bg-orange-50 hover:shadow-md" 
+                          onClick={() => setSelectedPatient(patient)}
+                        >
                           <div className="flex items-center justify-between">
                             <div>
                               <div className="font-semibold">{patient.full_name || `Patient ${patient.id}`}</div>
-                              <div className="text-sm text-gray-600">ESI {patient.esiLevel} • Waiting: {getCurrentStageTime(patient)}m</div>
+                              <div className="text-sm text-gray-600">
+                                ESI {patient.esiLevel} • Waiting: {getCurrentStageTime(patient)}m
+                              </div>
                             </div>
                             <Badge className="bg-orange-100 text-orange-800">Needs Assignment</Badge>
                           </div>
@@ -397,9 +516,13 @@ export function NurseInterface({
 
                     {selectedPatient && (
                       <div className="p-4 border border-blue-300 bg-blue-50 rounded-lg">
-                        <h4 className="font-semibold mb-4">Assign Doctor to {selectedPatient.full_name || selectedPatient.id}</h4>
+                        <h4 className="font-semibold mb-4">
+                          Assign Doctor to {selectedPatient.full_name || selectedPatient.id}
+                        </h4>
                         <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
-                          <SelectTrigger><SelectValue placeholder="Choose a doctor" /></SelectTrigger>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choose a doctor" />
+                          </SelectTrigger>
                           <SelectContent>
                             {availableDoctors.map((doctor) => (
                               <SelectItem key={doctor.username} value={doctor.username}>
@@ -409,7 +532,8 @@ export function NurseInterface({
                           </SelectContent>
                         </Select>
                         <Button onClick={handleAssignDoctor} disabled={!selectedDoctor} className="mt-4 w-full">
-                          <ArrowRight className="w-4 h-4 mr-2" />Assign Doctor
+                          <ArrowRight className="w-4 h-4 mr-2" />
+                          Assign Doctor
                         </Button>
                       </div>
                     )}

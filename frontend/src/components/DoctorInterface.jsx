@@ -664,7 +664,7 @@ const completeConsult = async () => {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-3 max-h-[600px] overflow-y-auto">
                     {completedPatients.map((p) => (
                       <div key={p.id} className="p-3 border border-green-200 rounded-lg bg-green-50">
                         <div className="space-y-2">
