@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+// frontend/src/components/DashboardInterface.jsx
+
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -13,49 +15,21 @@ import {
   DialogFooter,
 } from "./ui/dialog";
 import { Input } from "./ui/input";
-import { Edit, Calendar, Clock, X, Search } from "lucide-react@0.487.0";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
-
-// Common ICD-10 codes for Emergency Department
-const ICD_10_CODES = [
-  { code: "A09.9", description: "Gastroenteritis and colitis of unspecified origin" },
-  { code: "B34.9", description: "Viral infection, unspecified" },
-  { code: "E11.9", description: "Type 2 diabetes mellitus without complications" },
-  { code: "G43.909", description: "Migraine, unspecified, not intractable, without status migrainosus" },
-  { code: "I10", description: "Essential (primary) hypertension" },
-  { code: "I21.9", description: "Acute myocardial infarction, unspecified" },
-  { code: "I50.9", description: "Heart failure, unspecified" },
-  { code: "I63.9", description: "Cerebral infarction, unspecified" },
-  { code: "J02.9", description: "Acute pharyngitis, unspecified" },
-  { code: "J06.9", description: "Acute upper respiratory infection, unspecified" },
-  { code: "J18.9", description: "Pneumonia, unspecified organism" },
-  { code: "J44.0", description: "Chronic obstructive pulmonary disease with acute lower respiratory infection" },
-  { code: "J44.1", description: "Chronic obstructive pulmonary disease with acute exacerbation" },
-  { code: "J45.901", description: "Unspecified asthma with acute exacerbation" },
-  { code: "K21.9", description: "Gastro-esophageal reflux disease without esophagitis" },
-  { code: "K52.9", description: "Noninfective gastroenteritis and colitis, unspecified" },
-  { code: "K80.20", description: "Calculus of gallbladder without cholecystitis without obstruction" },
-  { code: "M25.561", description: "Pain in right knee" },
-  { code: "M54.5", description: "Low back pain" },
-  { code: "N39.0", description: "Urinary tract infection, site not specified" },
-  { code: "R05.9", description: "Cough, unspecified" },
-  { code: "R06.02", description: "Shortness of breath" },
-  { code: "R07.9", description: "Chest pain, unspecified" },
-  { code: "R10.9", description: "Unspecified abdominal pain" },
-  { code: "R11.0", description: "Nausea" },
-  { code: "R11.2", description: "Nausea with vomiting, unspecified" },
-  { code: "R42", description: "Dizziness and giddiness" },
-  { code: "R50.9", description: "Fever, unspecified" },
-  { code: "R51.9", description: "Headache, unspecified" },
-  { code: "R55", description: "Syncope and collapse" },
-  { code: "S06.0X0A", description: "Concussion without loss of consciousness, initial encounter" },
-  { code: "S42.001A", description: "Fracture of unspecified part of right clavicle, initial encounter" },
-  { code: "S52.501A", description: "Unspecified fracture of the lower end of right radius, initial" },
-  { code: "S72.001A", description: "Fracture of unspecified part of neck of right femur, initial" },
-  { code: "S82.001A", description: "Unspecified fracture of right patella, initial encounter" },
-  { code: "T14.90", description: "Injury, unspecified" },
-  { code: "T78.40XA", description: "Allergy, unspecified, initial encounter" },
-];
+import { Edit, Calendar, Clock, X, Search } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 
 const STAGE_LABELS = {
   waiting_triage: 'Waiting for Triage',
@@ -79,34 +53,38 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
   const initialStart = initialIsDay ? '07:00' : '19:00';
   const initialEnd = initialIsDay ? '15:00' : '07:00';
 
-  const [shiftStart, setShiftStart] = useState(initialStart); // 'HH:MM'
-  const [shiftEnd, setShiftEnd] = useState(initialEnd); // 'HH:MM'
+  const [shiftStart, setShiftStart] = useState(initialStart); // "HH:MM"
+  const [shiftEnd, setShiftEnd] = useState(initialEnd); // "HH:MM"
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [tempStart, setTempStart] = useState(shiftStart);
   const [tempEnd, setTempEnd] = useState(shiftEnd);
+
   // Filters - Date and Time Ranges
-  const [fromDate, setFromDate] = useState(null); // 'YYYY-MM-DD'
-  const [toDate, setToDate] = useState(null); // 'YYYY-MM-DD'
-  const [fromTime, setFromTime] = useState(null); // 'HH:MM'
-  const [toTime, setToTime] = useState(null); // 'HH:MM'
+  const [fromDate, setFromDate] = useState(null); // YYYY-MM-DD
+  const [toDate, setToDate] = useState(null); // YYYY-MM-DD
+  const [fromTime, setFromTime] = useState(null); // HH:MM
+  const [toTime, setToTime] = useState(null); // HH:MM
   const [isDateDialogOpen, setIsDateDialogOpen] = useState(false);
   const [isTimeDialogOpen, setIsTimeDialogOpen] = useState(false);
   const [tempFromDate, setTempFromDate] = useState('');
   const [tempToDate, setTempToDate] = useState('');
   const [tempFromTime, setTempFromTime] = useState('');
   const [tempToTime, setTempToTime] = useState('');
-  
-  // ICD-10 search states
-  const [icdSearchTerm, setIcdSearchTerm] = useState("");
+
+  // ICD-10 states
+  const [icdSearchTerm, setIcdSearchTerm] = useState('');
   const [showIcdDropdown, setShowIcdDropdown] = useState(false);
+  const [icd10Codes, setIcd10Codes] = useState([]);
+  const [icd10SearchResults, setIcd10SearchResults] = useState([]);
+  const [isLoadingIcd10, setIsLoadingIcd10] = useState(false);
 
   const formatShiftCode = (s, e) => `${s.replace(':', '')}H-${e.replace(':', '')}H`;
   const shiftTime = formatShiftCode(shiftStart, shiftEnd);
 
-  const isDayShift = (() => {
+  const isDayShift = () => {
     const sHour = parseInt(shiftStart.slice(0, 2), 10);
     return sHour >= 7 && sHour < 19;
-  })();
+  };
 
   const isNowInShift = (s, e, nowDate) => {
     const [sH, sM] = s.split(':').map(Number);
@@ -114,25 +92,99 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
     const startMinutes = sH * 60 + sM;
     const endMinutes = eH * 60 + eM;
     const nowMinutes = nowDate.getHours() * 60 + nowDate.getMinutes();
-
-    if (startMinutes <= endMinutes) {
+    if (startMinutes < endMinutes) {
       return nowMinutes >= startMinutes && nowMinutes < endMinutes;
     }
-    // overnight shift
     return nowMinutes >= startMinutes || nowMinutes < endMinutes;
   };
 
-  // Filter ICD codes based on search term
-  const filteredIcdCodes = ICD_10_CODES.filter((icd) => {
-    const searchLower = icdSearchTerm.toLowerCase();
-    return (
-      icd.code.toLowerCase().includes(searchLower) ||
-      icd.description.toLowerCase().includes(searchLower)
-    );
-  });
+// Load common ICD-10 codes from hybrid API (database + online)
+// Load common ICD-10 codes from hybrid API (database + online)
+useEffect(() => {
+  const fetchCommonCodes = async () => {
+    setIsLoadingIcd10(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/icd10/common?limit=100');
+      const data = await response.json();
+      
+      console.log('🔍 Raw API Response:', data);
+      
+      // Extract database codes (Your ED Data)
+      const dbCodes = (data.database?.codes || []).map(c => ({
+        ...c,
+        source: 'database'
+      }));
+      
+      // Extract online codes (National Research)
+      const onlineCodes = (data.online?.codes || []).map(c => ({
+        ...c,
+        source: 'online'
+      }));
+      
+      console.log('📊 Database codes:', dbCodes);
+      console.log('🌐 Online codes BEFORE filter:', onlineCodes);
+      
+      // ✅ Create a Set of database code IDs to filter out duplicates
+      const dbCodeSet = new Set(dbCodes.map(c => c.code));
+      console.log('🔑 Database code set:', Array.from(dbCodeSet));
+      
+      // ✅ Filter online codes - remove any that exist in database
+      const filteredOnlineCodes = onlineCodes.filter(c => !dbCodeSet.has(c.code));
+      console.log('🌐 Online codes AFTER filter:', filteredOnlineCodes);
+      
+      // Combine both arrays (database codes stay separate from online)
+      const allCodes = [...dbCodes, ...filteredOnlineCodes];
+      
+      console.log('✅ Final processed codes:', {
+        database: dbCodes.length,
+        online: filteredOnlineCodes.length,
+        total: allCodes.length,
+        allCodes: allCodes
+      });
+      
+      setIcd10Codes(allCodes);
+    } catch (error) {
+      console.error('Failed to load ICD-10 codes:', error);
+      setIcd10Codes([]);
+    } finally {
+      setIsLoadingIcd10(false);
+    }
+  };
+  
+  fetchCommonCodes();
+}, []);
+
+
+  // Search ICD-10 codes from API with debounce
+  useEffect(() => {
+    if (!icdSearchTerm || icdSearchTerm.length < 2) {
+      setIcd10SearchResults([]);
+      return;
+    }
+
+    const searchTimeout = setTimeout(async () => {
+      setIsLoadingIcd10(true);
+      try {
+        const response = await fetch(`http://localhost:5000/api/icd10/search?q=${encodeURIComponent(icdSearchTerm)}`);
+        const data = await response.json();
+        setIcd10SearchResults(data.map(item => ({
+          code: item.code,
+          description: item.shortDesc || item.longDesc
+        })));
+      } catch (error) {
+        console.error('ICD-10 search failed:', error);
+        setIcd10SearchResults([]);
+      } finally {
+        setIsLoadingIcd10(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(searchTimeout);
+  }, [icdSearchTerm]);
+
+  const displayedCodes = icdSearchTerm.length >= 2 ? icd10SearchResults : icd10Codes;
 
   const analytics = useMemo(() => {
-    // Apply optional filters (date/time) before computing analytics
     const basePatients = patients.filter(p => {
       if (fromDate) {
         const pDate = p.arrivalTime.toISOString().slice(0, 10);
@@ -160,9 +212,8 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
     const activePatients = basePatients.filter(p => p.isActive && p.currentStage !== 'departed');
     const completedPatients = basePatients.filter(p => !p.isActive || p.currentStage === 'departed');
 
-    // Current shift patients
     const computeShiftStartDate = (start, nowDate) => {
-      const [sH, sM] = start.split(":").map(Number);
+      const [sH, sM] = start.split(':').map(Number);
       const sd = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate(), sH, sM, 0);
       if (sd > nowDate) sd.setDate(sd.getDate() - 1);
       return sd;
@@ -171,22 +222,19 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
     const shiftStartDate = computeShiftStartDate(shiftStart, now);
     const currentShiftPatients = patients.filter(p => p.arrivalTime >= shiftStartDate);
 
-    // Stage counts
     const stageCounts = Object.keys(STAGE_LABELS).map(stage => ({
       stage: STAGE_LABELS[stage],
       count: activePatients.filter(p => p.currentStage === stage).length
     }));
 
-    // Average times
     const avgTotalTime = completedPatients.length > 0
       ? Math.round(completedPatients.reduce((sum, p) => sum + getTotalTime(p), 0) / completedPatients.length)
       : 0;
 
-    // Hourly distribution
     const hourlyData = Array.from({ length: 24 }, (_, hour) => {
       const hourPatients = basePatients.filter(p => p.arrivalTime.getHours() === hour);
       return {
-        hour: `${hour.toString().padStart(2, '0')}:00`,
+        hour: hour.toString().padStart(2, '0') + ':00',
         patients: hourPatients.length,
         avgWaitTime: hourPatients.length > 0
           ? Math.round(hourPatients.reduce((sum, p) => sum + getTotalTime(p), 0) / hourPatients.length)
@@ -194,7 +242,6 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
       };
     });
 
-    // Disposition breakdown
     const dispositions = completedPatients.reduce((acc, patient) => {
       const disp = patient.disposition || 'Unknown';
       acc[disp] = (acc[disp] || 0) + 1;
@@ -203,17 +250,14 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
 
     const dispositionData = Object.entries(dispositions).map(([name, value]) => ({ name, value }));
 
-    // Age and sex breakdown
     const demographics = completedPatients.reduce((acc, patient) => {
-      const ageGroup = patient.age ?
-        (patient.age < 18 ? 'Pediatric' : 'Adult') : 'Unknown';
+      const ageGroup = patient.age ? (patient.age < 18 ? 'Pediatric' : 'Adult') : 'Unknown';
       const sex = patient.sex || 'Unknown';
       const key = `${ageGroup} ${sex}`;
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {});
 
-    // Top 10 diagnoses
     const diagnosisCount = completedPatients.reduce((acc, patient) => {
       if (patient.diagnosis) {
         const diag = patient.diagnosis.trim();
@@ -242,168 +286,95 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
       totalObservations: completedPatients.filter(p => p.disposition === 'Observation').length,
       top10Diagnoses
     };
-  }, [patients, getTotalTime, shiftStart, shiftEnd, now]);
+  }, [patients, getTotalTime, shiftStart, shiftEnd, now, fromDate, toDate, fromTime, toTime]);
 
   return (
-
     <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Badge className="bg-blue-100 text-blue-800 border border-blue-300 text-lg px-4 py-2">
             {(() => {
               const formatTime = (t) => {
-                const [hoursStr, minutes] = t.split(":");
+                const [hoursStr, minutes] = t.split(':');
                 const hours = parseInt(hoursStr, 10);
-                const suffix = hours >= 12 ? "PM" : "AM";
+                const suffix = hours >= 12 ? 'PM' : 'AM';
                 const formattedHour = hours % 12 || 12;
                 return `${formattedHour}:${minutes} ${suffix}`;
               };
               return `${formatTime(shiftStart)} – ${formatTime(shiftEnd)}`;
             })()}
           </Badge>
-
           <Badge
-            className={`text-lg px-4 py-2 ${isDayShift
-                ? "bg-yellow-100 text-yellow-800 border border-yellow-300"
-                : "bg-indigo-100 text-indigo-800 border border-indigo-300"
-              }`}
+            className={`text-lg px-4 py-2 ${
+              isDayShift()
+                ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                : 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+            }`}
           >
-            {isDayShift ? "Day Shift" : "Night Shift"}
+            {isDayShift() ? 'Day Shift' : 'Night Shift'}
           </Badge>
-
-          <div>
-            <Dialog open={isDialogOpen} onOpenChange={(v) => { setIsDialogOpen(v); if (v) { setTempStart(shiftStart); setTempEnd(shiftEnd); } }}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="ml-2">
-                  <Edit className="w-4 h-4 mr-2" /> Edit
-                </Button>
-              </DialogTrigger>
-
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Edit Shift Time</DialogTitle>
-                  <DialogDescription>
-                    <div>Day interval: 07:00 AM – 03:59 PM</div>
-                    <div>Night interval: 04:00 PM – 06:59 AM</div>
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="grid gap-2">
-                  <label className="text-sm">Start</label>
-                  <Input type="time" value={tempStart} onChange={(e) => setTempStart(e.target.value)} />
-                  <label className="text-sm">End</label>
-                  <Input type="time" value={tempEnd} onChange={(e) => setTempEnd(e.target.value)} />
-                </div>
-
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={() => { setShiftStart(tempStart || initialStart); setShiftEnd(tempEnd || initialEnd); setIsDialogOpen(false); }}>Save</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
         </div>
+
+        <Dialog open={isDialogOpen} onOpenChange={(v) => {
+          setIsDialogOpen(v);
+          if (v) {
+            setTempStart(shiftStart);
+            setTempEnd(shiftEnd);
+          }
+        }}>
+          <DialogTrigger asChild>
+            <Button variant="ghost" size="sm" className="ml-2">
+              <Edit className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Shift Time</DialogTitle>
+              <DialogDescription>
+                <div>Day interval: 07:00 AM – 03:59 PM</div>
+                <div>Night interval: 04:00 PM – 06:59 AM</div>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-2">
+              <label className="text-sm">Start</label>
+              <Input type="time" value={tempStart} onChange={(e) => setTempStart(e.target.value)} />
+              <label className="text-sm">End</label>
+              <Input type="time" value={tempEnd} onChange={(e) => setTempEnd(e.target.value)} />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+              <Button onClick={() => {
+                setShiftStart(tempStart || initialStart);
+                setShiftEnd(tempEnd || initialEnd);
+                setIsDialogOpen(false);
+              }}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
+      {/* Tabs */}
       <Tabs defaultValue="realtime" className="w-full">
         <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
-          <TabsTrigger
-            value="realtime"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
+          <TabsTrigger value="realtime" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Real-time Data
           </TabsTrigger>
 
-          <TabsTrigger
-            value="analytics"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
+          <TabsTrigger value="analytics" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Waiting Time Analytics
           </TabsTrigger>
 
-          <TabsTrigger
-            value="trends"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
+          <TabsTrigger value="trends" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Trends
           </TabsTrigger>
 
-          <TabsTrigger
-            value="census"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
+          <TabsTrigger value="census" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             Census
           </TabsTrigger>
-          
-          <TabsTrigger
-            value="diagnosis"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
+
+          <TabsTrigger value="diagnosis" className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-gray-800 data-[state=active]:!bg-blue-100 dark:data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 dark:data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 dark:data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-1.05">
             <Search className="w-4 h-4" />
             ICD-10 Codes
           </TabsTrigger>
@@ -411,173 +382,130 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
 
         {/* Centered filters below the tab buttons */}
         <div className="flex items-center justify-center gap-3 mt-3">
-          <Dialog open={isDateDialogOpen} onOpenChange={(v) => { 
-            setIsDateDialogOpen(v); 
-            if (v) { 
-              setTempFromDate(fromDate || ''); 
+          {/* Date Range Filter Dialog */}
+          <Dialog open={isDateDialogOpen} onOpenChange={(v) => {
+            setIsDateDialogOpen(v);
+            if (v) {
+              setTempFromDate(fromDate || '');
               setTempToDate(toDate || '');
-            } 
-          }}> 
+            }
+          }}>
             <DialogTrigger asChild>
-              <Button 
-                variant={(fromDate || toDate) ? 'secondary' : 'outline'} 
-                size="sm" 
-                className="flex items-center"
-              >
+              <Button variant={fromDate || toDate ? "secondary" : "outline"} size="sm" className="flex items-center">
                 <Calendar className="w-4 h-4 mr-2" />
                 {fromDate || toDate ? (
-                  <span>
-                    {fromDate || '...'} → {toDate || '...'}
-                  </span>
+                  <span>{fromDate || '...'} → {toDate || '...'}</span>
                 ) : (
                   'Filter by Date Range'
                 )}
               </Button>
             </DialogTrigger>
-
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Filter by Date Range</DialogTitle>
                 <DialogDescription>Select date range to filter analytics (from - to).</DialogDescription>
               </DialogHeader>
-
               <div className="grid gap-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">From Date</label>
-                  <Input 
-                    type="date" 
-                    value={tempFromDate} 
-                    onChange={(e) => setTempFromDate(e.target.value)} 
-                  />
+                  <Input type="date" value={tempFromDate} onChange={(e) => setTempFromDate(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">To Date</label>
-                  <Input 
-                    type="date" 
-                    value={tempToDate} 
-                    onChange={(e) => setTempToDate(e.target.value)} 
-                  />
+                  <Input type="date" value={tempToDate} onChange={(e) => setTempToDate(e.target.value)} />
                 </div>
               </div>
-
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsDateDialogOpen(false)}>Cancel</Button>
-                <Button 
-                  variant="destructive" 
-                  onClick={() => { 
-                    setFromDate(null); 
-                    setToDate(null);
-                    setTempFromDate(''); 
-                    setTempToDate('');
-                    setIsDateDialogOpen(false); 
-                  }}
-                >
-                  Clear
-                </Button>
-                <Button onClick={() => { 
-                  setFromDate(tempFromDate || null); 
+                <Button variant="destructive" onClick={() => {
+                  setFromDate(null);
+                  setToDate(null);
+                  setTempFromDate('');
+                  setTempToDate('');
+                  setIsDateDialogOpen(false);
+                }}>Clear</Button>
+                <Button onClick={() => {
+                  setFromDate(tempFromDate || null);
                   setToDate(tempToDate || null);
-                  setIsDateDialogOpen(false); 
-                }}>
-                  Apply
-                </Button>
+                  setIsDateDialogOpen(false);
+                }}>Apply</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isTimeDialogOpen} onOpenChange={(v) => { 
-            setIsTimeDialogOpen(v); 
-            if (v) { 
-              setTempFromTime(fromTime || ''); 
+          {/* Time Range Filter Dialog */}
+          <Dialog open={isTimeDialogOpen} onOpenChange={(v) => {
+            setIsTimeDialogOpen(v);
+            if (v) {
+              setTempFromTime(fromTime || '');
               setTempToTime(toTime || '');
-            } 
+            }
           }}>
             <DialogTrigger asChild>
-              <Button 
-                variant={(fromTime || toTime) ? 'secondary' : 'outline'} 
-                size="sm" 
-                className="flex items-center"
-              >
+              <Button variant={fromTime || toTime ? "secondary" : "outline"} size="sm" className="flex items-center">
                 <Clock className="w-4 h-4 mr-2" />
                 {fromTime || toTime ? (
-                  <span>
-                    {fromTime || '...'} → {toTime || '...'}
-                  </span>
+                  <span>{fromTime || '...'} → {toTime || '...'}</span>
                 ) : (
                   'Filter by Time Range'
                 )}
               </Button>
             </DialogTrigger>
-
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Filter by Time Range</DialogTitle>
                 <DialogDescription>Select time range (HH:MM) to filter analytics by arrival time (from - to).</DialogDescription>
               </DialogHeader>
-
               <div className="grid gap-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">From Time</label>
-                  <Input 
-                    type="time" 
-                    value={tempFromTime} 
-                    onChange={(e) => setTempFromTime(e.target.value)} 
-                  />
+                  <Input type="time" value={tempFromTime} onChange={(e) => setTempFromTime(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-2 block">To Time</label>
-                  <Input 
-                    type="time" 
-                    value={tempToTime} 
-                    onChange={(e) => setTempToTime(e.target.value)} 
-                  />
+                  <Input type="time" value={tempToTime} onChange={(e) => setTempToTime(e.target.value)} />
                 </div>
               </div>
-
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsTimeDialogOpen(false)}>Cancel</Button>
-                <Button 
-                  variant="destructive" 
-                  onClick={() => { 
-                    setFromTime(null); 
-                    setToTime(null);
-                    setTempFromTime(''); 
-                    setTempToTime('');
-                    setIsTimeDialogOpen(false); 
-                  }}
-                >
-                  Clear
-                </Button>
-                <Button onClick={() => { 
-                  setFromTime(tempFromTime || null); 
+                <Button variant="destructive" onClick={() => {
+                  setFromTime(null);
+                  setToTime(null);
+                  setTempFromTime('');
+                  setTempToTime('');
+                  setIsTimeDialogOpen(false);
+                }}>Clear</Button>
+                <Button onClick={() => {
+                  setFromTime(tempFromTime || null);
                   setToTime(tempToTime || null);
-                  setIsTimeDialogOpen(false); 
-                }}>
-                  Apply
-                </Button>
+                  setIsTimeDialogOpen(false);
+                }}>Apply</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
 
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="flex items-center" 
-            onClick={() => { 
-              setFromDate(null); 
+          {/* Clear All Filters Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex items-center"
+            onClick={() => {
+              setFromDate(null);
               setToDate(null);
-              setFromTime(null); 
+              setFromTime(null);
               setToTime(null);
-              setTempFromDate(''); 
+              setTempFromDate('');
               setTempToDate('');
-              setTempFromTime(''); 
+              setTempFromTime('');
               setTempToTime('');
             }}
           >
-            <X className="w-4 h-4 mr-2" /> Clear All Filters
+            <X className="w-4 h-4 mr-2" />
+            Clear All Filters
           </Button>
         </div>
 
+        {/* Real-time Tab */}
         <TabsContent value="realtime" className="space-y-6">
           {/* Key Metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -618,13 +546,7 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={analytics.stageCounts}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="stage"
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
-                    fontSize={12}
-                  />
+                  <XAxis dataKey="stage" angle={-45} textAnchor="end" height={100} fontSize={12} />
                   <YAxis />
                   <Tooltip />
                   <Bar dataKey="count" fill="#8884d8" />
@@ -634,6 +556,7 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
           </Card>
         </TabsContent>
 
+        {/* Analytics Tab */}
         <TabsContent value="analytics" className="space-y-6">
           <Card>
             <CardHeader>
@@ -660,13 +583,10 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
               </CardHeader>
               <CardContent className="space-y-3">
                 {Object.entries(STAGE_LABELS).map(([stage, label]) => {
-                  const stagePatients = patients.filter(p =>
-                    p.stageHistory.some(h => h.stage === stage)
-                  );
+                  const stagePatients = patients.filter(p => p.stageHistory.some(h => h.stage === stage));
                   const avgTime = stagePatients.length > 0
                     ? Math.round(stagePatients.reduce((sum, p) => sum + getStageTime(p, stage), 0) / stagePatients.length)
                     : 0;
-
                   return (
                     <div key={stage} className="flex justify-between items-center">
                       <span className="text-sm">{label}</span>
@@ -697,6 +617,7 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
           </div>
         </TabsContent>
 
+        {/* Trends Tab */}
         <TabsContent value="trends" className="space-y-6">
           <Card>
             <CardHeader>
@@ -716,6 +637,7 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
           </Card>
         </TabsContent>
 
+        {/* Census Tab */}
         <TabsContent value="census" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
@@ -747,27 +669,16 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
           {/* Top 10 Diagnosed Diseases */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                🏥 Top 10 Diagnosed Diseases
-              </CardTitle>
+              <CardTitle className="flex items-center gap-2">Top 10 Diagnosed Diseases</CardTitle>
             </CardHeader>
             <CardContent>
               {analytics.top10Diagnoses.length > 0 ? (
                 <div className="space-y-4">
                   <ResponsiveContainer width="100%" height={400}>
-                    <BarChart 
-                      data={analytics.top10Diagnoses} 
-                      layout="vertical"
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
+                    <BarChart data={analytics.top10Diagnoses} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" />
-                      <YAxis 
-                        type="category" 
-                        dataKey="diagnosis" 
-                        width={200}
-                        tick={{ fontSize: 12 }}
-                      />
+                      <YAxis type="category" dataKey="diagnosis" width={200} tick={{ fontSize: 12 }} />
                       <Tooltip />
                       <Bar dataKey="count" fill="#8884d8" />
                     </BarChart>
@@ -775,7 +686,7 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
 
                   {/* Detailed List */}
                   <div className="mt-6">
-                    <h4 className="font-semibold text-gray-700 mb-3">Detailed Breakdown:</h4>
+                    <h4 className="font-semibold text-gray-700 mb-3">Detailed Breakdown</h4>
                     <div className="grid grid-cols-1 gap-3">
                       {analytics.top10Diagnoses.map((item, index) => (
                         <div
@@ -783,19 +694,22 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
                           className="flex items-center justify-between p-4 border rounded-lg hover:bg-blue-50 transition-colors"
                         >
                           <div className="flex items-center gap-3 flex-1">
-                            <Badge 
-                              className={`
-                                ${index === 0 ? 'bg-yellow-500 text-white' : ''}
-                                ${index === 1 ? 'bg-gray-400 text-white' : ''}
-                                ${index === 2 ? 'bg-orange-600 text-white' : ''}
-                                ${index > 2 ? 'bg-blue-600 text-white' : ''}
-                              `}
+                            <Badge
+                              className={
+                                index === 0
+                                  ? 'bg-yellow-500 text-white'
+                                  : index === 1
+                                  ? 'bg-gray-400 text-white'
+                                  : index === 2
+                                  ? 'bg-orange-600 text-white'
+                                  : index <= 2
+                                  ? 'bg-blue-600 text-white'
+                                  : ''
+                              }
                             >
-                              #{index + 1}
+                              {index + 1}
                             </Badge>
-                            <span className="text-sm font-medium text-gray-800 flex-1">
-                              {item.diagnosis}
-                            </span>
+                            <span className="text-sm font-medium text-gray-800 flex-1">{item.diagnosis}</span>
                           </div>
                           <div className="flex items-center gap-3">
                             <Badge variant="outline" className="text-base font-semibold">
@@ -834,7 +748,7 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
@@ -864,16 +778,38 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
             </Card>
           </div>
         </TabsContent>
-        
+
+        {/* ICD-10 Codes Tab */}
         <TabsContent value="diagnosis" className="space-y-6">
           {/* ICD-10 Code Searchable Reference */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="w-5 h-5" />
-                ICD-10 Code Reference Guide
-              </CardTitle>
-            </CardHeader>
+<CardHeader>
+  <div className="flex items-center justify-between">
+    <CardTitle className="flex items-center gap-2">
+      <Search className="w-5 h-5" />
+      ICD-10 Code Reference Guide
+    </CardTitle>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={async () => {
+        setIsLoadingIcd10(true);
+        try {
+          const response = await fetch('http://localhost:5000/api/icd10/common?limit=100&refresh=true');
+          const data = await response.json();
+          const dbCodes = data.database?.codes || [];
+          const onlineCodes = data.online?.codes || [];
+          setIcd10Codes([...dbCodes, ...onlineCodes]);
+        } finally {
+          setIsLoadingIcd10(false);
+        }
+      }}
+    >
+      🔄 Refresh Data
+    </Button>
+  </div>
+</CardHeader>
+
             <CardContent>
               <div className="space-y-4">
                 {/* Search Input */}
@@ -890,88 +826,271 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
                     onFocus={() => setShowIcdDropdown(true)}
                     className="pl-12 text-base py-6"
                   />
-                </div>
-
-                {/* Results Display */}
-                <div className="mt-4">
-                  {icdSearchTerm === "" ? (
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4 text-gray-700">
-                        Common ED ICD-10 Codes ({ICD_10_CODES.length} total)
-                      </h3>
-                      <div className="grid grid-cols-1 gap-3 max-h-[600px] overflow-y-auto">
-                        {ICD_10_CODES.map((icd, index) => (
-                          <div
-                            key={index}
-                            className="p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
-                          >
-                            <div className="flex items-start gap-4">
-                              <Badge variant="outline" className="shrink-0 font-mono text-sm px-3 py-1">
-                                {icd.code}
-                              </Badge>
-                              <p className="text-sm text-gray-700 flex-1">{icd.description}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : filteredIcdCodes.length > 0 ? (
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4 text-gray-700">
-                        Search Results ({filteredIcdCodes.length} found)
-                      </h3>
-                      <div className="grid grid-cols-1 gap-3 max-h-[600px] overflow-y-auto">
-                        {filteredIcdCodes.map((icd, index) => (
-                          <div
-                            key={index}
-                            className="p-4 border-2 border-blue-300 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors"
-                          >
-                            <div className="flex items-start gap-4">
-                              <Badge className="shrink-0 font-mono text-sm px-3 py-1 bg-blue-600 text-white">
-                                {icd.code}
-                              </Badge>
-                              <p className="text-sm text-gray-800 flex-1 font-medium">{icd.description}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <p className="text-gray-500 text-lg">No matching ICD-10 codes found</p>
-                      <p className="text-gray-400 text-sm mt-2">Try a different search term</p>
+                  {isLoadingIcd10 && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   )}
                 </div>
+
+{/* Results Display */}
+<div className="mt-4">
+  {!icdSearchTerm ? (
+    /* Show tabs when NOT searching */
+    <Tabs defaultValue="online" className="w-full">
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="database">
+          📊 Your ED Data
+        </TabsTrigger>
+        <TabsTrigger value="online">
+          🌐 Research-Based (National)
+        </TabsTrigger>
+      </TabsList>
+
+      {/* Your ED Data Tab */}
+      <TabsContent value="database" className="mt-4">
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <span className="font-semibold text-blue-900">
+            📊 Live Data from Your ED
+          </span>
+        </div>
+        
+        {isLoadingIcd10 ? (
+          <div className="text-center py-12">
+            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500 text-lg">Loading your ED data...</p>
+          </div>
+        ) : icd10Codes.filter(c => c.source === 'database').length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">No encounter data yet</p>
+            <p className="text-gray-400 text-sm mt-2">
+              Data will appear once doctors assign ICD-10 codes to patient encounters
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 max-h-[600px] overflow-y-auto">
+            {icd10Codes.filter(c => c.source === 'database').map((icd, index) => (
+              <div
+                key={`db-${icd.code}-${index}`}
+                className="p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 hover:shadow-md"
+              >
+                <div className="flex items-start gap-4">
+                  {icd.rank && (
+                    <Badge className={`shrink-0 font-bold text-xs px-2 py-1 ${
+                      icd.rank === 1 ? 'bg-yellow-500 text-white' :
+                      icd.rank === 2 ? 'bg-gray-400 text-white' :
+                      icd.rank === 3 ? 'bg-orange-600 text-white' :
+                      'bg-blue-600 text-white'
+                    }`}>
+                      #{icd.rank}
+                    </Badge>
+                  )}
+                  
+                  <Badge variant="outline" className="shrink-0 font-mono text-sm px-3 py-1 border-blue-400">
+                    {icd.code}
+                  </Badge>
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-700 font-medium mb-2">{icd.description}</p>
+                    
+{icd.count && (
+  <div className="space-y-1">
+    <div className="flex items-center justify-between text-xs">
+      <span className="text-gray-600">{icd.count} encounters in your ED</span>
+      <span className="font-bold text-blue-700">{icd.percentage}%</span>
+    </div>
+    <div style={{ width: '100%', height: '12px', backgroundColor: '#e5e7eb', borderRadius: '9999px', overflow: 'hidden' }}>
+      <div 
+        style={{ 
+          height: '100%', 
+          background: 'linear-gradient(to right, #2563eb, #3b82f6)',
+          borderRadius: '9999px',
+          width: `${icd.percentage}%`,
+          transition: 'width 0.5s ease'
+        }}
+      />
+    </div>
+  </div>
+)}
+
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </TabsContent>
+
+{/* Research-Based (National) Tab */}
+<TabsContent value="online" className="mt-4">
+  <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+    <span className="font-semibold text-green-900">
+      🌐 National ED Statistics (based on clinicaltables.nlm.nih.gov)
+    </span>
+  </div>
+  
+  <h3 className="text-lg font-semibold mb-4 text-gray-700">
+    Common ED ICD-10 Codes ({icd10Codes.filter(c => c.source === 'online').length} loaded)
+  </h3>
+  
+  {isLoadingIcd10 && icd10Codes.filter(c => c.source === 'online').length === 0 ? (
+    <div className="text-center py-12">
+      <div className="w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+      <p className="text-gray-500 text-lg">Loading research codes...</p>
+    </div>
+  ) : icd10Codes.filter(c => c.source === 'online').length === 0 ? (
+    <div className="text-center py-12">
+      <p className="text-gray-500 text-lg">No research codes available</p>
+    </div>
+  ) : (
+    <div className="grid grid-cols-1 gap-3 max-h-[600px] overflow-y-auto">
+{icd10Codes.filter(c => c.source === 'online').map((icd, index) => (
+  <div
+    key={`${icd.code}-${index}`}
+    className="p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-all duration-200 hover:shadow-md"
+  >
+    <div className="flex items-start gap-4">
+      {icd.rank && (
+        <Badge className={`shrink-0 font-bold text-xs px-2 py-1 ${
+          icd.rank === 1 ? 'bg-yellow-500 text-white' :
+          icd.rank === 2 ? 'bg-gray-400 text-white' :
+          icd.rank === 3 ? 'bg-orange-600 text-white' :
+          icd.rank <= 10 ? 'bg-green-600 text-white' :
+          'bg-gray-300 text-gray-700'
+        }`}>
+          #{icd.rank}
+        </Badge>
+      )}
+      
+      <Badge variant="outline" className="shrink-0 font-mono text-sm px-3 py-1 border-green-400">
+        {icd.code}
+      </Badge>
+      
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-gray-700 font-medium mb-2">{icd.description}</p>
+        
+        {/* ✅ PROGRESS BAR - FULL WORKING VERSION */}
+{icd.percentage && (
+  <div className="space-y-1">
+    <div className="flex items-center justify-between text-xs">
+      <span className="text-gray-600">National frequency</span>
+      <span className="font-bold text-green-700">{icd.percentage}%</span>
+    </div>
+    <div style={{ width: '100%', height: '12px', backgroundColor: '#e5e7eb', borderRadius: '9999px', overflow: 'hidden' }}>
+      <div 
+        style={{ 
+          height: '100%', 
+          background: 'linear-gradient(to right, #059669, #10b981)',
+          borderRadius: '9999px',
+          width: `${icd.percentage}%`,
+          transition: 'width 0.5s ease'
+        }}
+      />
+    </div>
+  </div>
+)}
+
+      </div>
+    </div>
+  </div>
+))}
+
+    </div>
+  )}
+</TabsContent>
+
+    </Tabs>
+  ) : (
+    /* Search results when user is typing */
+    displayedCodes.length === 0 ? (
+      <div className="text-center py-12">
+        {isLoadingIcd10 ? (
+          <>
+            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500 text-lg">Searching...</p>
+          </>
+        ) : (
+          <>
+            <p className="text-gray-500 text-lg">No matching ICD-10 codes found</p>
+            <p className="text-gray-400 text-sm mt-2">Try a different search term</p>
+          </>
+        )}
+      </div>
+    ) : (
+      <div>
+        <h3 className="text-lg font-semibold mb-4 text-gray-700">
+          Search Results ({displayedCodes.length} found)
+        </h3>
+        <div className="grid grid-cols-1 gap-3 max-h-[600px] overflow-y-auto">
+          {displayedCodes.map((icd, index) => (
+            <div
+              key={`${icd.code}-${index}`}
+              className="p-4 border-2 border-blue-300 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors"
+            >
+              <div className="flex items-start gap-4">
+                <Badge className="shrink-0 font-mono text-sm px-3 py-1 bg-blue-600 text-white">
+                  {icd.code}
+                </Badge>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-800 font-medium">{icd.description}</p>
+                  {icd.percentage && (
+                    <p className="text-xs text-gray-600 mt-1">{icd.percentage}% of ED visits</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  )}
+</div>
+
               </div>
             </CardContent>
           </Card>
 
-          {/* Quick Stats Card */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
-              <CardContent className="p-6 text-center">
-                <div className="text-3xl font-bold text-blue-700">{ICD_10_CODES.length}</div>
-                <div className="text-sm text-blue-600 font-medium">Total ICD-10 Codes</div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-green-50 to-green-100">
-              <CardContent className="p-6 text-center">
-                <div className="text-3xl font-bold text-green-700">
-                  {ICD_10_CODES.filter(icd => icd.code.startsWith('R')).length}
-                </div>
-                <div className="text-sm text-green-600 font-medium">Symptom Codes (R series)</div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-purple-50 to-purple-100">
-              <CardContent className="p-6 text-center">
-                <div className="text-3xl font-bold text-purple-700">
-                  {ICD_10_CODES.filter(icd => icd.code.startsWith('S') || icd.code.startsWith('T')).length}
-                </div>
-                <div className="text-sm text-purple-600 font-medium">Injury Codes (S & T series)</div>
-              </CardContent>
-            </Card>
-          </div>
+
+{/* Quick Stats */}
+<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+  <Card className="bg-gradient-to-br from-blue-50 to-blue-100">
+    <CardContent className="p-6 text-center">
+      <div className="text-3xl font-bold text-blue-700">
+        {icd10Codes.filter(c => c.source === 'online').length}
+      </div>
+      <div className="text-sm text-blue-600 font-medium">Common ED Codes Loaded</div>
+    </CardContent>
+  </Card>
+
+  <Card className="bg-gradient-to-br from-red-50 to-red-100">
+    <CardContent className="p-6 text-center">
+      <div className="text-3xl font-bold text-red-700">
+        {icd10Codes.filter(icd => icd.source === 'online' && icd.percentage && icd.percentage >= 3).length}
+      </div>
+      <div className="text-sm text-red-600 font-medium">High Frequency (≥3%)</div>
+    </CardContent>
+  </Card>
+
+  <Card className="bg-gradient-to-br from-green-50 to-green-100">
+    <CardContent className="p-6 text-center">
+      <div className="text-3xl font-bold text-green-700">
+        {icd10Codes.filter(icd => icd.source === 'online' && icd.code && icd.code.startsWith('R')).length}
+      </div>
+      <div className="text-sm text-green-600 font-medium">Symptom Codes (R series)</div>
+    </CardContent>
+  </Card>
+
+  <Card className="bg-gradient-to-br from-purple-50 to-purple-100">
+    <CardContent className="p-6 text-center">
+      <div className="text-3xl font-bold text-purple-700">
+        {icd10Codes.filter(icd => icd.source === 'online' && icd.code && (icd.code.startsWith('S') || icd.code.startsWith('T'))).length}
+      </div>
+      <div className="text-sm text-purple-600 font-medium">Injury Codes (S/T series)</div>
+    </CardContent>
+  </Card>
+</div>
+
+
 
           {/* ICD-10 Categories */}
           <Card>
@@ -981,37 +1100,42 @@ export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="font-semibold text-blue-900 mb-2">📋 Symptoms & Signs (R00-R99)</h4>
+                  <h4 className="font-semibold text-blue-900 mb-2">Symptoms & Signs (R00-R99)</h4>
                   <p className="text-sm text-blue-700">
                     Chest pain, abdominal pain, fever, headache, dizziness, nausea, vomiting
                   </p>
                 </div>
+
                 <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                  <h4 className="font-semibold text-green-900 mb-2">🫁 Respiratory (J00-J99)</h4>
+                  <h4 className="font-semibold text-green-900 mb-2">Respiratory (J00-J99)</h4>
                   <p className="text-sm text-green-700">
                     Pneumonia, COPD, asthma, pharyngitis, upper respiratory infections
                   </p>
                 </div>
+
                 <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                  <h4 className="font-semibold text-red-900 mb-2">❤️ Cardiovascular (I00-I99)</h4>
+                  <h4 className="font-semibold text-red-900 mb-2">Cardiovascular (I00-I99)</h4>
                   <p className="text-sm text-red-700">
                     MI, heart failure, hypertension, stroke, cerebral infarction
                   </p>
                 </div>
+
                 <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                  <h4 className="font-semibold text-orange-900 mb-2">🦴 Injury & External Causes (S00-T98)</h4>
+                  <h4 className="font-semibold text-orange-900 mb-2">Injury & External Causes (S00-T98)</h4>
                   <p className="text-sm text-orange-700">
                     Fractures, concussion, allergies, trauma, injuries
                   </p>
                 </div>
+
                 <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                  <h4 className="font-semibold text-purple-900 mb-2">🍽️ Digestive (K00-K95)</h4>
+                  <h4 className="font-semibold text-purple-900 mb-2">Digestive (K00-K95)</h4>
                   <p className="text-sm text-purple-700">
                     GERD, gastroenteritis, gallbladder disease, colitis
                   </p>
                 </div>
+
                 <div className="p-4 bg-pink-50 rounded-lg border border-pink-200">
-                  <h4 className="font-semibold text-pink-900 mb-2">🧠 Nervous System (G00-G99)</h4>
+                  <h4 className="font-semibold text-pink-900 mb-2">Nervous System (G00-G99)</h4>
                   <p className="text-sm text-pink-700">
                     Migraine headaches, neurological conditions
                   </p>
