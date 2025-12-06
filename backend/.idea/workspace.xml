@@ -5,14 +5,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bcfcf8c0-8817-4e48-a692-6018d2c69c0d" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/dataSources/4eb3ce94-780e-47c4-b7bd-2a99e790721f.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/4eb3ce94-780e-47c4-b7bd-2a99e790721f.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/db.js" beforeDir="false" afterPath="$PROJECT_DIR$/db.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/routes/registration.js" beforeDir="false" afterPath="$PROJECT_DIR$/routes/registration.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/routes/whiteboard.js" beforeDir="false" afterPath="$PROJECT_DIR$/routes/whiteboard.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/schema.sql" beforeDir="false" afterPath="$PROJECT_DIR$/schema.sql" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/server.js" beforeDir="false" afterPath="$PROJECT_DIR$/server.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/components/DoctorInterface.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/DoctorInterface.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/components/ManagerInterface.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/ManagerInterface.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/components/NurseInterface.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/NurseInterface.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/components/RegistrationInterface.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/RegistrationInterface.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/hooks/usePatientManagement.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/hooks/usePatientManagement.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -22,18 +24,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "GmFernando05"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;GmFernando05&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/HGX-ER/CMSC128.1.git",
-    "accountId": "6f370cc0-b2aa-4a4e-9c72-918ab077047a"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/HGX-ER/CMSC128.1.git&quot;,
+    &quot;accountId&quot;: &quot;6f370cc0-b2aa-4a4e-9c72-918ab077047a&quot;
   }
-}]]></component>
+}</component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;&quot;,
   &quot;associatedIndex&quot;: 3
@@ -53,9 +55,9 @@
     "Node.js.server.js.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "icd-doctor",
+    "git-widget-placeholder": "workflowupdated",
     "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "D:/3RD YEAR UPM/Software Engineering/icd-doctor/CMSC128.1/backend/data",
+    "last_opened_file_path": "D:/3RD YEAR UPM/Software Engineering/icd-doctor/CMSC128.1/backend",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -90,8 +92,8 @@
     <recent_temporary>
       <list>
         <item itemvalue="Node.js.server.js" />
-        <item itemvalue="Node.js.db.js" />
         <item itemvalue="Database Script.schema.sql" />
+        <item itemvalue="Node.js.db.js" />
       </list>
     </recent_temporary>
   </component>
@@ -113,7 +115,9 @@
       <updated>1764895249060</updated>
       <workItem from="1764895291458" duration="21000" />
       <workItem from="1764895330344" duration="2320000" />
-      <workItem from="1764921036750" duration="6689000" />
+      <workItem from="1764921036750" duration="9349000" />
+      <workItem from="1764988909749" duration="642000" />
+      <workItem from="1764991273694" duration="9259000" />
     </task>
     <servers />
   </component>

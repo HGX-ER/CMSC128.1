@@ -1010,7 +1010,7 @@ sys|schema||mysql.sys|localhost|TRIGGER|G</Grants>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </schema>
     <schema id="293" parent="1" name="testdb">
-      <LastIntrospectionLocalTimestamp>2025-12-05.10:05:29</LastIntrospectionLocalTimestamp>
+      <LastIntrospectionLocalTimestamp>2025-12-06.07:49:10</LastIntrospectionLocalTimestamp>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </schema>
     <user id="294" parent="1" name="mysql.infoschema">
@@ -1289,7 +1289,7 @@ at</ColNames>
       <UnderlyingIndexName>queue_number</UnderlyingIndexName>
     </key>
     <column id="352" parent="301" name="id">
-      <AutoIncrement>4</AutoIncrement>
+      <AutoIncrement>1</AutoIncrement>
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>int|0s</StoredType>
@@ -1428,7 +1428,7 @@ at</ColNames>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
     </key>
     <column id="381" parent="303" name="id">
-      <AutoIncrement>4</AutoIncrement>
+      <AutoIncrement>2</AutoIncrement>
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>int|0s</StoredType>

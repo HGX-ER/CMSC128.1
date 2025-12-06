@@ -25,7 +25,6 @@ router.get("/registration", async (_req, res) => {
             WHERE e.status = 'arrived'
             ORDER BY e.arrival_time ASC
         `);
-
         res.json(rows);
     } catch (err) {
         console.error("❌ Error loading registration list:", err);
@@ -46,7 +45,6 @@ router.post("/registration/new", async (req, res) => {
             INSERT INTO patients (full_name, dob, sex)
             VALUES ('New Patient', NULL, NULL)
         `);
-
         const patientId = result.insertId;
 
         // Generate queue number in format: ED + random 3 digits
@@ -101,11 +99,14 @@ router.put("/registration/patient/:queueNumber", async (req, res) => {
             emergencyContact,
             insuranceInfo,
             address,
+            chiefComplaint, // ✅ ADDED: Get chief complaint from request
         } = req.body;
+
+        console.log(`📝 Registering patient ${queueNumber}:`, { name, chiefComplaint });
 
         // Look up encounter by queue number
         const [encounters] = await db.query(
-            `SELECT patient_id FROM encounters WHERE queue_number = ? LIMIT 1`,
+            `SELECT patient_id, id as encounter_id FROM encounters WHERE queue_number = ? LIMIT 1`,
             [queueNumber]
         );
 
@@ -114,19 +115,20 @@ router.put("/registration/patient/:queueNumber", async (req, res) => {
         }
 
         const patientId = encounters[0].patient_id;
+        const encounterId = encounters[0].encounter_id;
 
         // Update patient record
         await db.query(
             `UPDATE patients
-             SET
-                 full_name = ?,
-                 dob = ?,
-                 sex = ?,
-                 contact_number = ?,
-                 emergency_contact = ?,
-                 insurance_info = ?,
-                 address = ?
-             WHERE id = ?`,
+       SET
+         full_name = ?,
+         dob = ?,
+         sex = ?,
+         contact_number = ?,
+         emergency_contact = ?,
+         insurance_info = ?,
+         address = ?
+       WHERE id = ?`,
             [
                 name || "",
                 dateOfBirth || null,
@@ -139,6 +141,16 @@ router.put("/registration/patient/:queueNumber", async (req, res) => {
             ]
         );
 
+        // ✅ ADDED: Save chief complaint to observations table
+        if (chiefComplaint && chiefComplaint.trim() !== '') {
+            await db.query(
+                `INSERT INTO observations (encounter_id, type, value, recorded_at)
+         VALUES (?, 'complaint', ?, NOW())`,
+                [encounterId, chiefComplaint.trim()]
+            );
+            console.log(`✅ Saved chief complaint for ${queueNumber}: "${chiefComplaint}"`);
+        }
+
         // Update encounter status to registered
         await db.query(
             `UPDATE encounters SET status = 'registered' WHERE queue_number = ?`,
@@ -148,17 +160,18 @@ router.put("/registration/patient/:queueNumber", async (req, res) => {
         // Log event
         await db.query(
             `INSERT INTO encounter_events (encounter_id, type, at, payload)
-             SELECT e.id, 'registered', NOW(), JSON_OBJECT(
-                     'full_name', ?,
-                     'dob', ?,
-                     'sex', ?,
-                     'contact_number', ?,
-                     'emergency_contact', ?,
-                     'insurance_info', ?,
-                     'address', ?
-                                               )
-             FROM encounters e
-             WHERE e.queue_number = ?`,
+       SELECT e.id, 'registered', NOW(), JSON_OBJECT(
+         'full_name', ?,
+         'dob', ?,
+         'sex', ?,
+         'contact_number', ?,
+         'emergency_contact', ?,
+         'insurance_info', ?,
+         'address', ?,
+         'chief_complaint', ?
+       )
+       FROM encounters e
+       WHERE e.queue_number = ?`,
             [
                 name,
                 dateOfBirth,
@@ -167,6 +180,7 @@ router.put("/registration/patient/:queueNumber", async (req, res) => {
                 emergencyContact,
                 insuranceInfo,
                 address,
+                chiefComplaint || null, // ✅ ADDED
                 queueNumber,
             ]
         );
@@ -181,9 +195,10 @@ router.put("/registration/patient/:queueNumber", async (req, res) => {
             });
         }
 
+        console.log(`✅ Registration completed for ${queueNumber}`);
         res.json({ message: "Patient registration updated successfully" });
     } catch (err) {
-        console.error("Error saving registration:", err);
+        console.error("❌ Error saving registration:", err);
         res.status(500).json({ error: err.message });
     }
 });

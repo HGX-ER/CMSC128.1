@@ -133,9 +133,7 @@ ON DUPLICATE KEY UPDATE
 
 -- SEED PATIENTS
 INSERT INTO patients (full_name, dob, sex, contact_number, emergency_contact, insurance_info, address) VALUES
-                                                                                                           ('Juan Dela Cruz', '2001-01-15', 'Male', '09171234567', 'Maria Cruz', 'PhilHealth', 'Manila'),
-                                                                                                           ('Maria Santos', '1999-07-20', 'Female', '09181234567', 'Jose Santos', 'Maxicare', 'Quezon City'),
-                                                                                                           ('Pedro Gomez', '1988-03-10', 'Male', '09191234567', 'Anna Gomez', 'Intellicare', 'Pasig')
+                                                                                                           ('Juan Dela Cruz', '2001-01-15', 'Male', '09171234567', 'Maria Cruz', 'PhilHealth', 'Manila')
 ON DUPLICATE KEY UPDATE
                      full_name = VALUES(full_name),
                      dob = VALUES(dob),
@@ -154,12 +152,6 @@ ON DUPLICATE KEY UPDATE
                      assigned_doctor = VALUES(assigned_doctor),
                      assigned_nurse = VALUES(assigned_nurse),
                      arrival_time = VALUES(arrival_time);
-
--- SEED OBSERVATIONS
-INSERT INTO observations (encounter_id, type, value, unit) VALUES
-                                                               ((SELECT id FROM encounters WHERE queue_number = 'ED001'), 'complaint', 'Headache', NULL),
-                                                               ((SELECT id FROM encounters WHERE queue_number = 'ED001'), 'bp_sys', '130', 'mmHg'),
-                                                               ((SELECT id FROM encounters WHERE queue_number = 'ED001'), 'bp_dia', '80', 'mmHg');
 
 -- ICD-10 CODES
 CREATE TABLE encounter_icd_codes (
