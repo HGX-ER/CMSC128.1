@@ -538,7 +538,7 @@ const completeConsult = async () => {
                   ✅ Completed Today
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 max-h-[500px] overflow-y-auto">
+              <CardContent className="space-y-3">
                 {completedPatients.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-gray-500">No completed consultations yet</p>
@@ -664,7 +664,7 @@ const completeConsult = async () => {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                  <div className="space-y-3">
                     {completedPatients.map((p) => (
                       <div key={p.id} className="p-3 border border-green-200 rounded-lg bg-green-50">
                         <div className="space-y-2">
@@ -696,7 +696,7 @@ const completeConsult = async () => {
 
       {/* Consultation Dialog */}
       <Dialog open={consultationOpen} onOpenChange={setConsultationOpen}>
-        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto w-[95vw]">
+        <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl">🩺 Patient Consultation</DialogTitle>
             <DialogDescription>
