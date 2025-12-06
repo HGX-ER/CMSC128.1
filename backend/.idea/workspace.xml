@@ -5,16 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bcfcf8c0-8817-4e48-a692-6018d2c69c0d" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources/4eb3ce94-780e-47c4-b7bd-2a99e790721f.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/4eb3ce94-780e-47c4-b7bd-2a99e790721f.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routes/registration.js" beforeDir="false" afterPath="$PROJECT_DIR$/routes/registration.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routes/whiteboard.js" beforeDir="false" afterPath="$PROJECT_DIR$/routes/whiteboard.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/schema.sql" beforeDir="false" afterPath="$PROJECT_DIR$/schema.sql" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/components/DoctorInterface.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/DoctorInterface.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/components/ManagerInterface.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/ManagerInterface.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/components/NurseInterface.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/NurseInterface.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/components/RegistrationInterface.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/RegistrationInterface.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/hooks/usePatientManagement.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/hooks/usePatientManagement.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/routes/icd10.js" beforeDir="false" afterPath="$PROJECT_DIR$/routes/icd10.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/server.js" beforeDir="false" afterPath="$PROJECT_DIR$/server.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/icd10Service.js" beforeDir="false" afterPath="$PROJECT_DIR$/services/icd10Service.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -117,7 +113,7 @@
       <workItem from="1764895330344" duration="2320000" />
       <workItem from="1764921036750" duration="9349000" />
       <workItem from="1764988909749" duration="642000" />
-      <workItem from="1764991273694" duration="9259000" />
+      <workItem from="1764991273694" duration="19709000" />
     </task>
     <servers />
   </component>

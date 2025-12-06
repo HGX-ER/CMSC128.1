@@ -1,3 +1,4 @@
+// backend/services/icd10Service.js
 const fs = require('fs');
 const csv = require('csv-parser');
 
@@ -29,16 +30,28 @@ function searchICD10(query) {
     if (!query || query.length < 2) return [];
     const q = query.toLowerCase();
 
-    return icd10Data.filter(item => {
-        const code = (item.code || '').toLowerCase();
-        const shortDesc = (item.shortDesc || '').toLowerCase();
+    return icd10Data
+        .filter((item) => {
+            const code = (item.code || '').toLowerCase();
+            const shortDesc = (item.shortDesc || '').toLowerCase();
+            const longDesc = (item.longDesc || '').toLowerCase();
 
-        return code.startsWith(q) || shortDesc.includes(q);
-    }).slice(0, 20);
+            return (
+                code.startsWith(q) ||
+                code.includes(q) ||
+                shortDesc.includes(q) ||
+                longDesc.includes(q)
+            );
+        })
+        .slice(0, 50);
 }
 
 function getByCode(code) {
-    return icd10Data.find(item => item.code === code) || null;
+    return icd10Data.find((item) => item.code === code) || null;
 }
 
-module.exports = { loadICD10, searchICD10, getByCode };
+function getAllCodes() {
+    return icd10Data;
+}
+
+module.exports = { loadICD10, searchICD10, getByCode, getAllCodes };

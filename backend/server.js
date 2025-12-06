@@ -78,7 +78,7 @@ app.use("/api", doctorsRoutes);
 app.use('/api', feedbackRoutes);
 app.use('/api', transferRouter);
 app.use('/api', adminRoutes); //
-app.use('/api', icd10Routes);
+app.use('/api/icd10', icd10Routes);
 
 /* ===== Error handler ===== */
 app.use((err, req, res, next) => {
