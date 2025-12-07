@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { DoctorPatientCard } from "./DoctorPatientCard";
 import { toast } from 'sonner';
 import { Stethoscope, Activity, Search } from "lucide-react";
+import { formatDisposition } from '../types/patient';
 import { Input } from "./ui/input";
 
 const ESI_COLORS = {
@@ -558,7 +559,7 @@ const completeConsult = async () => {
                           {ageFromDOB(patient.dateOfBirth)} • {patient.sex}
                         </div>
                         <div className="text-xs text-green-600 bg-white p-2 rounded border border-green-200">
-                          <p><strong>Disposition:</strong> {patient.disposition}</p>
+                          <p><strong>Disposition:</strong> {formatDisposition ? formatDisposition(patient.disposition) : (patient.disposition || '')}</p>
                         </div>
                         {patient.esiLevel && (
                           <Badge className={ESI_COLORS[patient.esiLevel]}>

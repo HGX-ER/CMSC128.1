@@ -1,18 +1,8 @@
 // backend/routes/transfer.js
 const express = require('express');
 const router = express.Router();
-const db = require('../db'); // adjust if your DB helper path is different
+const db = require('../db'); // adjust path if necessary
 
-/**
- * POST /api/doctor/encounters/:id/transfer
- * Body: { toDoctor: string, note?: string }
- *
- * Behavior:
- * - Validates `toDoctor`
- * - Starts a transaction, locks the encounter row, updates assigned_doctor + status
- * - Inserts an audit record to encounter_events (parameterized)
- * - If the `type` ENUM rejects 'transferred', falls back to inserting without the type column
- */
 router.post('/doctor/encounters/:id/transfer', async (req, res) => {
     const encounterId = req.params.id;
     const { toDoctor, note } = req.body;
@@ -21,37 +11,32 @@ router.post('/doctor/encounters/:id/transfer', async (req, res) => {
         return res.status(400).json({ error: 'toDoctor is required' });
     }
 
-    // Optionally capture actor info if you have auth middleware
+    // optional actor info from auth middleware
     const performedBy = (req.user && (req.user.username || req.user.id)) || null;
 
     let conn;
     try {
-        // Get connection (works whether db exposes pool.query or getConnection)
         conn = typeof db.getConnection === 'function' ? await db.getConnection() : db;
+        if (typeof conn.beginTransaction === 'function') await conn.beginTransaction();
 
-        if (typeof conn.beginTransaction === 'function') {
-            await conn.beginTransaction();
-        }
-
-        // Lock encounter row for update
+        // lock the encounter row
         const [rows] = await conn.query('SELECT * FROM encounters WHERE id = ? FOR UPDATE', [encounterId]);
         if (!rows || rows.length === 0) {
             if (typeof conn.rollback === 'function') await conn.rollback();
             return res.status(404).json({ error: 'Encounter not found' });
         }
-
         const encounter = rows[0];
         const prevDoctor = encounter.assigned_doctor || null;
 
-        // Update assignment and status
-        const newStatus = 'waiting_doctor'; // tweak if your app uses different status labels
+        // update assignment + status
+        const newStatus = 'waiting_doctor';
         await conn.query('UPDATE encounters SET assigned_doctor = ?, status = ? WHERE id = ?', [
             toDoctor,
             newStatus,
             encounterId,
         ]);
 
-        // Build payload for audit
+        // audit payload
         const payloadObj = {
             fromDoctor: prevDoctor,
             toDoctor,
@@ -61,18 +46,16 @@ router.post('/doctor/encounters/:id/transfer', async (req, res) => {
         };
         const payloadJson = JSON.stringify(payloadObj);
 
-        // Insert audit event (parameterized). Try inserting with `type` first.
+        // insert event (try with type then fallback)
         try {
             await conn.query(
                 'INSERT INTO encounter_events (encounter_id, type, at, payload) VALUES (?, ?, NOW(), ?)',
                 [encounterId, 'transferred', payloadJson]
             );
         } catch (insertErr) {
-            // If enum truncation occurs, fall back to inserting without `type`
+            // if enum or other issue, fall back to inserting without type
             const isEnumTruncation = insertErr && (insertErr.errno === 1265 || insertErr.code === 'WARN_DATA_TRUNCATED');
-
             if (isEnumTruncation) {
-                console.warn('encounter_events.type rejected "transferred", falling back to insert without `type`', insertErr);
                 await conn.query('INSERT INTO encounter_events (encounter_id, at, payload) VALUES (?, NOW(), ?)', [
                     encounterId,
                     payloadJson,
@@ -82,10 +65,27 @@ router.post('/doctor/encounters/:id/transfer', async (req, res) => {
             }
         }
 
+        // Persist transfer note to encounters.transfer_note (recommended)
+        if (note && note.trim().length > 0) {
+            try {
+                await conn.query('UPDATE encounters SET transfer_note = ? WHERE id = ?', [note, encounterId]);
+            } catch (uErr) {
+                // column may not exist yet — log and continue
+                console.warn('Failed to persist transfer_note on encounters (column may be missing).', uErr);
+            }
+        }
+
         if (typeof conn.commit === 'function') await conn.commit();
 
         const [updatedRows] = await conn.query('SELECT * FROM encounters WHERE id = ?', [encounterId]);
-        return res.json(updatedRows[0]);
+        const updated = (updatedRows && updatedRows[0]) ? updatedRows[0] : null;
+
+        // attach note to response if DB didn't store it
+        if (updated && (!updated.transfer_note || updated.transfer_note === null) && note && note.trim().length > 0) {
+            updated.transfer_note = note;
+        }
+
+        return res.json(updated);
     } catch (err) {
         if (conn && typeof conn.rollback === 'function') {
             try { await conn.rollback(); } catch (_) {}

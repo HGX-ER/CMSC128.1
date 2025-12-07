@@ -12,8 +12,10 @@ import { MedicalTrivia } from './MedicalTrivia';
 import { HealthTips } from './HealthTips';
 import { RelaxationExercises } from './RelaxationExercises';
 import { HospitalServices } from './HospitalServices';
+import { ConsultationCompletionScreen } from './ConsultationCompletionScreen';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.jsx';
 import { Clock, Timer, Heart, Activity, Stethoscope, UserCheck, CheckCircle, MapPin, Loader2, History, Newspaper, Brain, Lightbulb, Wind, Building, Bell, MessageCircle, Send, Star, RefreshCw } from 'lucide-react';
+import { formatDisposition } from '../types/patient';
 
 export function PatientInterface({ patients, currentPatientId, getTotalTime, getCurrentStageTime, onAddSatisfactionFeedback, onAddRealtimeFeedback }) {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -775,6 +777,12 @@ const handleSubmitComment = async () => {
                     {getStageDisplayName(patient.currentStage)}
                   </CardTitle>
                   <p className="text-gray-600">Queue Number: {patient.id}</p>
+                  {patient.disposition && (
+                    <div className="mt-1">
+                      <span className="text-sm text-gray-700">Disposition: </span>
+                      <strong className="text-sm text-gray-800">{formatDisposition(patient.disposition)}</strong>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="text-right">
@@ -786,157 +794,166 @@ const handleSubmitComment = async () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-blue-800 font-medium mb-1">Current Status:</p>
-                <p className="text-blue-700">{getStageDescription(patient.currentStage)}</p>
-              </div>
-
-              {/* Real-Time Updates & Patient Comments */}
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-2 mb-3">
-                  <Bell className="w-4 h-4 text-green-700" />
-                  <p className="text-green-800 font-medium">Real-Time Updates & Communication:</p>
-                </div>
-                
-                {/* System Updates */}
-                <div className="space-y-2 mb-4">
-                  {realtimeComments.map((comment, index) => (
-                    <div key={index} className="flex items-start gap-2 bg-white p-2 rounded">
-                      <MessageCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-sm text-green-700">{comment.message}</p>
-                        <p className="text-xs text-gray-500">{comment.time.toLocaleTimeString()}</p>
-                      </div>
-                    </div>
-                  ))}
+            {/* Show Completion Screen when progress is 100% */}
+            {getProgressPercentage() === 100 ? (
+              <ConsultationCompletionScreen 
+                onSubmitFeedback={onAddSatisfactionFeedback}
+                patientName={patient.name}
+                queueNumber={queueNumber}
+              />
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-blue-800 font-medium mb-1">Current Status:</p>
+                  <p className="text-blue-700">{getStageDescription(patient.currentStage)}</p>
                 </div>
 
-                {/* Patient Submitted Comments */}
-                {submittedComments.filter(c => c.stage === patient.currentStage).length > 0 && (
+                {/* Real-Time Updates & Patient Comments */}
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Bell className="w-4 h-4 text-green-700" />
+                    <p className="text-green-800 font-medium">Real-Time Updates & Communication:</p>
+                  </div>
+                  
+                  {/* System Updates */}
                   <div className="space-y-2 mb-4">
-                    <p className="text-sm font-medium text-green-800">Your Comments:</p>
-                    {submittedComments.filter(c => c.stage === patient.currentStage).map((comment, index) => (
-                      <div key={index} className="flex items-start gap-2 bg-blue-50 p-2 rounded border border-blue-200">
-                        <MessageCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    {realtimeComments.map((comment, index) => (
+                      <div key={index} className="flex items-start gap-2 bg-white p-2 rounded">
+                        <MessageCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
-                          <p className="text-sm text-blue-700 font-medium">You: {comment.message}</p>
-                          <div className="flex items-center gap-1 mt-1">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={`w-3 h-3 ${
-                                  star <= comment.rating
-                                    ? 'text-yellow-500 fill-yellow-500'
-                                    : 'text-gray-300'
-                                }`}
-                              />
-                            ))}
-                          </div>
+                          <p className="text-sm text-green-700">{comment.message}</p>
                           <p className="text-xs text-gray-500">{comment.time.toLocaleTimeString()}</p>
                         </div>
                       </div>
                     ))}
                   </div>
-                )}
 
-                {/* Real-time Feedback Section */}
-                <div className="mt-4 p-4 border border-green-300 rounded-xl bg-white shadow-sm">
-                  <p className="text-center text-green-800 font-semibold mb-4">
-                    How are you feeling right now? Share your experience with the ED Manager
-                  </p>
-
-                  {/* Satisfaction Rating */}
-                  <div className="text-center">
-                    <p className="text-base text-green-800 font-semibold mb-6">
-                      How satisfied are you with this stage?
-                    </p>
-
-                    <div className="flex justify-center items-center gap-6 mb-6">
-                      {[
-                        { id: 1, emoji: '😠', label: 'Very Unsatisfied' },
-                        { id: 2, emoji: '😕', label: 'Unsatisfied' },
-                        { id: 3, emoji: '😐', label: 'Neutral' },
-                        { id: 4, emoji: '🙂', label: 'Satisfied' },
-                        { id: 5, emoji: '😄', label: 'Very Satisfied' },
-                      ].map((smile, index, arr) => (
-                        <div key={smile.id} className="flex items-center">
-                          <div
-                            className="flex flex-col items-center cursor-pointer"
-                            onClick={() => setCommentSatisfaction(smile.id)}
-                            title={smile.label}
-                          >
-                            <span
-                              className={`text-6xl transition-transform duration-200 ${
-                                commentSatisfaction === smile.id
-                                  ? 'scale-125'
-                                  : 'opacity-60 hover:opacity-100 hover:scale-110'
-                              }`}
-                            >
-                              {smile.emoji}
-                            </span>
-                            <span
-                              className={`mt-2 text-sm font-medium ${
-                                commentSatisfaction === smile.id
-                                  ? 'text-blue-700'
-                                  : 'text-gray-500'
-                              }`}
-                            >
-                              {smile.label}
-                            </span>
+                  {/* Patient Submitted Comments */}
+                  {submittedComments.filter(c => c.stage === patient.currentStage).length > 0 && (
+                    <div className="space-y-2 mb-4">
+                      <p className="text-sm font-medium text-green-800">Your Comments:</p>
+                      {submittedComments.filter(c => c.stage === patient.currentStage).map((comment, index) => (
+                        <div key={index} className="flex items-start gap-2 bg-blue-50 p-2 rounded border border-blue-200">
+                          <MessageCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-sm text-blue-700 font-medium">You: {comment.message}</p>
+                            <div className="flex items-center gap-1 mt-1">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`w-3 h-3 ${
+                                    star <= comment.rating
+                                      ? 'text-yellow-500 fill-yellow-500'
+                                      : 'text-gray-300'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <p className="text-xs text-gray-500">{comment.time.toLocaleTimeString()}</p>
                           </div>
-
-                          {/* Divider - skip after last emoji */}
-                          {index < arr.length - 1 && (
-                            <div className="h-10 border-l border-gray-600 mx-6"></div>
-                          )}
                         </div>
                       ))}
                     </div>
-                  </div>
+                  )}
 
-                  {/* Comment Input */}
-                  <div className="space-y-2">
-                    <p className="text-sm font-bold text-green-800">
-                      Additional Comments or Concerns:
+                  {/* Real-time Feedback Section */}
+                  <div className="mt-4 p-4 border border-green-300 rounded-xl bg-white shadow-sm">
+                    <p className="text-center text-green-800 font-semibold mb-4">
+                      How are you feeling right now? Share your experience with the ED Manager
                     </p>
-                    <div className="flex gap-2">
-                      <Textarea
-                        value={patientComment}
-                        onChange={(e) => setPatientComment(e.target.value)}
-                        placeholder="Tell us about your experience, any concerns, or suggestions..."
-                        className="flex-1 min-h-[80px] text-sm"
-                      />
-                      <Button
-                        onClick={handleSubmitComment}
-                        disabled={!patientComment.trim() || commentSatisfaction === 0}
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 self-end"
-                      >
-                        <Send className="w-4 h-4" />
-                      </Button>
+
+                    {/* Satisfaction Rating */}
+                    <div className="text-center">
+                      <p className="text-base text-green-800 font-semibold mb-6">
+                        How satisfied are you with this stage?
+                      </p>
+
+                      <div className="flex justify-center items-center gap-6 mb-6">
+                        {[
+                          { id: 1, emoji: '😠', label: 'Very Unsatisfied' },
+                          { id: 2, emoji: '😕', label: 'Unsatisfied' },
+                          { id: 3, emoji: '😐', label: 'Neutral' },
+                          { id: 4, emoji: '🙂', label: 'Satisfied' },
+                          { id: 5, emoji: '😄', label: 'Very Satisfied' },
+                        ].map((smile, index, arr) => (
+                          <div key={smile.id} className="flex items-center">
+                            <div
+                              className="flex flex-col items-center cursor-pointer"
+                              onClick={() => setCommentSatisfaction(smile.id)}
+                              title={smile.label}
+                            >
+                              <span
+                                className={`text-6xl transition-transform duration-200 ${
+                                  commentSatisfaction === smile.id
+                                    ? 'scale-125'
+                                    : 'opacity-60 hover:opacity-100 hover:scale-110'
+                                }`}
+                              >
+                                {smile.emoji}
+                              </span>
+                              <span
+                                className={`mt-2 text-sm font-medium ${
+                                  commentSatisfaction === smile.id
+                                    ? 'text-blue-700'
+                                    : 'text-gray-500'
+                                }`}
+                              >
+                                {smile.label}
+                              </span>
+                            </div>
+
+                            {/* Divider - skip after last emoji */}
+                            {index < arr.length - 1 && (
+                              <div className="h-10 border-l border-gray-600 mx-6"></div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <p className="text-xs text-green-600">
-                      Your feedback will be sent directly to the ED Manager for immediate attention
-                    </p>
+
+                    {/* Comment Input */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-bold text-green-800">
+                        Additional Comments or Concerns:
+                      </p>
+                      <div className="flex gap-2">
+                        <Textarea
+                          value={patientComment}
+                          onChange={(e) => setPatientComment(e.target.value)}
+                          placeholder="Tell us about your experience, any concerns, or suggestions..."
+                          className="flex-1 min-h-[80px] text-sm"
+                        />
+                        <Button
+                          onClick={handleSubmitComment}
+                          disabled={!patientComment.trim() || commentSatisfaction === 0}
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 self-end"
+                        >
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-green-600">
+                        Your feedback will be sent directly to the ED Manager for immediate attention
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-              
-              {/* Progress Bar */}
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-700">Visit Progress</span>
-                  <span className="text-sm text-gray-600">{getProgressPercentage()}% Complete</span>
+                
+                {/* Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-700">Visit Progress</span>
+                    <span className="text-sm text-gray-600">{getProgressPercentage()}% Complete</span>
+                  </div>
+                  <Progress value={getProgressPercentage()} className="h-3" />
                 </div>
-                <Progress value={getProgressPercentage()} className="h-3" />
-              </div>
 
-              {/* History Button */}
-              <div className="flex justify-center pt-2">
-                <StageHistory patient={patient} />
+                {/* History Button */}
+                <div className="flex justify-center pt-2">
+                  <StageHistory patient={patient} />
+                </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
