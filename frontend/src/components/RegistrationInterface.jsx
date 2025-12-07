@@ -466,8 +466,8 @@ const handleRegisterPatient = async () => {
                         required
                         className="text-base md:text-lg"
                       />
-                      <p className="text-sm text-gray-500 italic">Format: First Name, Middle Name, Last Name</p>
-                      <p className="text-sm text-gray-500 italic">Example: Juan Aguilar Dela Cruz</p>
+                      <p className="text-xs text-gray-500">Format: First Name, Middle Name, Last Name</p>
+                      <p className="text-xs text-gray-500 italic">Example: Juan Aguilar Dela Cruz</p>
                     </div>
 
                     <div className="space-y-2">

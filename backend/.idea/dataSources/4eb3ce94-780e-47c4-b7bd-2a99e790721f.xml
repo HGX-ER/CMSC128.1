@@ -922,7 +922,7 @@
     <schema id="292" parent="1" name="testdb">
       <AutoIntrospectionLevel>3</AutoIntrospectionLevel>
       <LastIntrospectionLevel>3</LastIntrospectionLevel>
-      <LastIntrospectionLocalTimestamp>2025-12-07.02:48:33</LastIntrospectionLocalTimestamp>
+      <LastIntrospectionLocalTimestamp>2025-12-07.07:21:05</LastIntrospectionLocalTimestamp>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </schema>
     <user id="293" parent="1" name="xtian_cmt7"/>

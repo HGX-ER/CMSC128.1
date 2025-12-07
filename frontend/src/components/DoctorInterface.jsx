@@ -45,7 +45,6 @@ export function DoctorInterface({
   const [consultationStartTime, setConsultationStartTime] = useState(null);
   const [availableDoctors, setAvailableDoctors] = useState([]);
   const [transferDoctor, setTransferDoctor] = useState("");
-  const [transferNote, setTransferNote] = useState("");
   const [transferConfirm, setTransferConfirm] = useState(false);
   
   // ✅ UPDATED: ICD-10 search states - now supports multiple codes
@@ -785,7 +784,7 @@ const completeConsult = async () => {
 
                   {/* Search input */}
                   <div className="relative mt-2">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       id="icdSearch"
                       type="text"
@@ -796,7 +795,7 @@ const completeConsult = async () => {
                         setShowIcdDropdown(true);
                       }}
                       onFocus={() => setShowIcdDropdown(true)}
-                      className="pl-10"
+                      style={{ paddingLeft: "4rem" }}
                     />
                   </div>
 
@@ -923,17 +922,7 @@ const completeConsult = async () => {
                     </Select>
                   </div>
 
-                  <div>
-                    <Label htmlFor="transferNote" className="text-sm font-medium text-red-700">Optional note for receiving doctor</Label>
-                    <Textarea
-                      id="transferNote"
-                      value={transferNote}
-                      onChange={(e) => setTransferNote(e.target.value)}
-                      placeholder="Optional note to receiving doctor"
-                      rows={3}
-                      className="mt-2 w-full"
-                    />
-                  </div>
+                  {/* Note field removed: transfers now only send receiving doctor */}
 
                   <div className="flex items-center gap-3">
                     <Button
@@ -953,7 +942,7 @@ const completeConsult = async () => {
                           const res = await fetch(`http://localhost:5000/api/doctor/encounters/${selectedPatient}/transfer`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ toDoctor: transferDoctor, note: transferNote })
+                            body: JSON.stringify({ toDoctor: transferDoctor })
                           });
 
                           if (!res.ok) throw new Error('Transfer failed');
@@ -970,7 +959,6 @@ const completeConsult = async () => {
                           setDoctorPatients(normalized);
 
                           setTransferDoctor("");
-                          setTransferNote("");
                           setTransferConfirm(false);
                           setConsultationOpen(false);
                           setSelectedPatient(null);
@@ -989,7 +977,6 @@ const completeConsult = async () => {
                       size="sm"
                       onClick={() => {
                         setTransferDoctor("");
-                        setTransferNote("");
                         setTransferConfirm(false);
                       }}
                     >
