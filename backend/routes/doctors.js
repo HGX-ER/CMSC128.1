@@ -24,8 +24,8 @@ const toEncounter = (r) => ({
     esiLevel: r.priority_esi ?? null,
     assignedDoctor: r.assigned_doctor || null,
     assignedNurse: r.assigned_nurse || null,
-    arrivalTime: r.arrival_time || null,
-    triageTime: r.triage_time || null,
+    arrivalTime: r.arrival_time || null,  // ✅ FIXED
+    triageTime: r.triage_time || null,     // ✅ FIXED
     disposition: r.disposition || null,
     diagnosis: r.diagnosis || null,
 });
@@ -71,7 +71,6 @@ router.get('/managers', async (_req, res) => {
 });
 
 // ---------- USER PROFILE for doctors AND managers ----------
-// Keeps your existing frontend call `/api/doctor/manager1` working.
 router.get('/doctor/:username', async (req, res) => {
     try {
         const { username } = req.params;
@@ -112,9 +111,11 @@ router.get('/manager/:username', async (req, res) => {
 });
 
 // ---------- Patients assigned to a doctor ----------
+// ---------- Patients assigned to a doctor ----------
 router.get('/doctor/:username/patients', async (req, res) => {
     try {
         const { username } = req.params;
+
         const [rows] = await db.query(
             `SELECT
                  e.id AS encounter_id,
@@ -135,17 +136,24 @@ router.get('/doctor/:username/patients', async (req, res) => {
              FROM encounters e
                       JOIN patients p ON p.id = e.patient_id
              WHERE e.assigned_doctor = ?
-               AND e.status <> 'departed'
+               AND (
+                 e.status <> 'departed'
+                     OR (e.status = 'departed' AND DATE(e.depart_time) = CURDATE())
+                 )
              ORDER BY
                  CASE e.status
-                     WHEN 'waiting_doctor' THEN 0
-                     WHEN 'consultation' THEN 1
-                     ELSE 2
-                     END,
+                 WHEN 'waiting_doctor'   THEN 0
+                 WHEN 'consultation'     THEN 1
+                 WHEN 'in_observation'   THEN 2
+                 WHEN 'admitted_non_icu' THEN 3
+                 WHEN 'admitted_icu'     THEN 4
+                 ELSE 5
+            END,
                  COALESCE(e.priority_esi, 99),
                  e.arrival_time ASC`,
             [username]
         );
+
         res.json(rows.map(toEncounter));
     } catch (e) {
         console.error('GET /doctor/:username/patients error:', e);
@@ -198,7 +206,6 @@ router.patch('/doctor/encounters/:id/complete', async (req, res) => {
         return res.status(400).json({ error: 'diagnosis and disposition are required' });
     }
 
-    // Map disposition to FINAL status (patient done)
     const FINAL_STATUS_BY_DISPOSITION = {
         'Discharge': 'departed',
         'Observation': 'in_observation',
@@ -215,7 +222,6 @@ router.patch('/doctor/encounters/:id/complete', async (req, res) => {
     try {
         await conn.beginTransaction();
 
-        // Update to final status and set depart_time (patient done)
         const [r] = await conn.query(
             `UPDATE encounters
              SET status = ?,
@@ -232,12 +238,9 @@ router.patch('/doctor/encounters/:id/complete', async (req, res) => {
             return res.status(404).json({ error: 'Encounter not found' });
         }
 
-        // Insert ICD-10 codes if provided
         if (icdCodes && Array.isArray(icdCodes) && icdCodes.length > 0) {
-            // Delete existing codes first
             await conn.query('DELETE FROM encounter_icd_codes WHERE encounter_id = ?', [id]);
 
-            // Insert new codes
             const values = icdCodes.map(icd => [id, icd.code, icd.description || '']);
             await conn.query(
                 'INSERT INTO encounter_icd_codes (encounter_id, icd_code, icd_description) VALUES ?',
@@ -247,14 +250,12 @@ router.patch('/doctor/encounters/:id/complete', async (req, res) => {
             console.log(`✅ Stored ${icdCodes.length} ICD-10 codes for encounter ${id}`);
         }
 
-        // Log dispositioned event
         await conn.query(
             `INSERT INTO encounter_events (encounter_id, type, at, payload)
              VALUES (?, 'dispositioned', NOW(), JSON_OBJECT('nextStatus', ?, 'diagnosis', ?, 'disposition', ?))`,
             [id, finalStatus, diagnosis, disposition]
         );
 
-        // Create completion event based on disposition
         let completionEventType;
         switch (disposition) {
             case 'Discharge':
@@ -301,14 +302,12 @@ router.post('/doctor/encounters/:id/transfer', async (req, res) => {
     if (!id) return res.status(400).json({ error: 'Invalid encounter id' });
     if (!toDoctor) return res.status(400).json({ error: 'toDoctor is required' });
 
-    // If you have auth middleware that sets req.user, you can use it here for audit.
     const performedBy = req.user?.username || null;
 
     const conn = await db.getConnection();
     try {
         await conn.beginTransaction();
 
-        // Lock the encounter row to avoid race conditions
         const [rows] = await conn.query(
             `SELECT id, assigned_doctor, patient_id, status
              FROM encounters
@@ -323,7 +322,6 @@ router.post('/doctor/encounters/:id/transfer', async (req, res) => {
         const current = rows[0];
         const fromDoctor = current.assigned_doctor || null;
 
-        // Update assigned doctor and set to waiting_doctor so receiving doctor sees it
         await conn.query(
             `UPDATE encounters
              SET assigned_doctor = ?, status = 'waiting_doctor', updated_at = NOW()
@@ -331,7 +329,6 @@ router.post('/doctor/encounters/:id/transfer', async (req, res) => {
             [toDoctor, id]
         );
 
-        // Insert an event/audit entry
         await conn.query(
             `INSERT INTO encounter_events (encounter_id, type, at, payload)
              VALUES (?, 'transferred', NOW(), JSON_OBJECT(
@@ -342,7 +339,6 @@ router.post('/doctor/encounters/:id/transfer', async (req, res) => {
 
         await conn.commit();
 
-        // Return the updated encounter (optional)
         const [updatedRows] = await db.query(
             `SELECT id AS encounter_id, queue_number, status, assigned_doctor, arrival_time, disposition, diagnosis
              FROM encounters
@@ -355,6 +351,75 @@ router.post('/doctor/encounters/:id/transfer', async (req, res) => {
         await conn.rollback();
         console.error('POST /doctor/encounters/:id/transfer error:', err);
         return res.status(500).json({ error: err.sqlMessage || err.message || 'Server error' });
+    } finally {
+        conn.release();
+    }
+});
+
+// ---------- Resume from observation ----------
+router.post('/doctor/encounters/:id/resume', async (req, res) => {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid encounter id' });
+
+    const conn = await db.getConnection();
+    try {
+        await conn.beginTransaction();
+
+        await conn.query(
+            `UPDATE encounters 
+             SET status = 'consultation', 
+                 updated_at = NOW() 
+             WHERE id = ?`,
+            [id]
+        );
+
+        await conn.query(
+            `INSERT INTO encounter_events (encounter_id, type, at, payload)
+             VALUES (?, 'resumed_from_observation', NOW(), NULL)`,
+            [id]
+        );
+
+        await conn.commit();
+        res.json({ ok: true });
+    } catch (e) {
+        await conn.rollback();
+        console.error('POST /doctor/encounters/:id/resume error:', e);
+        res.status(500).json({ error: 'Failed to resume observation' });
+    } finally {
+        conn.release();
+    }
+});
+
+// ---------- Mark admitted patient as departed ----------
+router.post('/doctor/encounters/:id/depart', async (req, res) => {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid encounter id' });
+
+    const conn = await db.getConnection();
+    try {
+        await conn.beginTransaction();
+
+        await conn.query(
+            `UPDATE encounters 
+             SET status = 'departed', 
+                 depart_time = NOW(),
+                 updated_at = NOW() 
+             WHERE id = ?`,
+            [id]
+        );
+
+        await conn.query(
+            `INSERT INTO encounter_events (encounter_id, type, at, payload)
+             VALUES (?, 'departed', NOW(), NULL)`,
+            [id]
+        );
+
+        await conn.commit();
+        res.json({ ok: true });
+    } catch (e) {
+        await conn.rollback();
+        console.error('POST /doctor/encounters/:id/depart error:', e);
+        res.status(500).json({ error: 'Failed to mark as departed' });
     } finally {
         conn.release();
     }

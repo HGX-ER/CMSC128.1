@@ -81,10 +81,11 @@ CREATE TABLE observations (
 CREATE INDEX idx_obs_encounter ON observations(encounter_id);
 
 -- ENCOUNTER EVENTS
+-- ✅ FIXED: Changed type from ENUM to VARCHAR(50)
 CREATE TABLE encounter_events (
                                   id INT AUTO_INCREMENT PRIMARY KEY,
                                   encounter_id INT NOT NULL,
-                                  type ENUM('arrived','registered','triaged','roomed','provider_started','results_ready','dispositioned','departed','transferred') NOT NULL,
+                                  type VARCHAR(50) NOT NULL,
                                   at DATETIME NOT NULL,
                                   payload JSON,
                                   CONSTRAINT fk_evt_enc FOREIGN KEY (encounter_id) REFERENCES encounters(id) ON DELETE CASCADE ON UPDATE CASCADE
@@ -144,14 +145,6 @@ ON DUPLICATE KEY UPDATE
                      address = VALUES(address);
 
 -- SEED ENCOUNTERS
-INSERT INTO encounters (patient_id, queue_number, status, priority_esi, assigned_doctor, assigned_nurse, arrival_time)
-VALUES (1, 'ED001', 'waiting_doctor', 4, 'doc1', 'nurse1', NOW())
-ON DUPLICATE KEY UPDATE
-                     status = VALUES(status),
-                     priority_esi = VALUES(priority_esi),
-                     assigned_doctor = VALUES(assigned_doctor),
-                     assigned_nurse = VALUES(assigned_nurse),
-                     arrival_time = VALUES(arrival_time);
 
 -- ICD-10 CODES
 CREATE TABLE encounter_icd_codes (

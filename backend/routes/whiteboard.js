@@ -26,16 +26,25 @@ const statusToStageMap = {
     'consultation': 'consultation',
     'roomed': 'consultation',
     'provider_started': 'consultation',
-    'waiting_admission': 'waiting_admission',
+
+    // *** ADDED: normalize observation/admission statuses from doctor backend ***
     'waiting_observation': 'waiting_observation',
+    'in_observation': 'waiting_observation',   // doctor sets this → show as For Observation
+    'observation': 'waiting_observation',      // safety alias
+
+    'waiting_admission': 'waiting_admission',
+    'admitted_non_icu': 'waiting_admission',   // in admission pipeline
+    'admitted_icu': 'waiting_admission',       // in admission pipeline
+
     'waiting_discharge': 'waiting_discharge',
+
     'admission_orders': 'admission_orders',
     'awaiting_non_icu': 'awaiting_non_icu',
     'awaiting_icu': 'awaiting_icu',
     'discharge_documents': 'discharge_documents',
     'awaiting_departure': 'awaiting_departure',
     'dispositioned': 'waiting_discharge',
-    'departed': 'departed'
+    'departed': 'departed',
 };
 
 // normalize raw status to snake_case key and map to frontend stage
