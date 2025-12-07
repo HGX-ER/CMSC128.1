@@ -257,6 +257,20 @@ const activePatients = showDeparted
     return activePatients.filter(p => p.currentStage === stage);
   };
 
+  // NEW helper: total patients in the admission pipeline
+const getForAdmissionTotal = () => {
+  const admissionStages = [
+    "waitingadmission",   // For Admission
+    "admissionorders",    // Admitting Orders In
+    "awaitingnonicu",     // Awaiting transfer to Non-ICU
+    "awaitingicu",        // Awaiting transfer to ICU
+  ];
+  return admissionStages.reduce(
+    (sum, s) => sum + getPatientsByStage(s).length,
+    0
+  );
+};
+
   const handleEndMonitoring = (patientId) => {
     onMoveToStage(patientId, 'departed');
     onUpdatePatient(patientId, { isActive: false });
@@ -271,40 +285,65 @@ const activePatients = showDeparted
     return 'Unknown';
   };
 
+  // Split stored diagnosis into doctor's note and ICD-10 list
+const splitDiagnosis = (full) => {
+  if (!full) return { note: "", icd: "" };
+
+  const marker = "ICD-10 Codes:";
+  const idx = full.indexOf(marker);
+
+  if (idx === -1) {
+    // No marker → treat whole thing as free-text note
+    return { note: full.trim(), icd: "" };
+  }
+
+  const note = full.slice(0, idx).trim();
+  const icd = full.slice(idx + marker.length).trim();
+
+  return { note, icd };
+};
+
+
   const isOverThreshold = (patient, stage) => {
     const threshold = TIME_THRESHOLDS[stage];
     if (!threshold) return false;
     return getStageTime(patient, stage) > threshold;
   };
 
-  const getStageAlerts = () => {
-    const alerts = [];
+const getStageAlerts = () => {
+  const alerts = [];
 
-    // Time threshold alerts
-    activePatients.forEach(patient => {
-      const threshold = TIME_THRESHOLDS[patient.currentStage];
-      if (threshold && getStageTime(patient) > threshold) {
-        alerts.push({
-          type: 'time',
-          message: `${patient.name} has been in ${STAGE_LABELS[patient.currentStage]} for ${getStageTime(patient)} minutes (threshold: ${threshold}m)`,
-          patient: patient
-        });
-      }
-    });
+  // 🔒 Only monitor non‑departed, active patients for alerts
+  const monitoredPatients = activePatients.filter(
+    (patient) => patient.currentStage !== 'departed' && patient.isActive !== false
+  );
 
-    // ESI 1-2 alerts
-    activePatients.forEach(patient => {
-      if ((patient.esiLevel === 1 || patient.esiLevel === 2) && getTotalTime(patient) > 30) {
-        alerts.push({
-          type: 'priority',
-          message: `High priority patient ${patient.name} (ESI ${patient.esiLevel}) has been waiting ${getTotalTime(patient)} minutes`,
-          patient: patient
-        });
-      }
-    });
+  // Time threshold alerts
+  monitoredPatients.forEach(patient => {
+    const threshold = TIME_THRESHOLDS[patient.currentStage];
+    if (threshold && getStageTime(patient, patient.currentStage) > threshold) {
+      alerts.push({
+        type: 'time',
+        message: `${patient.name} has been in ${STAGE_LABELS[patient.currentStage]} for ${getStageTime(patient, patient.currentStage)} minutes (threshold: ${threshold}m)`,
+        patient,
+      });
+    }
+  });
 
-    return alerts;
-  };
+  // ESI 1–2 alerts
+  monitoredPatients.forEach(patient => {
+    if ((patient.esiLevel === 1 || patient.esiLevel === 2) && getTotalTime(patient) > 30) {
+      alerts.push({
+        type: 'priority',
+        message: `High priority patient ${patient.name} (ESI ${patient.esiLevel}) has been waiting ${getTotalTime(patient)} minutes`,
+        patient,
+      });
+    }
+  });
+
+  return alerts;
+};
+
 
   const alerts = getStageAlerts();
 
@@ -671,7 +710,8 @@ const activePatients = showDeparted
                     <TableHead>Age</TableHead>
                     <TableHead>Sex</TableHead>
                     <TableHead>Chief Complaint</TableHead>
-                    <TableHead>Diagnosis</TableHead>
+                    <TableHead>Diagnosis (Doctor Note)</TableHead>
+                    <TableHead>ICD-10 Codes</TableHead> 
                     <TableHead>Stage of Care</TableHead>
                     <TableHead>Stage Time</TableHead>
                     <TableHead>Feedback</TableHead>
@@ -687,98 +727,140 @@ const activePatients = showDeparted
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredActivePatients.map((patient) => {
-                      const hasNewFeedback = newFeedbackPatients.has(patient.id);
-                      const feedbackCount = backendFeedback.filter(f => f.queue_number === patient.id).length;
-                      
-                      // ✅ ADDED: Gray out departed patients
-                      const isDeparted = patient.currentStage === 'departed';
+filteredActivePatients.map((patient) => {
+  const hasNewFeedback = newFeedbackPatients.has(patient.id);
+  const feedbackCount = backendFeedback.filter(
+    (f) => f.queue_number === patient.id
+  ).length;
 
-                      return (
-                        <TableRow 
-                          key={patient.id} 
-                          className={`
-                            ${hasNewFeedback ? 'animate-pulse bg-green-50' : ''}
-                            ${isDeparted ? 'bg-gray-100 opacity-60' : ''}
-                          `}
-                        >
-                          <TableCell>
-                            <Badge variant="outline" className={`font-mono ${isDeparted ? 'bg-gray-200' : ''}`}>
-                              {patient.id}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{patient.arrivalTime.toLocaleTimeString()}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{getTotalTime(patient)}m</Badge>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {patient.name || 'Not registered'}
-                          </TableCell>
-                          <TableCell>{getPatientAge(patient)}</TableCell>
-                          <TableCell>{patient.sex || '-'}</TableCell>
-                          <TableCell className="max-w-xs truncate">
-                            {patient.chiefComplaint || '-'}
-                          </TableCell>
-                          <TableCell className="max-w-xs truncate">
-                            {patient.diagnosis || '-'}
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <Badge 
-                                variant={isDeparted ? "secondary" : "outline"}
-                                className={isDeparted ? "bg-gray-300 text-gray-700" : ""}
-                              >
-                                {STAGE_LABELS[patient.currentStage]}
-                              </Badge>
-                              {patient.esiLevel && (
-                                <Badge className={ESI_COLORS[patient.esiLevel]}>
-                                  ESI {patient.esiLevel}
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={isOverThreshold(patient, patient.currentStage) ? "destructive" : "outline"}>
-                              {getStageTime(patient)}m
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {feedbackCount > 0 && (
-                              <div className="flex items-center gap-1">
-                                <MessageSquare className={`w-4 h-4 ${hasNewFeedback ? 'text-green-600 animate-bounce' : 'text-blue-600'}`} />
-                                <Badge 
-                                  variant="outline" 
-                                  className={hasNewFeedback ? 'bg-green-100 border-green-500 text-green-800 animate-pulse' : 'bg-blue-100 border-blue-500 text-blue-800'}
-                                >
-                                  {feedbackCount}
-                                </Badge>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {(patient.esiLevel === 1 || patient.esiLevel === 2) && getTotalTime(patient) > 30 && (
-                              <AlertTriangle className="h-4 w-4 text-red-500" />
-                            )}
-                            {isOverThreshold(patient, patient.currentStage) && (
-                              <Clock className="h-4 w-4 text-orange-500" />
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {!isDeparted && patient.currentStage === 'awaiting_departure' && (
-                              <Button 
-                                size="sm" 
-                                onClick={() => handleEndMonitoring(patient.id)}
-                              >
-                                End Monitoring
-                              </Button>
-                            )}
-                            {isDeparted && (
-                              <span className="text-gray-400 text-sm">Completed</span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
+  // ✅ ADDED: Gray out departed patients
+  const isDeparted = patient.currentStage === "departed";
+
+  // ✅ NEW: split diagnosis into doctor's note vs ICD-10 codes
+  const { note: diagnosisNote, icd: icdCodes } = splitDiagnosis(
+    patient.diagnosis
+  );
+
+  return (
+    <TableRow
+      key={patient.id}
+      className={`
+        ${hasNewFeedback ? "animate-pulse bg-green-50" : ""}
+        ${isDeparted ? "bg-gray-100 opacity-60" : ""}
+      `}
+    >
+      <TableCell>
+        <Badge
+          variant="outline"
+          className={`font-mono ${isDeparted ? "bg-gray-200" : ""}`}
+        >
+          {patient.id}
+        </Badge>
+      </TableCell>
+
+      <TableCell>{patient.arrivalTime.toLocaleTimeString()}</TableCell>
+
+      <TableCell>
+        <Badge variant="outline">{getTotalTime(patient)}m</Badge>
+      </TableCell>
+
+      <TableCell className="font-medium">
+        {patient.name || "Not registered"}
+      </TableCell>
+
+      <TableCell>{getPatientAge(patient)}</TableCell>
+      <TableCell>{patient.sex || "-"}</TableCell>
+
+      <TableCell className="max-w-xs truncate">
+        {patient.chiefComplaint || "-"}
+      </TableCell>
+
+      {/* ✅ NEW: doctor's diagnosis narrative */}
+      <TableCell className="max-w-xs truncate">
+        {diagnosisNote || "-"}
+      </TableCell>
+
+      {/* ✅ NEW: ICD-10 codes only */}
+      <TableCell className="max-w-xs truncate font-mono text-xs">
+        {icdCodes || "-"}
+      </TableCell>
+
+      <TableCell>
+        <div className="space-y-1">
+          <Badge
+            variant={isDeparted ? "secondary" : "outline"}
+            className={isDeparted ? "bg-gray-300 text-gray-700" : ""}
+          >
+            {STAGE_LABELS[patient.currentStage]}
+          </Badge>
+          {patient.esiLevel && (
+            <Badge className={ESI_COLORS[patient.esiLevel]}>
+              ESI {patient.esiLevel}
+            </Badge>
+          )}
+        </div>
+      </TableCell>
+
+      <TableCell>
+        <Badge
+          variant={
+            isOverThreshold(patient, patient.currentStage)
+              ? "destructive"
+              : "outline"
+          }
+        >
+          {getStageTime(patient)}m
+        </Badge>
+      </TableCell>
+
+      <TableCell>
+        {feedbackCount > 0 && (
+          <div className="flex items-center gap-1">
+            <MessageSquare
+              className={`w-4 h-4 ${
+                hasNewFeedback
+                  ? "text-green-600 animate-bounce"
+                  : "text-blue-600"
+              }`}
+            />
+            <Badge
+              variant="outline"
+              className={
+                hasNewFeedback
+                  ? "bg-green-100 border-green-500 text-green-800 animate-pulse"
+                  : "bg-blue-100 border-blue-500 text-blue-800"
+              }
+            >
+              {feedbackCount}
+            </Badge>
+          </div>
+        )}
+      </TableCell>
+
+      <TableCell>
+        {(patient.esiLevel === 1 || patient.esiLevel === 2) &&
+          getTotalTime(patient) > 30 && (
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+          )}
+        {isOverThreshold(patient, patient.currentStage) && (
+          <Clock className="h-4 w-4 text-orange-500" />
+        )}
+      </TableCell>
+
+      <TableCell>
+        {!isDeparted && patient.currentStage === "awaiting_departure" && (
+          <Button size="sm" onClick={() => handleEndMonitoring(patient.id)}>
+            End Monitoring
+          </Button>
+        )}
+        {isDeparted && (
+          <span className="text-gray-400 text-sm">Completed</span>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+})
+
                   )}
                 </TableBody>
               </Table>

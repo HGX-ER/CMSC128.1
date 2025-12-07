@@ -47,6 +47,25 @@ const STAGE_LABELS = {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
+// Split stored diagnosis into doctor's note and ICD-10 list
+const splitDiagnosis = (full) => {
+  if (!full) return { note: "", icd: "" };
+
+  const marker = "ICD-10 Codes:";
+  const idx = full.indexOf(marker);
+
+  if (idx === -1) {
+    // No marker → whole thing is the free-text diagnosis
+    return { note: full.trim(), icd: "" };
+  }
+
+  const note = full.slice(0, idx).trim();
+  const icd = full.slice(idx + marker.length).trim();
+
+  return { note, icd };
+};
+
+
 export function DashboardInterface({ patients, getTotalTime, getStageTime }) {
   const now = new Date();
   const initialIsDay = now.getHours() >= 8 && now.getHours() < 20;
@@ -184,7 +203,19 @@ useEffect(() => {
 
   const displayedCodes = icdSearchTerm.length >= 2 ? icd10SearchResults : icd10Codes;
 
-  const analytics = useMemo(() => {
+const analytics = useMemo(() => {
+    const getGeneration = (birthYear) => {
+  if (!birthYear || Number.isNaN(birthYear)) return "Unknown";
+
+  if (birthYear >= 2013) return "Gen Alpha";       // optional
+  if (birthYear >= 1997) return "Gen Z";          // 1997–2012 [web:38][web:39][web:40]
+  if (birthYear >= 1981) return "Millennial";     // 1981–1996 [web:43][web:46]
+  if (birthYear >= 1965) return "Gen X";          // 1965–1980 [web:44][web:53]
+  if (birthYear >= 1946) return "Baby Boomer";    // 1946–1964 [web:47][web:55]
+  return "Silent+";
+};
+
+
     const basePatients = patients.filter(p => {
       if (fromDate) {
         const pDate = p.arrivalTime.toISOString().slice(0, 10);
@@ -209,69 +240,237 @@ useEffect(() => {
       return true;
     });
 
-    const activePatients = basePatients.filter(p => p.isActive && p.currentStage !== 'departed');
-    const completedPatients = basePatients.filter(p => !p.isActive || p.currentStage === 'departed');
+    const activePatients = basePatients.filter(
+      p => p.isActive && p.currentStage !== 'departed'
+    );
+    const completedPatients = basePatients.filter(
+      p => !p.isActive || p.currentStage === 'departed'
+    );
 
     const computeShiftStartDate = (start, nowDate) => {
       const [sH, sM] = start.split(':').map(Number);
-      const sd = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate(), sH, sM, 0);
+      const sd = new Date(
+        nowDate.getFullYear(),
+        nowDate.getMonth(),
+        nowDate.getDate(),
+        sH,
+        sM,
+        0
+      );
       if (sd > nowDate) sd.setDate(sd.getDate() - 1);
       return sd;
     };
 
     const shiftStartDate = computeShiftStartDate(shiftStart, now);
-    const currentShiftPatients = patients.filter(p => p.arrivalTime >= shiftStartDate);
+    const currentShiftPatients = patients.filter(
+      p => p.arrivalTime >= shiftStartDate
+    );
 
     const stageCounts = Object.keys(STAGE_LABELS).map(stage => ({
       stage: STAGE_LABELS[stage],
-      count: activePatients.filter(p => p.currentStage === stage).length
+      count: activePatients.filter(p => p.currentStage === stage).length,
     }));
 
-    const avgTotalTime = completedPatients.length > 0
-      ? Math.round(completedPatients.reduce((sum, p) => sum + getTotalTime(p), 0) / completedPatients.length)
-      : 0;
+    const avgTotalTime =
+      completedPatients.length > 0
+        ? Math.round(
+            completedPatients.reduce(
+              (sum, p) => sum + getTotalTime(p),
+              0
+            ) / completedPatients.length
+          )
+        : 0;
 
     const hourlyData = Array.from({ length: 24 }, (_, hour) => {
-      const hourPatients = basePatients.filter(p => p.arrivalTime.getHours() === hour);
+      const hourPatients = basePatients.filter(
+        p => p.arrivalTime.getHours() === hour
+      );
       return {
         hour: hour.toString().padStart(2, '0') + ':00',
         patients: hourPatients.length,
-        avgWaitTime: hourPatients.length > 0
-          ? Math.round(hourPatients.reduce((sum, p) => sum + getTotalTime(p), 0) / hourPatients.length)
-          : 0
+        avgWaitTime:
+          hourPatients.length > 0
+            ? Math.round(
+                hourPatients.reduce(
+                  (sum, p) => sum + getTotalTime(p),
+                  0
+                ) / hourPatients.length
+              )
+            : 0,
       };
     });
 
-    const dispositions = completedPatients.reduce((acc, patient) => {
-      const disp = patient.disposition || 'Unknown';
-      acc[disp] = (acc[disp] || 0) + 1;
-      return acc;
-    }, {});
+const dispositions = completedPatients.reduce((acc, patient) => {
+  const disp = patient.disposition || 'Unknown';
+  acc[disp] = (acc[disp] || 0) + 1;
+  return acc;
+}, {});
 
-    const dispositionData = Object.entries(dispositions).map(([name, value]) => ({ name, value }));
+const dispositionData = Object.entries(dispositions).map(([name, value]) => ({ name, value }));
 
-    const demographics = completedPatients.reduce((acc, patient) => {
-      const ageGroup = patient.age ? (patient.age < 18 ? 'Pediatric' : 'Adult') : 'Unknown';
-      const sex = patient.sex || 'Unknown';
-      const key = `${ageGroup} ${sex}`;
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
+// 1) Keep your existing demographics reducer
+const demographics = completedPatients.reduce((acc, patient) => {
+  // 1) Try explicit age if present
+  let age = patient.age;
 
-    const diagnosisCount = completedPatients.reduce((acc, patient) => {
-      if (patient.diagnosis) {
-        const diag = patient.diagnosis.trim();
-        if (diag) {
-          acc[diag] = (acc[diag] || 0) + 1;
-        }
+  // 2) Derive age from dateOfBirth / dob if age missing
+  if ((age === undefined || age === null) && patient.dateOfBirth) {
+    const dob = new Date(patient.dateOfBirth);
+    if (!Number.isNaN(dob.getTime())) {
+      const today = new Date();
+      age = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+        age--;
       }
-      return acc;
-    }, {});
+    }
+  }
 
-    const top10Diagnoses = Object.entries(diagnosisCount)
-      .map(([diagnosis, count]) => ({ diagnosis, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+  // 3) Bucket by age group
+  let ageGroup;
+  if (typeof age === "number" && !Number.isNaN(age)) {
+    ageGroup = age < 18 ? "Pediatric" : "Adult";
+  } else {
+    ageGroup = "Unknown age";
+  }
+
+  // 4) Use sex from patients table, with fallback
+  const sex = (patient.sex || "Unknown sex").trim();
+
+  const key = `${ageGroup} • ${sex}`;
+  acc[key] = (acc[key] || 0) + 1;
+  return acc;
+}, {});
+
+// 2) Add THIS for the population pyramid (new code)
+const makeAgeBand = (age) => {
+  if (typeof age !== "number" || Number.isNaN(age)) return "Unknown";
+  if (age < 18) return "0–17";
+  if (age < 40) return "18–39";
+  if (age < 65) return "40–64";
+  return "65+";
+};
+
+// ----- Generation–sex population pyramid data -----
+const generationSexCounts = completedPatients.reduce((acc, patient) => {
+  // Derive birthYear from dateOfBirth or from age
+  let birthYear = null;
+
+  if (patient.dateOfBirth) {
+    const dob = new Date(patient.dateOfBirth);
+    if (!Number.isNaN(dob.getTime())) {
+      birthYear = dob.getFullYear();
+    }
+  } else if (typeof patient.age === "number" && !Number.isNaN(patient.age)) {
+    const thisYear = new Date().getFullYear();
+    birthYear = thisYear - patient.age;
+  }
+
+  const gen = getGeneration(birthYear);
+  if (!acc[gen]) acc[gen] = { male: 0, female: 0 };
+
+  const sex = (patient.sex || "").toLowerCase();
+  if (sex === "male") acc[gen].male += 1;
+  else if (sex === "female") acc[gen].female += 1;
+  else acc[gen].female += 1; // put unknown/other on positive side
+
+  return acc;
+}, {});
+
+// Convert to array; male negative so it appears on the left
+const ageSexPyramidData = Object.entries(generationSexCounts)
+  .map(([generation, { male, female }]) => ({
+    ageBand: generation,  // reuse ageBand field name for the Y axis
+    male: -male,
+    female,
+  }))
+  .sort((a, b) => {
+    const order = ["Gen Alpha", "Gen Z", "Millennial", "Gen X", "Baby Boomer", "Silent+", "Unknown"];
+    return order.indexOf(a.ageBand) - order.indexOf(b.ageBand);
+  });
+
+
+
+// Turn demographics object into array for charts
+const demographicsData = Object.entries(demographics).map(
+  ([name, value]) => ({ name, value })
+);
+
+// Sex distribution
+const sexCounts = completedPatients.reduce((acc, patient) => {
+  const sex = (patient.sex || "Unknown").trim();
+  acc[sex] = (acc[sex] || 0) + 1;
+  return acc;
+}, {});
+const sexData = Object.entries(sexCounts).map(([name, value]) => ({ name, value }));
+
+// Age-group distribution from age or DOB
+const ageGroupCounts = completedPatients.reduce((acc, patient) => {
+  let age = patient.age;
+  if ((age === undefined || age === null) && patient.dateOfBirth) {
+    const dob = new Date(patient.dateOfBirth);
+    if (!Number.isNaN(dob.getTime())) {
+      const today = new Date();
+      age = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+    }
+  }
+
+  let bucket = "Unknown age";
+  if (typeof age === "number" && !Number.isNaN(age)) {
+    if (age < 18) bucket = "0–17";
+    else if (age < 40) bucket = "18–39";
+    else if (age < 65) bucket = "40–64";
+    else bucket = "65+";
+  }
+
+  acc[bucket] = (acc[bucket] || 0) + 1;
+  return acc;
+}, {});
+const ageData = Object.entries(ageGroupCounts).map(([name, value]) => ({ name, value }));
+
+// Insurance info distribution
+const insuranceCounts = completedPatients.reduce((acc, patient) => {
+  const ins = (patient.insurance_info || "Unknown / Self-pay").trim();
+  acc[ins] = (acc[ins] || 0) + 1;
+  return acc;
+}, {});
+const insuranceData = Object.entries(insuranceCounts).map(([name, value]) => ({ name, value }));
+
+// City distribution from address (last comma-separated token)
+const cityCounts = completedPatients.reduce((acc, patient) => {
+  const raw = (patient.address || "").trim();
+  let city = "Unknown city";
+  if (raw) {
+    const parts = raw.split(",");
+    city = parts[parts.length - 1].trim() || "Unknown city";
+  }
+  acc[city] = (acc[city] || 0) + 1;
+  return acc;
+}, {});
+const cityData = Object.entries(cityCounts).map(([name, value]) => ({ name, value }));
+
+
+
+// Count top ICD‑10 diagnoses (codes/descriptions only)
+const diagnosisCount = completedPatients.reduce((acc, patient) => {
+  if (patient.diagnosis) {
+    const { icd } = splitDiagnosis(patient.diagnosis);
+    const diag = (icd || "").trim();
+
+    if (diag) {
+      acc[diag] = (acc[diag] || 0) + 1;
+    }
+  }
+  return acc;
+}, {});
+
+const top10Diagnoses = Object.entries(diagnosisCount)
+  .map(([diagnosis, count]) => ({ diagnosis, count }))
+  .sort((a, b) => b.count - a.count)
+  .slice(0, 10);
+
 
     return {
       currentShiftTotal: currentShiftPatients.length,
@@ -281,12 +480,27 @@ useEffect(() => {
       hourlyData,
       dispositionData,
       demographics,
-      totalAdmissions: completedPatients.filter(p => p.disposition?.includes('Admission')).length,
-      totalDischarges: completedPatients.filter(p => p.disposition === 'Discharge').length,
-      totalObservations: completedPatients.filter(p => p.disposition === 'Observation').length,
-      top10Diagnoses
+      demographicsData, 
+      ageSexPyramidData,  // ✅ add this
+      sexData,          // ✅ new
+      ageData,          // ✅ new
+      insuranceData,    // ✅ new
+       cityData,
+      // CHANGED: use basePatients so admitted_non_icu / admitted_icu count
+      totalAdmissions: basePatients.filter(
+        p => p.disposition && p.disposition.includes('Admission')
+      ).length,
+      totalDischarges: completedPatients.filter(
+        p => p.disposition === 'Discharge'
+      ).length,
+      // CHANGED: observations can be active or departed
+      totalObservations: basePatients.filter(
+        p => p.disposition === 'Observation'
+      ).length,
+      top10Diagnoses,
     };
   }, [patients, getTotalTime, shiftStart, shiftEnd, now, fromDate, toDate, fromTime, toTime]);
+
 
   return (
     <div className="p-6 space-y-6">
@@ -763,19 +977,125 @@ useEffect(() => {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Demographics Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {Object.entries(analytics.demographics).map(([demographic, count]) => (
-                  <div key={demographic} className="flex justify-between items-center">
-                    <span className="text-sm">{demographic}</span>
-                    <Badge variant="outline">{count}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+<Card>
+  <CardHeader>
+    <CardTitle>Demographics Breakdown</CardTitle>
+  </CardHeader>
+
+  <CardContent className="space-y-8">
+    {/* Overall demographics pie (age-group • sex buckets) */}
+    <ResponsiveContainer width="100%" height={250}>
+      <PieChart>
+        <Pie
+          data={analytics.demographicsData}
+          dataKey="value"
+          nameKey="name"
+          cx="50%"
+          cy="50%"
+          outerRadius={80}
+          label={({ name, percent }) =>
+            `${name}: ${(percent * 100).toFixed(0)}%`
+          }
+        >
+          {analytics.demographicsData.map((entry, index) => (
+            <Cell
+              key={`demo-cell-${index}`}
+              fill={COLORS[index % COLORS.length]}
+            />
+          ))}
+        </Pie>
+        <Tooltip />
+      </PieChart>
+    </ResponsiveContainer>
+
+    {/* Text breakdown below the main pie */}
+    <div className="space-y-2">
+      {Object.entries(analytics.demographics).map(
+        ([demographic, count]) => (
+          <div
+            key={demographic}
+            className="flex justify-between items-center"
+          >
+            <span className="text-sm">{demographic}</span>
+            <Badge variant="outline">{count}</Badge>
+          </div>
+        )
+      )}
+    </div>
+
+    {/* Extra mini‑charts for Age, Sex, Insurance, City */}
+    {/* Population pyramid + other demographics */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+      {/* Age–sex population pyramid (spans two columns on md+) */}
+      <div className="md:col-span-2">
+        <h4 className="text-sm font-semibold mb-2">
+          Age–Sex Population Pyramid
+        </h4>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart
+            data={analytics.ageSexPyramidData}
+            layout="vertical"
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              type="number"
+              tickFormatter={(value) => Math.abs(value)}
+            />
+            <YAxis type="category" dataKey="ageBand" />
+<Tooltip
+  formatter={(value, name) => [
+    Math.abs(value),
+    name === "Male" ? "Male" : "Female",
+  ]}
+/>
+
+            <Bar
+              dataKey="male"
+              name="Male"
+              fill="#3B82F6"
+            />
+            <Bar
+              dataKey="female"
+              name="Female"
+              fill="#EC4899"
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Insurance – horizontal bar for long labels */}
+      <div>
+        <h4 className="text-sm font-semibold mb-2">Insurance Info</h4>
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={analytics.insuranceData} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis type="number" allowDecimals={false} />
+            <YAxis type="category" dataKey="name" width={110} />
+            <Tooltip />
+            <Bar dataKey="value" fill="#FFBB28" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* City – horizontal/vertical bar from address */}
+      <div>
+        <h4 className="text-sm font-semibold mb-2">City (from Address)</h4>
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={analytics.cityData} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis type="number" allowDecimals={false} />
+            <YAxis type="category" dataKey="name" width={110} />
+            <Tooltip />
+            <Bar dataKey="value" fill="#82CA9D" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+
+  </CardContent>
+</Card>
+
+
           </div>
         </TabsContent>
 
