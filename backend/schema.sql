@@ -134,7 +134,7 @@ ON DUPLICATE KEY UPDATE
 
 -- SEED PATIENTS
 INSERT INTO patients (full_name, dob, sex, contact_number, emergency_contact, insurance_info, address) VALUES
-                                                                                                           ('Juan Dela Cruz', '2001-01-15', 'Male', '09171234567', 'Maria Cruz', 'PhilHealth', 'Manila')
+    ('Juan Dela Cruz', '2001-01-15', 'Male', '09171234567', 'Maria Cruz', 'PhilHealth', 'Manila')
 ON DUPLICATE KEY UPDATE
                      full_name = VALUES(full_name),
                      dob = VALUES(dob),
@@ -158,3 +158,4 @@ CREATE TABLE encounter_icd_codes (
 
 CREATE INDEX idx_icd_encounter ON encounter_icd_codes(encounter_id);
 CREATE INDEX idx_icd_code ON encounter_icd_codes(icd_code);
+

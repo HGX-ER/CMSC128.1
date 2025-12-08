@@ -1,4 +1,3 @@
-// routes/admin.js
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
@@ -10,9 +9,9 @@ const db = require("../db");
 router.get("/admin/users", async (req, res) => {
     try {
         const [rows] = await db.query(
-            `SELECT id, username, role, full_name, specialty, room, floor, 
-              email, phone, status 
-       FROM users`
+            `SELECT id, username, role, full_name, specialty, room, floor,
+                    email, phone, status
+             FROM users`
         );
         res.json(rows);
     } catch (err) {
@@ -27,22 +26,53 @@ router.get("/admin/users", async (req, res) => {
 ============================= */
 router.post("/admin/users", async (req, res) => {
     try {
-        const { username, password, role, full_name, specialty, room, floor, email, phone } = req.body;
+        // Accept name/department from frontend, map to full_name/specialty
+        const {
+            username,
+            password,
+            role,
+            name,
+            full_name,
+            department,
+            specialty,
+            room,
+            floor,
+            email,
+            phone,
+        } = req.body;
 
         if (!username || !password || !role) {
-            return res.status(400).json({ error: "Missing required fields: username, password, role" });
+            return res
+                .status(400)
+                .json({ error: "Missing required fields: username, password, role" });
         }
 
         // Check if username already exists
-        const [existing] = await db.query("SELECT id FROM users WHERE username = ?", [username]);
+        const [existing] = await db.query(
+            "SELECT id FROM users WHERE username = ?",
+            [username]
+        );
         if (existing.length > 0) {
             return res.status(400).json({ error: "Username already exists" });
         }
 
+        const finalName = name || full_name || null;
+        const finalSpecialty = department || specialty || null;
+
         const [result] = await db.query(
             `INSERT INTO users (username, password, role, full_name, specialty, room, floor, email, phone, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
-            [username, password, role, full_name || null, specialty || null, room || null, floor || null, email || null, phone || null]
+            [
+                username,
+                password,
+                role,
+                finalName,
+                finalSpecialty,
+                room || null,
+                floor || null,
+                email || null,
+                phone || null,
+            ]
         );
 
         res.json({ success: true, id: result.insertId });
@@ -59,14 +89,39 @@ router.post("/admin/users", async (req, res) => {
 router.put("/admin/users/:id", async (req, res) => {
     try {
         const id = req.params.id;
-        const { full_name, specialty, room, floor, role, email, phone, status } = req.body;
+
+        const {
+            name,
+            full_name,
+            department,
+            specialty,
+            room,
+            floor,
+            role,
+            email,
+            phone,
+            status,
+        } = req.body;
+
+        const finalName = name || full_name || null;
+        const finalSpecialty = department || specialty || null;
 
         await db.query(
             `UPDATE users
              SET full_name = ?, specialty = ?, room = ?, floor = ?, role = ?,
                  email = ?, phone = ?, status = ?
              WHERE id = ?`,
-            [full_name, specialty, room, floor, role, email || null, phone || null, status || 'active', id]
+            [
+                finalName,
+                finalSpecialty,
+                room || null,
+                floor || null,
+                role,
+                email || null,
+                phone || null,
+                status || "active",
+                id,
+            ]
         );
 
         res.json({ success: true });
@@ -86,10 +141,15 @@ router.put("/admin/users/:id/password", async (req, res) => {
         const { password } = req.body;
 
         if (!password || password.length < 6) {
-            return res.status(400).json({ error: "Password must be at least 6 characters" });
+            return res
+                .status(400)
+                .json({ error: "Password must be at least 6 characters" });
         }
 
-        await db.query("UPDATE users SET password = ? WHERE id = ?", [password, id]);
+        await db.query("UPDATE users SET password = ? WHERE id = ?", [
+            password,
+            id,
+        ]);
 
         res.json({ success: true });
     } catch (err) {
