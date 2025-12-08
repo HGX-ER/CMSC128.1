@@ -26,7 +26,16 @@ export function TriageInterface({ onBack }) {
         const res = await fetch("http://localhost:5000/api/triage");
         if (!res.ok) throw new Error("Failed to fetch triage patients");
         const data = await res.json();
-        setWaitingPatients(data);
+        // exclude locally canceled queue numbers so canceled numbers won't appear in triage UI
+        let canceled = [];
+        try {
+          const raw = localStorage.getItem("canceledQueueNumbers");
+          canceled = raw ? JSON.parse(raw) : [];
+        } catch (e) {
+          console.error("Failed to read canceledQueueNumbers from localStorage", e);
+        }
+        const filtered = data.filter((p) => !canceled.includes(p.queue_number));
+        setWaitingPatients(filtered);
       } catch (err) {
         console.error(err);
         setError("Failed to load triage patients");

@@ -2,11 +2,14 @@
 <dataSource name="@localhost">
   <database-model serializer="dbm" dbms="MYSQL" family-id="MYSQL" format-version="4.53">
     <root id="1">
+      <DefaultAuthPlugin>caching_sha2_password</DefaultAuthPlugin>
       <DefaultCasing>lower/lower</DefaultCasing>
       <DefaultEngine>InnoDB</DefaultEngine>
       <DefaultTmpEngine>InnoDB</DefaultTmpEngine>
       <Grants>|root||root|localhost|ALTER|G
+|root||xtian_cmt7||ALTER|G
 |root||root|localhost|ALTER ROUTINE|G
+|root||xtian_cmt7||ALTER ROUTINE|G
 |root||root|localhost|APPLICATION_PASSWORD_ADMIN|G
 |root||mysql.infoschema|localhost|AUDIT_ABORT_EXEMPT|G
 |root||mysql.session|localhost|AUDIT_ABORT_EXEMPT|G
@@ -24,19 +27,30 @@
 |root||mysql.session|localhost|CONNECTION_ADMIN|G
 |root||root|localhost|CONNECTION_ADMIN|G
 |root||root|localhost|CREATE|G
+|root||xtian_cmt7||CREATE|G
 |root||root|localhost|CREATE ROLE|G
 |root||root|localhost|CREATE ROUTINE|G
+|root||xtian_cmt7||CREATE ROUTINE|G
 |root||root|localhost|CREATE TABLESPACE|G
+|root||xtian_cmt7||CREATE TABLESPACE|G
 |root||root|localhost|CREATE TEMPORARY TABLES|G
+|root||xtian_cmt7||CREATE TEMPORARY TABLES|G
 |root||root|localhost|CREATE USER|G
+|root||xtian_cmt7||CREATE USER|G
 |root||root|localhost|CREATE VIEW|G
+|root||xtian_cmt7||CREATE VIEW|G
 |root||root|localhost|DELETE|G
+|root||xtian_cmt7||DELETE|G
 |root||root|localhost|DROP|G
+|root||xtian_cmt7||DROP|G
 |root||root|localhost|DROP ROLE|G
 |root||root|localhost|ENCRYPTION_KEY_ADMIN|G
 |root||root|localhost|EVENT|G
+|root||xtian_cmt7||EVENT|G
 |root||root|localhost|EXECUTE|G
+|root||xtian_cmt7||EXECUTE|G
 |root||root|localhost|FILE|G
+|root||xtian_cmt7||FILE|G
 |root||mysql.infoschema|localhost|FIREWALL_EXEMPT|G
 |root||mysql.session|localhost|FIREWALL_EXEMPT|G
 |root||mysql.sys|localhost|FIREWALL_EXEMPT|G
@@ -48,18 +62,26 @@
 |root||root|localhost|GROUP_REPLICATION_ADMIN|G
 |root||root|localhost|GROUP_REPLICATION_STREAM|G
 |root||root|localhost|INDEX|G
+|root||xtian_cmt7||INDEX|G
 |root||root|localhost|INNODB_REDO_LOG_ARCHIVE|G
 |root||root|localhost|INNODB_REDO_LOG_ENABLE|G
 |root||root|localhost|INSERT|G
+|root||xtian_cmt7||INSERT|G
 |root||root|localhost|LOCK TABLES|G
+|root||xtian_cmt7||LOCK TABLES|G
 |root||root|localhost|PASSWORDLESS_USER_ADMIN|G
 |root||mysql.session|localhost|PERSIST_RO_VARIABLES_ADMIN|G
 |root||root|localhost|PERSIST_RO_VARIABLES_ADMIN|G
 |root||root|localhost|PROCESS|G
+|root||xtian_cmt7||PROCESS|G
 |root||root|localhost|REFERENCES|G
+|root||xtian_cmt7||REFERENCES|G
 |root||root|localhost|RELOAD|G
+|root||xtian_cmt7||RELOAD|G
 |root||root|localhost|REPLICATION CLIENT|G
+|root||xtian_cmt7||REPLICATION CLIENT|G
 |root||root|localhost|REPLICATION SLAVE|G
+|root||xtian_cmt7||REPLICATION SLAVE|G
 |root||root|localhost|REPLICATION_APPLIER|G
 |root||root|localhost|REPLICATION_SLAVE_ADMIN|G
 |root||root|localhost|RESOURCE_GROUP_ADMIN|G
@@ -67,18 +89,23 @@
 |root||root|localhost|ROLE_ADMIN|G
 |root||mysql.infoschema|localhost|SELECT|G
 |root||root|localhost|SELECT|G
+|root||xtian_cmt7||SELECT|G
 |root||root|localhost|SENSITIVE_VARIABLES_OBSERVER|G
 |root||root|localhost|SERVICE_CONNECTION_ADMIN|G
 |root||mysql.session|localhost|SESSION_VARIABLES_ADMIN|G
 |root||root|localhost|SESSION_VARIABLES_ADMIN|G
 |root||root|localhost|SET_USER_ID|G
 |root||root|localhost|SHOW DATABASES|G
+|root||xtian_cmt7||SHOW DATABASES|G
 |root||root|localhost|SHOW VIEW|G
+|root||xtian_cmt7||SHOW VIEW|G
 |root||root|localhost|SHOW_ROUTINE|G
 |root||mysql.session|localhost|SHUTDOWN|G
 |root||root|localhost|SHUTDOWN|G
+|root||xtian_cmt7||SHUTDOWN|G
 |root||mysql.session|localhost|SUPER|G
 |root||root|localhost|SUPER|G
+|root||xtian_cmt7||SUPER|G
 |root||mysql.infoschema|localhost|SYSTEM_USER|G
 |root||mysql.session|localhost|SYSTEM_USER|G
 |root||mysql.sys|localhost|SYSTEM_USER|G
@@ -88,12 +115,15 @@
 |root||root|localhost|TABLE_ENCRYPTION_ADMIN|G
 |root||root|localhost|TELEMETRY_LOG_ADMIN|G
 |root||root|localhost|TRIGGER|G
+|root||xtian_cmt7||TRIGGER|G
 |root||root|localhost|UPDATE|G
+|root||xtian_cmt7||UPDATE|G
 |root||root|localhost|XA_RECOVER_ADMIN|G
 |root||root|localhost|grant option|G
+|root||xtian_cmt7||grant option|G
 performance_schema|schema||mysql.session|localhost|SELECT|G
 sys|schema||mysql.sys|localhost|TRIGGER|G</Grants>
-      <ServerVersion>8.0.43</ServerVersion>
+      <ServerVersion>8.0.44</ServerVersion>
     </root>
     <collation id="2" parent="1" name="armscii8_bin">
       <Charset>armscii8</Charset>
@@ -997,66 +1027,69 @@ sys|schema||mysql.sys|localhost|TRIGGER|G</Grants>
     <schema id="288" parent="1" name="information_schema">
       <CollationName>utf8mb3_general_ci</CollationName>
     </schema>
-    <schema id="289" parent="1" name="intelli_check">
+    <schema id="289" parent="1" name="mysql">
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </schema>
-    <schema id="290" parent="1" name="mysql">
+    <schema id="290" parent="1" name="performance_schema">
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </schema>
-    <schema id="291" parent="1" name="performance_schema">
+    <schema id="291" parent="1" name="sys">
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </schema>
-    <schema id="292" parent="1" name="sys">
+    <schema id="292" parent="1" name="testdb">
+      <AutoIntrospectionLevel>3</AutoIntrospectionLevel>
+      <LastIntrospectionLevel>3</LastIntrospectionLevel>
+      <LastIntrospectionLocalTimestamp>2025-12-08.09:26:29</LastIntrospectionLocalTimestamp>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </schema>
-    <schema id="293" parent="1" name="testdb">
-      <LastIntrospectionLocalTimestamp>2025-12-07.09:25:41</LastIntrospectionLocalTimestamp>
-      <CollationName>utf8mb4_0900_ai_ci</CollationName>
-    </schema>
-    <user id="294" parent="1" name="mysql.infoschema">
+    <user id="293" parent="1" name="mysql.infoschema">
       <CanLogin>0</CanLogin>
       <Host>localhost</Host>
-      <Plugin>caching_sha2_password</Plugin>
     </user>
-    <user id="295" parent="1" name="mysql.session">
+    <user id="294" parent="1" name="mysql.session">
       <CanLogin>0</CanLogin>
       <Host>localhost</Host>
-      <Plugin>caching_sha2_password</Plugin>
     </user>
-    <user id="296" parent="1" name="mysql.sys">
+    <user id="295" parent="1" name="mysql.sys">
       <CanLogin>0</CanLogin>
       <Host>localhost</Host>
-      <Plugin>caching_sha2_password</Plugin>
     </user>
-    <user id="297" parent="1" name="root">
+    <user id="296" parent="1" name="root">
       <Host>localhost</Host>
-      <Plugin>caching_sha2_password</Plugin>
     </user>
-    <table id="298" parent="293" name="encounter_events">
+    <user id="297" parent="1" name="xtian_cmt7"/>
+    <table id="298" parent="292" name="encounter_events">
+      <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="299" parent="293" name="encounter_icd_codes">
+    <table id="299" parent="292" name="encounter_icd_codes">
+      <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="300" parent="293" name="encounters">
+    <table id="300" parent="292" name="encounters">
+      <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="301" parent="293" name="observations">
+    <table id="301" parent="292" name="observations">
+      <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="302" parent="293" name="patient_feedback">
+    <table id="302" parent="292" name="patient_feedback">
+      <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="303" parent="293" name="patients">
+    <table id="303" parent="292" name="patients">
+      <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="304" parent="293" name="users">
+    <table id="304" parent="292" name="users">
+      <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>

@@ -19,13 +19,13 @@ export const DEMO_USERS = {
       department: 'Emergency Medicine'
     }
   },
-  'dr.johnson': {
+  'dr.jones': {
     password: 'doctor123',
     user: {
       id: '5',
-      username: 'dr.johnson',
+      username: 'dr.jones',
       role: 'doctor',
-      name: 'Dr. Robert Johnson',
+      name: 'Dr. Becky Jones',
       department: 'Emergency Medicine'
     }
   },

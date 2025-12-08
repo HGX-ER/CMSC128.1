@@ -48,25 +48,11 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       building: 'Main Hospital Building',
       floor: '2nd Floor'
     },
-    'dr.johnson': { 
-      name: 'Dr. Michael Johnson',
-      photo: 'https://images.unsplash.com/photo-1615177393114-bd2917a4f74a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtYWxlJTIwZG9jdG9yJTIwcG9ydHJhaXR8ZW58MXx8fHwxNzYwNjA5MDI5fDA&ixlib=rb-4.1.0&q=80&w=1080',
+    'dr.jones': { 
+      name: 'Dr. Becky Jones',
+      photo: 'https://images.unsplash.com/photo-1719610894782-7b376085e200?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmZW1hbGUlMjBkb2N0b3IlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjA1ODg4OTh8MA&ixlib=rb-4.1.0&q=80&w=1080',
       room: '203',
       building: 'Main Hospital Building',
-      floor: '2nd Floor'
-    },
-    'dr.davis': { 
-      name: 'Dr. Emily Davis',
-      photo: 'https://images.unsplash.com/photo-1612523138351-4643808db8f3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkb2N0b3IlMjBwcm9mZXNzaW9uYWwlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjA2MDEwNDZ8MA&ixlib=rb-4.1.0&q=80&w=1080',
-      room: '205',
-      building: 'Pediatric Wing',
-      floor: '2nd Floor'
-    },
-    'dr.brown': { 
-      name: 'Dr. James Brown',
-      photo: 'https://images.unsplash.com/photo-1615177393114-bd2917a4f74a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtYWxlJTIwZG9jdG9yJTIwcG9ydHJhaXR8ZW58MXx8fHwxNzYwNjA5MDI5fDA&ixlib=rb-4.1.0&q=80&w=1080',
-      room: '207',
-      building: 'Trauma Center',
       floor: '2nd Floor'
     },
     'nurse.williams': { 

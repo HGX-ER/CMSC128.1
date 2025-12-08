@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -24,7 +24,9 @@ import {
   Ticket,
   Printer,
   CheckCircle,
+  X,
 } from "lucide-react";
+import api from "../lib/api";
 
 const ROLE_INFO = {
   patient: {
@@ -70,6 +72,8 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
   const [generatedQueueNumber, setGeneratedQueueNumber] = useState("");
   const [showGenerator, setShowGenerator] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const generationTimer = useRef(null);
+  const autoLoginTimer = useRef(null);
 
   // Reset form when component mounts (after logout)
   useEffect(() => {
@@ -82,6 +86,18 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
     setShowGenerator(false);
     setActiveTab("patient");
     setIsGenerating(false);
+
+    // cleanup timers on unmount
+    return () => {
+      if (generationTimer.current) {
+        clearTimeout(generationTimer.current);
+        generationTimer.current = null;
+      }
+      if (autoLoginTimer.current) {
+        clearTimeout(autoLoginTimer.current);
+        autoLoginTimer.current = null;
+      }
+    };
   }, []);
 
   const handleStaffSubmit = async (e) => {
@@ -141,9 +157,12 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
         setGeneratedQueueNumber(data.queueNumber);
         setShowGenerator(true);
 
-        setTimeout(() => {
+        // schedule auto-use; keep a ref so cancel can stop it
+        if (generationTimer.current) clearTimeout(generationTimer.current);
+        generationTimer.current = setTimeout(() => {
+          generationTimer.current = null;
           handleUseGeneratedNumber(true, data.queueNumber);
-        }, 5000);
+        }, 2000);
       } else {
         throw new Error(data.error || "Failed to generate queue number");
       }
@@ -159,11 +178,48 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
   const handleUseGeneratedNumber = async (autoCheck = false, newQueue) => {
     const numToUse = newQueue || generatedQueueNumber;
 
+    // check canceled numbers stored in localStorage
+    const canceledRaw = localStorage.getItem("canceledQueueNumbers");
+    const canceled = canceledRaw ? JSON.parse(canceledRaw) : [];
+
+    if (canceled.includes(numToUse)) {
+      // ensure it's removed from UI and timers cancelled
+      if (generationTimer.current) {
+        clearTimeout(generationTimer.current);
+        generationTimer.current = null;
+      }
+      if (autoLoginTimer.current) {
+        clearTimeout(autoLoginTimer.current);
+        autoLoginTimer.current = null;
+      }
+      setGeneratedQueueNumber("");
+      setShowGenerator(false);
+      return;
+    }
+
     if (autoCheck) {
+      // cancel the generation timer if it's pending
+      if (generationTimer.current) {
+        clearTimeout(generationTimer.current);
+        generationTimer.current = null;
+      }
+
       setQueueNumber(numToUse);
       setShowGenerator(false);
 
-      setTimeout(async () => {
+      // schedule the actual login; keep a ref so cancel can stop it
+      if (autoLoginTimer.current) clearTimeout(autoLoginTimer.current);
+      autoLoginTimer.current = setTimeout(async () => {
+        autoLoginTimer.current = null;
+
+        // re-check canceled before proceeding
+        const canceledNowRaw = localStorage.getItem("canceledQueueNumbers");
+        const canceledNow = canceledNowRaw ? JSON.parse(canceledNowRaw) : [];
+        if (canceledNow.includes(numToUse)) {
+          setIsLoading(false);
+          return;
+        }
+
         setIsLoading(true);
         setError("");
 
@@ -424,7 +480,7 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                           Please save this number. You'll need it to check your visit status.
                         </p>
                         <p className="text-xs text-gray-500">
-                          The generated queue number will be displayed for 5 seconds and automatically logins.
+                          The generated queue number will be displayed for 2 seconds and will automatically log you in.
                         </p>
                         <div className="flex gap-2">
                           <Button
@@ -450,25 +506,58 @@ export function LoginInterface({ onLogin, onQueueLogin }) {
                             Use This Number
                           </Button>
                         </div>
-                        <div className="text-center">
-                          <Button
-                            type="button"
-                            onClick={() => handleUseGeneratedNumber(true)}
-                            variant="outline"
-                            className="w-full"
-                            style={{ borderColor: "#4CAF50", color: "#4CAF50" }}
-                          >
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Check Status Now
-                          </Button>
-                        </div>
                         <Button
                           type="button"
-                          onClick={() => setShowGenerator(false)}
-                          variant="ghost"
+                          onClick={async () => {
+                            const num = generatedQueueNumber;
+
+                            // cancel pending timers
+                            if (generationTimer.current) {
+                              clearTimeout(generationTimer.current);
+                              generationTimer.current = null;
+                            }
+                            if (autoLoginTimer.current) {
+                              clearTimeout(autoLoginTimer.current);
+                              autoLoginTimer.current = null;
+                            }
+
+                            // attempt to delete from backend so the queue number is removed permanently
+                            if (num) {
+                              try {
+                                await api.delete(`/registration/patient/${encodeURIComponent(num)}`);
+                                // ensure triage/board reloads won't show it
+                              } catch (err) {
+                                console.warn("Failed to delete generated queue on backend", err);
+                                // fallback: persist canceled number locally so UI hides it until backend sync
+                                try {
+                                  const raw = localStorage.getItem("canceledQueueNumbers");
+                                  const list = raw ? JSON.parse(raw) : [];
+                                  if (!list.includes(num)) {
+                                    list.push(num);
+                                    localStorage.setItem("canceledQueueNumbers", JSON.stringify(list));
+                                  }
+                                } catch (e) {
+                                  console.error("Failed to persist canceled number", e);
+                                }
+                              }
+                            }
+
+                            // remove from UI
+                            setGeneratedQueueNumber("");
+                            setShowGenerator(false);
+                          }}
+                          style={{
+                            backgroundColor: "#ff4d4f",
+                            color: "white",
+                            border: "none",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: "bold"
+                          }}
                           className="w-full text-sm"
                         >
-                          Cancel
+                          <X className="w-4 h-4 mr-2" /> Cancel
                         </Button>
                       </div>
                     </CardContent>

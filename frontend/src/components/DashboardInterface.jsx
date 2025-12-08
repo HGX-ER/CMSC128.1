@@ -949,26 +949,59 @@ const top10Diagnoses = Object.entries(diagnosisCount)
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Patient disposition full width */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Patient Disposition</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={analytics.dispositionData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {analytics.dispositionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Demographics and pyramid side-by-side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Patient Disposition</CardTitle>
+                <CardTitle>Demographics Breakdown</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={analytics.dispositionData}
+                      data={analytics.demographicsData}
+                      dataKey="value"
+                      nameKey="name"
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                       outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
+                      label={({ name, percent }) =>
+                        `${name}: ${(percent * 100).toFixed(0)}%`
+                      }
                     >
-                      {analytics.dispositionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      {analytics.demographicsData.map((entry, index) => (
+                        <Cell
+                          key={`demo-cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
                       ))}
                     </Pie>
                     <Tooltip />
@@ -977,126 +1010,81 @@ const top10Diagnoses = Object.entries(diagnosisCount)
               </CardContent>
             </Card>
 
-<Card>
-  <CardHeader>
-    <CardTitle>Demographics Breakdown</CardTitle>
-  </CardHeader>
-
-  <CardContent className="space-y-8">
-    {/* Overall demographics pie (age-group • sex buckets) */}
-    <ResponsiveContainer width="100%" height={250}>
-      <PieChart>
-        <Pie
-          data={analytics.demographicsData}
-          dataKey="value"
-          nameKey="name"
-          cx="50%"
-          cy="50%"
-          outerRadius={80}
-          label={({ name, percent }) =>
-            `${name}: ${(percent * 100).toFixed(0)}%`
-          }
-        >
-          {analytics.demographicsData.map((entry, index) => (
-            <Cell
-              key={`demo-cell-${index}`}
-              fill={COLORS[index % COLORS.length]}
-            />
-          ))}
-        </Pie>
-        <Tooltip />
-      </PieChart>
-    </ResponsiveContainer>
-
-    {/* Text breakdown below the main pie */}
-    <div className="space-y-2">
-      {Object.entries(analytics.demographics).map(
-        ([demographic, count]) => (
-          <div
-            key={demographic}
-            className="flex justify-between items-center"
-          >
-            <span className="text-sm">{demographic}</span>
-            <Badge variant="outline">{count}</Badge>
+            <Card>
+              <CardHeader>
+                <CardTitle>Age–Sex Population Pyramid</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart
+                    data={analytics.ageSexPyramidData}
+                    layout="vertical"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      type="number"
+                      tickFormatter={(value) => Math.abs(value)}
+                    />
+                    <YAxis type="category" dataKey="ageBand" />
+                    <Tooltip
+                      formatter={(value, name) => [
+                        Math.abs(value),
+                        name === "Male" ? "Male" : "Female",
+                      ]}
+                    />
+                    <Bar
+                      dataKey="male"
+                      name="Male"
+                      fill="#3B82F6"
+                    />
+                    <Bar
+                      dataKey="female"
+                      name="Female"
+                      fill="#EC4899"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
           </div>
-        )
-      )}
-    </div>
 
-    {/* Extra mini‑charts for Age, Sex, Insurance, City */}
-    {/* Population pyramid + other demographics */}
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-      {/* Age–sex population pyramid (spans two columns on md+) */}
-      <div className="md:col-span-2">
-        <h4 className="text-sm font-semibold mb-2">
-          Age–Sex Population Pyramid
-        </h4>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart
-            data={analytics.ageSexPyramidData}
-            layout="vertical"
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              type="number"
-              tickFormatter={(value) => Math.abs(value)}
-            />
-            <YAxis type="category" dataKey="ageBand" />
-<Tooltip
-  formatter={(value, name) => [
-    Math.abs(value),
-    name === "Male" ? "Male" : "Female",
-  ]}
-/>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+  <Card>
+    <CardHeader>
+      <CardTitle>Insurance Info</CardTitle>
+    </CardHeader>
+    <CardContent>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={analytics.insuranceData} layout="vertical">
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis type="number" allowDecimals={false} />
+          <YAxis type="category" dataKey="name" width={110} />
+          <Tooltip />
+          <Bar dataKey="value" fill="#FFBB28" />
+        </BarChart>
+      </ResponsiveContainer>
+    </CardContent>
+  </Card>
 
-            <Bar
-              dataKey="male"
-              name="Male"
-              fill="#3B82F6"
-            />
-            <Bar
-              dataKey="female"
-              name="Female"
-              fill="#EC4899"
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Insurance – horizontal bar for long labels */}
-      <div>
-        <h4 className="text-sm font-semibold mb-2">Insurance Info</h4>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={analytics.insuranceData} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" allowDecimals={false} />
-            <YAxis type="category" dataKey="name" width={110} />
-            <Tooltip />
-            <Bar dataKey="value" fill="#FFBB28" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* City – horizontal/vertical bar from address */}
-      <div>
-        <h4 className="text-sm font-semibold mb-2">City (from Address)</h4>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={analytics.cityData} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" allowDecimals={false} />
-            <YAxis type="category" dataKey="name" width={110} />
-            <Tooltip />
-            <Bar dataKey="value" fill="#82CA9D" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-
-  </CardContent>
-</Card>
+  <Card>
+    <CardHeader>
+      <CardTitle>City (from Address)</CardTitle>
+    </CardHeader>
+    <CardContent>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={analytics.cityData} layout="vertical">
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis type="number" allowDecimals={false} />
+          <YAxis type="category" dataKey="name" width={110} />
+          <Tooltip />
+          <Bar dataKey="value" fill="#82CA9D" />
+        </BarChart>
+      </ResponsiveContainer>
+    </CardContent>
+  </Card>
+</div>
 
 
-          </div>
         </TabsContent>
 
         {/* ICD-10 Codes Tab */}

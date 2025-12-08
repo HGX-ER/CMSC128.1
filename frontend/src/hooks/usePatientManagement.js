@@ -23,7 +23,19 @@ export function usePatientManagement() {
       
       console.log('📊 Loaded whiteboard data:', data);
       
-      const mapped = data.map((row) => ({
+      // Filter out any queue numbers canceled locally so they won't appear in the UI
+      let filteredData = data;
+      try {
+        const raw = localStorage.getItem('canceledQueueNumbers');
+        const canceled = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(canceled) && canceled.length) {
+          filteredData = data.filter((row) => !canceled.includes(row.queue_number));
+        }
+      } catch (e) {
+        console.warn('Failed to read canceledQueueNumbers from localStorage', e);
+      }
+      
+      const mapped = filteredData.map((row) => ({
         id: row.queue_number,
         encounterId: row.encounter_id,
         patientId: row.patient_id,

@@ -90,10 +90,13 @@ export function DoctorInterface({ patients: unused, onUpdatePatient, onMoveToSta
         if (!res.ok) return;
         const list = await res.json();
         if (cancelled) return;
-        const normalized = list.map(d => ({
-          username: d.username || d.id || d.user || d.name,
-          fullname: d.fullname || d.name || d.displayname
-        }));
+        const normalized = list.map(d => {
+          const docUsername = d.username || d.id || d.user || d.name;
+          return {
+            username: docUsername,
+            fullname: d.full_name || d.fullname || d.name || d.displayname || docUsername
+          };
+        });
         setAvailableDoctors(normalized.filter(d => d.username !== currentDoctorUsername));
       } catch (e) {
         console.warn("Failed to fetch doctors list", e);
