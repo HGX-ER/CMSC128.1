@@ -43,8 +43,12 @@ export function AdminInterface() {
     role: '',
     department: '',
     email: '',
-    phone: ''
+    phone: '',
+      room: '',
+  floor: '',
   });
+
+  const [createError, setCreateError] = useState('');
 
   // Load users on mount
   useEffect(() => {
@@ -70,13 +74,14 @@ export function AdminInterface() {
   };
 
   // Filter users
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.username || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = filterRole === 'all' || user.role === filterRole;
-    const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+const filteredUsers = users.filter(user => {
+  const matchesSearch = (user.full_name || user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (user.username || '').toLowerCase().includes(searchTerm.toLowerCase());
+  const matchesRole = filterRole === 'all' || user.role === filterRole;
+  const matchesStatus = filterStatus === 'all' || user.status === filterStatus;
+  return matchesSearch && matchesRole && matchesStatus;
+});
+
 
   // Add activity log entry
   const addActivityLog = (action, userInfo) => {
@@ -91,53 +96,92 @@ export function AdminInterface() {
   };
 
   // Reset form
-  const resetForm = () => {
-    setFormData({
-      username: '',
-      password: '',
-      confirmPassword: '',
-      name: '',
-      role: '',
-      department: '',
-      email: '',
-      phone: ''
-    });
-  };
+const resetForm = () => {
+  setFormData({
+    username: '',
+    password: '',
+    confirmPassword: '',
+    name: '',
+    role: '',
+    department: '',
+    email: '',
+    phone: '',
+    room: '',
+    floor: '',
+  });
+  setCreateError('');
+};
 
-  // Handle create user
-  const handleCreateUser = async () => {
-    if (!formData.username || !formData.password || !formData.name || !formData.role) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-    if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
-    if (formData.password.length < 6) {
-      toast.error('Password must be at least 6 characters');
-      return;
-    }
 
-    const result = await createUser({
-      username: formData.username.toLowerCase(),
-      password: formData.password,
-      name: formData.name,
-      role: formData.role,
-      department: formData.department,
-      email: formData.email,
-      phone: formData.phone
-    });
+// Refresh list and reset filters
+const handleRefresh = async () => {
+  // Reset filters & search so you see the full fresh list
+  setSearchTerm('');
+  setFilterRole('all');
+  setFilterStatus('all');
 
-    if (result.success) {
-      addActivityLog('CREATE', { username: formData.username, role: formData.role });
-      toast.success(`User ${formData.username} created successfully`);
-      resetForm();
-      setIsCreateDialogOpen(false);
-    } else {
-      toast.error(result.error);
-    }
-  };
+  const result = await loadUsers();
+
+  if (!result.success) {
+    toast.error(result.error || 'Failed to refresh users');
+  } else {
+    toast.success('User list refreshed');
+  }
+};
+
+
+// Handle create user
+const handleCreateUser = async () => {
+  // Required fields
+  if (!formData.username || !formData.password || !formData.name || !formData.role) {
+    const msg = 'Please fill in all required fields (Username, Full Name, Role, Password).';
+    setCreateError(msg);
+    toast.error(msg);
+    return;
+  }
+
+  // Passwords must match
+  if (formData.password !== formData.confirmPassword) {
+    const msg = 'Passwords do not match.';
+    setCreateError(msg);
+    toast.error(msg);
+    return;
+  }
+
+  // Minimum length
+  if (formData.password.length < 6) {
+    const msg = 'Password must be at least 6 characters.';
+    setCreateError(msg);
+    toast.error(msg);
+    return;
+  }
+
+  // Clear old error before submit
+  setCreateError('');
+
+  const result = await createUser({
+    username: formData.username.toLowerCase(),
+    password: formData.password,
+    name: formData.name,
+    role: formData.role,
+    department: formData.department,
+    email: formData.email,
+    phone: formData.phone
+  });
+
+  if (result.success) {
+    await loadUsers();
+    addActivityLog('CREATE', { username: formData.username, role: formData.role });
+    toast.success(`User ${formData.username} created successfully`);
+    resetForm();
+    setIsCreateDialogOpen(false);
+  } else {
+    const msg = result.error || 'Failed to create user';
+    setCreateError(msg);
+    toast.error(msg);
+  }
+};
+
 
   // Handle edit user
   const handleEditUser = async () => {
@@ -146,14 +190,17 @@ export function AdminInterface() {
       return;
     }
 
-    const result = await updateUser(selectedUser.id, {
-      name: formData.name,
-      role: formData.role,
-      department: formData.department,
-      email: formData.email,
-      phone: formData.phone,
-      status: selectedUser.status
-    });
+const result = await updateUser(selectedUser.id, {
+  name: formData.name,
+  role: formData.role,
+  department: formData.department,
+  email: formData.email,
+  phone: formData.phone,
+  room: formData.room,
+  floor: formData.floor,
+  status: selectedUser.status,
+});
+
 
     if (result.success) {
       addActivityLog('UPDATE', { username: selectedUser.username, role: formData.role });
@@ -166,18 +213,32 @@ export function AdminInterface() {
     }
   };
 
-  // Handle delete user
-  const handleDeleteUser = async (user) => {
-    if (window.confirm(`Are you sure you want to delete user "${user.username}"? This action cannot be undone.`)) {
-      const result = await deleteUser(user.id);
-      if (result.success) {
-        addActivityLog('DELETE', { username: user.username, role: user.role });
-        toast.success(`User ${user.username} deleted successfully`);
-      } else {
-        toast.error(result.error);
-      }
+// Handle delete user
+const handleDeleteUser = async (user) => {
+  // Never allow deleting the main admin account
+  if (user.username === 'admin' || user.role === 'admin') {
+    toast.error('The primary admin account cannot be deleted.');
+    return;
+  }
+
+  if (
+    window.confirm(
+      `Are you sure you want to delete user "${user.username}"? This action cannot be undone.`
+    )
+  ) {
+    const result = await deleteUser(user.id);
+    if (result.success) {
+      addActivityLog('DELETE', {
+        username: user.username,
+        role: user.role,
+      });
+      toast.success(`User ${user.username} deleted successfully`);
+    } else {
+      toast.error(result.error);
     }
-  };
+  }
+};
+
 
   // Handle toggle status
   const handleToggleStatus = async (user) => {
@@ -218,20 +279,24 @@ export function AdminInterface() {
   };
 
   // Open edit dialog
-  const openEditDialog = (user) => {
-    setSelectedUser(user);
-    setFormData({
-      username: user.username,
-      password: '',
-      confirmPassword: '',
-      name: user.name,
-      role: user.role,
-      department: user.department || '',
-      email: user.email || '',
-      phone: user.phone || ''
-    });
-    setIsEditDialogOpen(true);
-  };
+const openEditDialog = (user) => {
+  setSelectedUser(user);
+  setFormData({
+    username: user.username,
+    password: '',
+    confirmPassword: '',
+    name: user.full_name || user.name || '',
+    role: user.role,
+    department: user.specialty || user.department || '',
+    email: user.email || '',
+    phone: user.phone || '',
+    room: user.room || '',
+    floor: user.floor || '',
+  });
+  setIsEditDialogOpen(true);
+};
+
+
 
   // Open reset password dialog
   const openResetPasswordDialog = (user) => {
@@ -240,16 +305,35 @@ export function AdminInterface() {
     setIsResetPasswordDialogOpen(true);
   };
 
-  const getRoleBadge = (role) => {
-    const roleConfig = roles.find(r => r.value === role);
-    return roleConfig ? (
-      <Badge className={`${roleConfig.color} text-white`}>
-        {roleConfig.label}
+const getRoleBadge = (role) => {
+  const roleConfig = roles.find(r => r.value === role);
+
+  if (!roleConfig) {
+    return (
+      <Badge className="bg-slate-600 text-white px-3 py-0.5 rounded-full text-xs font-medium">
+        {role}
       </Badge>
-    ) : (
-      <Badge variant="secondary">{role}</Badge>
     );
+  }
+
+  const colorMap = {
+    nurse: 'bg-teal-600 hover:bg-teal-700 text-white',
+    doctor: 'bg-purple-600 hover:bg-purple-700 text-white',
+    ed_manager: 'bg-orange-500 hover:bg-orange-600 text-white',
+    admin: 'bg-red-600 hover:bg-red-700 text-white',
   };
+
+  const classes =
+    colorMap[roleConfig.value] ||
+    'bg-slate-600 hover:bg-slate-700 text-white';
+
+  return (
+    <Badge className={`${classes} px-3 py-0.5 rounded-full text-xs font-medium`}>
+      {roleConfig.label}
+    </Badge>
+  );
+};
+
 
   const getStatusBadge = (status) => {
     return status === 'active' ? (
@@ -267,10 +351,11 @@ export function AdminInterface() {
           <h1 className="text-3xl font-bold">User Management</h1>
           <p className="text-muted-foreground">Manage system users and permissions</p>
         </div>
-        <Button onClick={() => loadUsers()} disabled={loading} variant="outline">
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+<Button onClick={handleRefresh} disabled={loading} variant="outline">
+  <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+  Refresh
+</Button>
+
       </div>
 
       {/* Stats Cards */}
@@ -334,26 +419,6 @@ export function AdminInterface() {
           >
             Users
           </TabsTrigger>
-          
-          <TabsTrigger
-            value="activity-log"
-            className="
-              flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-              text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-              hover:bg-blue-50 hover:text-blue-700
-              dark:hover:bg-gray-800 
-              data-[state=active]:!bg-blue-100
-              dark:data-[state=active]:!bg-blue-100 
-              data-[state=active]:!text-blue-800
-              dark:data-[state=active]:!text-blue-800
-              data-[state=active]:!border-blue-300
-              dark:data-[state=active]:!border-blue-300
-              data-[state=active]:shadow-lg
-              data-[state=active]:scale-[1.05]
-            "
-          >
-            Activity Log
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-4">
@@ -392,139 +457,193 @@ export function AdminInterface() {
               </Select>
             </div>
 
-            {/* Create User Dialog */}
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => { resetForm(); setIsCreateDialogOpen(true); }}>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Add User
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Create New User</DialogTitle>
-                  <DialogDescription>Add a new user to the system</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="username">Username *</Label>
-                    <Input
-                      id="username"
-                      value={formData.username}
-                      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                      placeholder="Enter username"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="name">Full Name *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Enter full name"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="role">Role *</Label>
-                    <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {roles.map(role => (
-                          <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="department">Department/Specialty</Label>
-                    <Input
-                      id="department"
-                      value={formData.department}
-                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                      placeholder="Enter department"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="Enter email"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="Enter phone"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="password">Password *</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      placeholder="Enter password (min 6 chars)"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="confirmPassword">Confirm Password *</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      value={formData.confirmPassword}
-                      onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                      placeholder="Confirm password"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={handleCreateUser} disabled={loading}>
-                    {loading ? 'Creating...' : 'Create User'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+{/* Create User Dialog */}
+<Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+  <DialogTrigger asChild>
+    <Button
+      onClick={() => {
+        resetForm();
+        setIsCreateDialogOpen(true);
+      }}
+    >
+      <UserPlus className="w-4 h-4 mr-2" />
+      Add User
+    </Button>
+  </DialogTrigger>
+
+  <DialogContent className="w-full max-w-2xl">
+    <DialogHeader>
+      <DialogTitle className="text-xl font-semibold">Create New User</DialogTitle>
+      <DialogDescription className="text-sm text-muted-foreground">
+        Add a new user to the system. Fields marked with <span className="text-red-500">*</span> are required.
+      </DialogDescription>
+    </DialogHeader>
+
+      {createError && (
+    <Alert variant="destructive" className="mb-3">
+      <AlertCircle className="h-4 w-4" />
+      <AlertDescription>{createError}</AlertDescription>
+    </Alert>
+  )}
+
+
+    <div className="grid gap-4 pt-2">
+      <div className="grid gap-2">
+        <Label htmlFor="username">
+          Username <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="username"
+          value={formData.username}
+          onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+          placeholder="Enter username"
+        />
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="name">
+          Full Name <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          placeholder="Enter full name"
+        />
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="role">
+          Role <span className="text-red-500">*</span>
+        </Label>
+        <Select
+          value={formData.role}
+          onValueChange={(value) => setFormData({ ...formData, role: value })}
+        >
+          <SelectTrigger id="role">
+            <SelectValue placeholder="Select role" />
+          </SelectTrigger>
+          <SelectContent>
+            {roles.map((role) => (
+              <SelectItem key={role.value} value={role.value}>
+                {role.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="department">Department/Specialty</Label>
+        <Input
+          id="department"
+          value={formData.department}
+          onChange={(e) =>
+            setFormData({ ...formData, department: e.target.value })
+          }
+          placeholder="Enter department (optional)"
+        />
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2 sm:gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            placeholder="Enter email"
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="phone">Phone</Label>
+          <Input
+            id="phone"
+            value={formData.phone}
+            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            placeholder="Enter phone"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2 sm:gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="password">
+            Password <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="password"
+            type="password"
+            value={formData.password}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            placeholder="Enter password (min 6 chars)"
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="confirmPassword">
+            Confirm Password <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            value={formData.confirmPassword}
+            onChange={(e) =>
+              setFormData({ ...formData, confirmPassword: e.target.value })
+            }
+            placeholder="Confirm password"
+          />
+        </div>
+      </div>
+    </div>
+
+    <DialogFooter className="mt-4">
+      <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+        Cancel
+      </Button>
+      <Button onClick={handleCreateUser} disabled={loading}>
+        {loading ? 'Creating...' : 'Create User'}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
           </div>
 
           {/* Users Table */}
           <Card>
             <CardContent className="p-0">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        {loading ? 'Loading users...' : 'No users found'}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.username}</TableCell>
-                        <TableCell>{user.name}</TableCell>
-                        <TableCell>{getRoleBadge(user.role)}</TableCell>
-                        <TableCell>{user.department || '-'}</TableCell>
-                        <TableCell>{getStatusBadge(user.status)}</TableCell>
+<TableHeader>
+  <TableRow>
+    <TableHead>Name</TableHead>
+    <TableHead>Username</TableHead>
+    <TableHead>Role</TableHead>
+    <TableHead>Department</TableHead>
+    <TableHead>Status</TableHead>
+    <TableHead className="text-right">Actions</TableHead>
+  </TableRow>
+</TableHeader>
+<TableBody>
+  {filteredUsers.length === 0 ? (
+    <TableRow>
+      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+        {loading ? 'Loading users...' : 'No users found'}
+      </TableCell>
+    </TableRow>
+  ) : (
+    filteredUsers.map((user) => (
+      <TableRow key={user.id}>
+<TableCell className="font-medium">
+  {user.full_name || user.name || '-'}
+</TableCell>
+<TableCell className="text-muted-foreground">{user.username}</TableCell>
+<TableCell>{getRoleBadge(user.role)}</TableCell>
+<TableCell>
+  {user.specialty || user.department || '-'}
+</TableCell>
+<TableCell>{getStatusBadge(user.status)}</TableCell>
+
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button variant="ghost" size="sm" onClick={() => openEditDialog(user)}>
@@ -581,69 +700,184 @@ export function AdminInterface() {
         </TabsContent>
       </Tabs>
 
-      {/* Edit User Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
-            <DialogDescription>Update user information for {selectedUser?.username}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-name">Full Name *</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map(role => (
-                    <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="edit-department">Department/Specialty</Label>
-              <Input
-                id="edit-department"
-                value={formData.department}
-                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-email">Email</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-phone">Phone</Label>
-              <Input
-                id="edit-phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleEditUser} disabled={loading}>
-              {loading ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+{/* Edit User Dialog */}
+<Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+  <DialogContent className="max-w-lg sm:max-w-2xl">
+<DialogHeader>
+  <DialogTitle>Edit Staff Member</DialogTitle>
+  <DialogDescription>
+    Update profile details for{' '}
+    <span className="font-semibold">
+      {selectedUser?.full_name || selectedUser?.name || selectedUser?.username}
+    </span>
+    .
+  </DialogDescription>
+</DialogHeader>
+
+
+<div className="mt-2 space-y-4">
+  {/* Name and Role side‑by‑side */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div>
+      <Label
+        htmlFor="edit-name"
+        className="mb-1 inline-block"
+      >
+        Full Name <span className="text-red-500">*</span>
+      </Label>
+      <Input
+        id="edit-name"
+        className="mt-1"
+        value={formData.name}
+        onChange={(e) =>
+          setFormData({ ...formData, name: e.target.value })
+        }
+        placeholder="Enter full name"
+      />
+    </div>
+
+    <div>
+      <Label
+        htmlFor="edit-role"
+        className="mb-1 inline-block"
+      >
+        Role <span className="text-red-500">*</span>
+      </Label>
+      <Select
+        value={formData.role}
+        onValueChange={(value) =>
+          setFormData({ ...formData, role: value })
+        }
+      >
+        <SelectTrigger id="edit-role" className="mt-1">
+          <SelectValue placeholder="Select role" />
+        </SelectTrigger>
+        <SelectContent>
+          {roles.map((role) => (
+            <SelectItem key={role.value} value={role.value}>
+              {role.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
+
+  {/* Department / Specialty */}
+  <div>
+    <Label
+      htmlFor="edit-department"
+      className="mb-1 inline-block"
+    >
+      Department / Specialty
+    </Label>
+    <Input
+      id="edit-department"
+      className="mt-1"
+      value={formData.department}
+      onChange={(e) =>
+        setFormData({ ...formData, department: e.target.value })
+      }
+      placeholder="e.g. Emergency Medicine"
+    />
+  </div>
+
+  {/* Room / Floor for doctors */}
+  {formData.role === 'doctor' && (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <Label
+          htmlFor="edit-room"
+          className="mb-1 inline-block"
+        >
+          Room
+        </Label>
+        <Input
+          id="edit-room"
+          className="mt-1"
+          value={formData.room}
+          onChange={(e) =>
+            setFormData({ ...formData, room: e.target.value })
+          }
+          placeholder="e.g. 201"
+        />
+      </div>
+      <div>
+        <Label
+          htmlFor="edit-floor"
+          className="mb-1 inline-block"
+        >
+          Floor
+        </Label>
+        <Input
+          id="edit-floor"
+          className="mt-1"
+          value={formData.floor}
+          onChange={(e) =>
+            setFormData({ ...formData, floor: e.target.value })
+          }
+          placeholder="e.g. 2nd Floor"
+        />
+      </div>
+    </div>
+  )}
+  
+  {/* Email / Phone side‑by‑side */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div>
+      <Label
+        htmlFor="edit-email"
+        className="mb-1 inline-block"
+      >
+        Email
+      </Label>
+      <Input
+        id="edit-email"
+        type="email"
+        className="mt-1"
+        value={formData.email}
+        onChange={(e) =>
+          setFormData({ ...formData, email: e.target.value })
+        }
+        placeholder="name@hospital.com"
+      />
+    </div>
+    <div>
+      <Label
+        htmlFor="edit-phone"
+        className="mb-1 inline-block"
+      >
+        Phone
+      </Label>
+      <Input
+        id="edit-phone"
+        className="mt-1"
+        value={formData.phone}
+        onChange={(e) =>
+          setFormData({ ...formData, phone: e.target.value })
+        }
+        placeholder="09XXXXXXXXX"
+      />
+    </div>
+  </div>
+</div>
+
+
+    <DialogFooter className="mt-4">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setIsEditDialogOpen(false)}
+      >
+        Cancel
+      </Button>
+      <Button type="button" onClick={handleEditUser} disabled={loading}>
+        {loading ? 'Saving...' : 'Save Changes'}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
 
       {/* Reset Password Dialog */}
       <Dialog open={isResetPasswordDialogOpen} onOpenChange={setIsResetPasswordDialogOpen}>
@@ -652,28 +886,49 @@ export function AdminInterface() {
             <DialogTitle>Reset Password</DialogTitle>
             <DialogDescription>Set a new password for {selectedUser?.username}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="new-password">New Password *</Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Enter new password (min 6 chars)"
-              />
-            </div>
-            <div>
-              <Label htmlFor="confirm-new-password">Confirm Password *</Label>
-              <Input
-                id="confirm-new-password"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                placeholder="Confirm new password"
-              />
-            </div>
-          </div>
+<div className="space-y-4 mt-2">
+  <div>
+    <Label
+      htmlFor="new-password"
+      className="mb-1 inline-block"
+    >
+      New Password *
+    </Label>
+    <Input
+      id="new-password"
+      type="password"
+      className="mt-1"
+      value={formData.password}
+      onChange={(e) =>
+        setFormData({ ...formData, password: e.target.value })
+      }
+      placeholder="Enter new password (min 6 chars)"
+    />
+  </div>
+
+  <div>
+    <Label
+      htmlFor="confirm-new-password"
+      className="mb-1 inline-block"
+    >
+      Confirm Password *
+    </Label>
+    <Input
+      id="confirm-new-password"
+      type="password"
+      className="mt-1"
+      value={formData.confirmPassword}
+      onChange={(e) =>
+        setFormData({
+          ...formData,
+          confirmPassword: e.target.value,
+        })
+      }
+      placeholder="Confirm new password"
+    />
+  </div>
+</div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsResetPasswordDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleResetPassword} disabled={loading}>

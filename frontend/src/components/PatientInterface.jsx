@@ -14,10 +14,37 @@ import { RelaxationExercises } from './RelaxationExercises';
 import { HospitalServices } from './HospitalServices';
 import { ConsultationCompletionScreen } from './ConsultationCompletionScreen';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.jsx';
-import { Clock, Timer, Heart, Activity, Stethoscope, UserCheck, CheckCircle, MapPin, Loader2, History, Newspaper, Brain, Lightbulb, Wind, Building, Bell, MessageCircle, Send, Star, RefreshCw } from 'lucide-react';
+import {
+  Clock,
+  Timer,
+  Heart,
+  Activity,
+  Stethoscope,
+  UserCheck,
+  CheckCircle,
+  MapPin,
+  Loader2,
+  Newspaper,
+  Brain,
+  Lightbulb,
+  Wind,
+  Building,
+  Bell,
+  MessageCircle,
+  Send,
+  Star,
+  RefreshCw,
+} from 'lucide-react';
 import { formatDisposition } from '../types/patient';
 
-export function PatientInterface({ patients, currentPatientId, getTotalTime, getCurrentStageTime, onAddSatisfactionFeedback, onAddRealtimeFeedback }) {
+export function PatientInterface({
+  patients,
+  currentPatientId,
+  getTotalTime,
+  getCurrentStageTime,
+  onAddSatisfactionFeedback,
+  onAddRealtimeFeedback,
+}) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [realtimeComments, setRealtimeComments] = useState([]);
   const [patientComment, setPatientComment] = useState('');
@@ -28,8 +55,50 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
-  
-  // Get queue number from URL or props
+  const [staffDirectory, setStaffDirectory] = useState({ doctors: [], nurses: [] });
+
+  // Load staff directory (doctors + nurses) once
+useEffect(() => {
+  const loadStaff = async () => {
+    try {
+      const [docRes] = await Promise.all([
+        fetch('http://localhost:5000/api/doctors'),
+        // you can drop nurses for now since there is no /registration/nurses route
+      ]);
+
+      const doctors = docRes.ok ? await docRes.json() : [];
+      setStaffDirectory({ doctors, nurses: [] });
+    } catch (e) {
+      console.error('Failed to load staff directory', e);
+    }
+  };
+  loadStaff();
+}, []);
+
+  // Helpers to get doctor / nurse info by username
+  const getDoctorInfo = (username) => {
+    if (!username) return null;
+    const d = staffDirectory.doctors.find((doc) => doc.username === username);
+    if (!d) return null;
+    return {
+      name: d.full_name || d.name || username,
+      specialty: d.specialty || d.department || '',
+      room: d.room || '',
+      floor: d.floor || '',
+      building: 'Main Hospital Building',
+    };
+  };
+
+  const getNurseInfo = (username) => {
+    if (!username) return null;
+    const n = staffDirectory.nurses.find((nurse) => nurse.username === username);
+    if (!n) return null;
+    return {
+      name: n.full_name || n.name || username,
+    };
+  };
+
+  // Queue number from URL or prop
   const getQueueNumber = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const queueFromUrl = urlParams.get('queue');
@@ -37,104 +106,51 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   };
 
   const queueNumber = getQueueNumber();
-  const patient = backendPatientData || patients.find(p => p.id === queueNumber);
+  const patient = backendPatientData || patients.find((p) => p.id === queueNumber);
 
-  // Staff profile pictures and information
-  const staffProfiles = {
-    'dr.smith': { 
-      name: 'Dr. Sarah Smith',
-      photo: 'https://images.unsplash.com/photo-1719610894782-7b376085e200?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmZW1hbGUlMjBkb2N0b3IlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjA1ODg4OTh8MA&ixlib=rb-4.1.0&q=80&w=1080',
-      room: '201',
-      building: 'Main Hospital Building',
-      floor: '2nd Floor'
-    },
-    'dr.jones': { 
-      name: 'Dr. Becky Jones',
-      photo: 'https://images.unsplash.com/photo-1719610894782-7b376085e200?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmZW1hbGUlMjBkb2N0b3IlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NjA1ODg4OTh8MA&ixlib=rb-4.1.0&q=80&w=1080',
-      room: '203',
-      building: 'Main Hospital Building',
-      floor: '2nd Floor'
-    },
-    'nurse.williams': { 
-      name: 'Nurse Jennifer Williams',
-      photo: 'https://images.unsplash.com/photo-1758204054877-fb1c7ba85ea1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxudXJzZSUyMHByb2Zlc3Npb25hbCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2MDY2ODE5Nnww&ixlib=rb-4.1.0&q=80&w=1080'
-    },
-    'nurse.thompson': { 
-      name: 'Nurse Robert Thompson',
-      photo: 'https://images.unsplash.com/photo-1758204054877-fb1c7ba85ea1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxudXJzZSUyMHByb2Zlc3Npb25hbCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2MDY2ODE5Nnww&ixlib=rb-4.1.0&q=80&w=1080'
-    },
-    'nurse.davis': { 
-      name: 'Nurse Lisa Davis',
-      photo: 'https://images.unsplash.com/photo-1758204054877-fb1c7ba85ea1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxudXJzZSUyMHByb2Zlc3Npb25hbCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2MDY2ODE5Nnww&ixlib=rb-4.1.0&q=80&w=1080'
-    },
-    'nurse.wilson': { 
-      name: 'Nurse Mark Wilson',
-      photo: 'https://images.unsplash.com/photo-1758204054877-fb1c7ba85ea1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxudXJzZSUyMHByb2Zlc3Npb25hbCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2MDY2ODE5Nnww&ixlib=rb-4.1.0&q=80&w=1080'
-    },
-    'nurse.martinez': { 
-      name: 'Nurse Maria Martinez',
-      photo: 'https://images.unsplash.com/photo-1758204054877-fb1c7ba85ea1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxudXJzZSUyMHByb2Zlc3Npb25hbCUyMHBvcnRyYWl0fGVufDF8fHx8MTc2MDY2ODE5Nnww&ixlib=rb-4.1.0&q=80&w=1080'
-    }
-  };
-
-  // Helper to normalize stage through map
+  // Stage normalization helper
   const normalizeStage = (statusToStageMap, rawStage) => {
     if (!rawStage) return 'kiosk';
     return statusToStageMap[rawStage] || rawStage;
   };
 
-  // Real-time polling for patient status
+  // Polling for patient status every 5s
   useEffect(() => {
-    if (!queueNumber) {
-      console.log('No queue number available for polling');
-      return;
-    }
+    if (!queueNumber) return;
 
     const pollPatientStatus = async () => {
       try {
-        console.log("🔄 Polling patient status for:", queueNumber);
-        
         const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
-        
         if (!response.ok) {
-          if (response.status === 404) {
-            console.log('Queue number not found yet, will retry...');
-            return;
-          }
+          if (response.status === 404) return;
           throw new Error(`Failed to fetch patient status: ${response.status}`);
         }
-        
+
         const data = await response.json();
-        
-        // Map backend status to frontend currentStage
+
         const statusToStageMap = {
-          'arrived': 'kiosk',
-          'waiting_for_triage': 'waiting_triage',
-          'in_triage': 'triage',
-          'triaged': 'waiting_registration',
-          'waiting_for_registration': 'waiting_registration',
-          'in_registration': 'registration',
-          'waiting_for_provider': 'waiting_doctor',
-          'with_provider': 'consultation',
-          'waiting_for_admission': 'waiting_admission',
-          'waiting_for_observation': 'waiting_observation',
-          'waiting_for_discharge': 'waiting_discharge',
-          'admission_in_progress': 'admission_orders',
-          'awaiting_bed': 'awaiting_non_icu',
-          'awaiting_icu_bed': 'awaiting_icu',
-          'discharge_in_progress': 'discharge_documents',
-          'ready_to_depart': 'awaiting_departure',
-          'departed': 'departed',
-          
-          // Observation is still in-process
-          'in_observation': 'waiting_observation',
-          
-          // Non-ICU behaves like ICU (both completed)
-          'admitted_non_icu': 'awaiting_non_icu', 
-          'admitted_icu': 'awaiting_icu'     
+          arrived: 'kiosk',
+          waiting_for_triage: 'waiting_triage',
+          in_triage: 'triage',
+          triaged: 'waiting_registration',
+          waiting_for_registration: 'waiting_registration',
+          in_registration: 'registration',
+          waiting_for_provider: 'waiting_doctor',
+          with_provider: 'consultation',
+          waiting_for_admission: 'waiting_admission',
+          waiting_for_observation: 'waiting_observation',
+          waiting_for_discharge: 'waiting_discharge',
+          admission_in_progress: 'admission_orders',
+          awaiting_bed: 'awaiting_non_icu',
+          awaiting_icu_bed: 'awaiting_icu',
+          discharge_in_progress: 'discharge_documents',
+          ready_to_depart: 'awaiting_departure',
+          departed: 'departed',
+          in_observation: 'waiting_observation',
+          admitted_non_icu: 'awaiting_non_icu',
+          admitted_icu: 'awaiting_icu',
         };
 
-        // Transform backend data to match frontend format
         const transformedPatient = {
           id: data.queue_number,
           name: data.patient.full_name,
@@ -143,20 +159,21 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
           currentStage: normalizeStage(statusToStageMap, data.frontend_stage || data.status),
           arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
           isActive: data.status !== 'departed',
-          stageHistory: data.events?.map((event, index, array) => ({
-            stage: normalizeStage(statusToStageMap, event.frontend_stage || event.type),
-            startTime: new Date(event.at),
-            endTime: array[index + 1] ? new Date(array[index + 1].at) : null,
-            payload: event.payload
-          })) || [],
+          stageHistory:
+            data.events?.map((event, index, array) => ({
+              stage: normalizeStage(statusToStageMap, event.frontend_stage || event.type),
+              startTime: new Date(event.at),
+              endTime: array[index + 1] ? new Date(array[index + 1].at) : null,
+              payload: event.payload,
+            })) || [],
           chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
-          assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
-          assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
+          assignedDoctor: data.assigned_doctor || null,
+          assignedNurse: data.assigned_nurse || null,
           sex: data.patient.sex,
           dob: data.patient.dob,
           disposition: data.timestamps.dispositioned,
         };
-        
+
         setBackendPatientData(transformedPatient);
         setLastUpdated(new Date());
         setError(null);
@@ -170,7 +187,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     return () => clearInterval(intervalId);
   }, [queueNumber]);
 
-  // Initial patient data fetch
+  // Initial load (same endpoint)
   useEffect(() => {
     const fetchPatientStatus = async () => {
       if (!queueNumber) {
@@ -178,13 +195,10 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
         setIsLoading(false);
         return;
       }
-      
+
       try {
         setIsLoading(true);
-        console.log("📋 Fetching patient status for:", queueNumber);
-        
         const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
-        
         if (!response.ok) {
           if (response.status === 404) {
             setError(`Queue number "${queueNumber}" not found in the system`);
@@ -193,38 +207,32 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
           }
           throw new Error(`Failed to fetch patient status: ${response.status}`);
         }
-        
+
         const data = await response.json();
-        
-        // Map backend status to frontend currentStage
+
         const statusToStageMap = {
-          'arrived': 'kiosk',
-          'waiting_for_triage': 'waiting_triage',
-          'in_triage': 'triage',
-          'triaged': 'waiting_registration',
-          'waiting_for_registration': 'waiting_registration',
-          'in_registration': 'registration',
-          'waiting_for_provider': 'waiting_doctor',
-          'with_provider': 'consultation',
-          'waiting_for_admission': 'waiting_admission',
-          'waiting_for_observation': 'waiting_observation',
-          'waiting_for_discharge': 'waiting_discharge',
-          'admission_in_progress': 'admission_orders',
-          'awaiting_bed': 'awaiting_non_icu',
-          'awaiting_icu_bed': 'awaiting_icu',
-          'discharge_in_progress': 'discharge_documents',
-          'ready_to_depart': 'awaiting_departure',
-          'departed': 'departed',
-          
-          // Observation is still in-process
-          'in_observation': 'waiting_observation',
-          
-          // Non-ICU behaves like ICU (both completed)
-          'admitted_non_icu': 'awaiting_non_icu', 
-          'admitted_icu': 'awaiting_icu'     
+          arrived: 'kiosk',
+          waiting_for_triage: 'waiting_triage',
+          in_triage: 'triage',
+          triaged: 'waiting_registration',
+          waiting_for_registration: 'waiting_registration',
+          in_registration: 'registration',
+          waiting_for_provider: 'waiting_doctor',
+          with_provider: 'consultation',
+          waiting_for_admission: 'waiting_admission',
+          waiting_for_observation: 'waiting_observation',
+          waiting_for_discharge: 'waiting_discharge',
+          admission_in_progress: 'admission_orders',
+          awaiting_bed: 'awaiting_non_icu',
+          awaiting_icu_bed: 'awaiting_icu',
+          discharge_in_progress: 'discharge_documents',
+          ready_to_depart: 'awaiting_departure',
+          departed: 'departed',
+          in_observation: 'waiting_observation',
+          admitted_non_icu: 'awaiting_non_icu',
+          admitted_icu: 'awaiting_icu',
         };
-        
-        // Transform backend data to match frontend format
+
         const transformedPatient = {
           id: data.queue_number,
           name: data.patient.full_name,
@@ -233,20 +241,21 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
           currentStage: normalizeStage(statusToStageMap, data.frontend_stage || data.status),
           arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
           isActive: data.status !== 'departed',
-          stageHistory: data.events?.map((event, index, array) => ({
-            stage: normalizeStage(statusToStageMap, event.frontend_stage || event.type),
-            startTime: new Date(event.at),
-            endTime: array[index + 1] ? new Date(array[index + 1].at) : null,
-            payload: event.payload
-          })) || [],
+          stageHistory:
+            data.events?.map((event, index, array) => ({
+              stage: normalizeStage(statusToStageMap, event.frontend_stage || event.type),
+              startTime: new Date(event.at),
+              endTime: array[index + 1] ? new Date(array[index + 1].at) : null,
+              payload: event.payload,
+            })) || [],
           chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
-          assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
-          assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
+          assignedDoctor: data.assigned_doctor || null,
+          assignedNurse: data.assigned_nurse || null,
           sex: data.patient.sex,
           dob: data.patient.dob,
           disposition: data.timestamps.dispositioned,
         };
-        
+
         setBackendPatientData(transformedPatient);
         setLastUpdated(new Date());
         setError(null);
@@ -261,7 +270,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     fetchPatientStatus();
   }, [queueNumber]);
 
-  // Manual refresh function
+  // Manual refresh
   const handleManualRefresh = async () => {
     if (!queueNumber) {
       toast.error('No queue number available');
@@ -270,45 +279,36 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
 
     setIsLoading(true);
     try {
-      console.log("🔄 Manual refresh for:", queueNumber);
-      
       const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
-      
       if (!response.ok) {
         throw new Error(`Failed to refresh patient status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
-      // Map backend status to frontend currentStage
+
       const statusToStageMap = {
-        'arrived': 'kiosk',
-        'waiting_for_triage': 'waiting_triage',
-        'in_triage': 'triage',
-        'triaged': 'waiting_registration',
-        'waiting_for_registration': 'waiting_registration',
-        'in_registration': 'registration',
-        'waiting_for_provider': 'waiting_doctor',
-        'with_provider': 'consultation',
-        'waiting_for_admission': 'waiting_admission',
-        'waiting_for_observation': 'waiting_observation',
-        'waiting_for_discharge': 'waiting_discharge',
-        'admission_in_progress': 'admission_orders',
-        'awaiting_bed': 'awaiting_non_icu',
-        'awaiting_icu_bed': 'awaiting_icu',
-        'discharge_in_progress': 'discharge_documents',
-        'ready_to_depart': 'awaiting_departure',
-        'departed': 'departed',
-        
-        // Observation is still in-process
-        'in_observation': 'waiting_observation',
-        
-        // Non-ICU behaves like ICU (both completed)
-        'admitted_non_icu': 'awaiting_non_icu', 
-        'admitted_icu': 'awaiting_icu'     
+        arrived: 'kiosk',
+        waiting_for_triage: 'waiting_triage',
+        in_triage: 'triage',
+        triaged: 'waiting_registration',
+        waiting_for_registration: 'waiting_registration',
+        in_registration: 'registration',
+        waiting_for_provider: 'waiting_doctor',
+        with_provider: 'consultation',
+        waiting_for_admission: 'waiting_admission',
+        waiting_for_observation: 'waiting_observation',
+        waiting_for_discharge: 'waiting_discharge',
+        admission_in_progress: 'admission_orders',
+        awaiting_bed: 'awaiting_non_icu',
+        awaiting_icu_bed: 'awaiting_icu',
+        discharge_in_progress: 'discharge_documents',
+        ready_to_depart: 'awaiting_departure',
+        departed: 'departed',
+        in_observation: 'waiting_observation',
+        admitted_non_icu: 'awaiting_non_icu',
+        admitted_icu: 'awaiting_icu',
       };
-      
-      // Transform backend data to match frontend format
+
       const transformedPatient = {
         id: data.queue_number,
         name: data.patient.full_name,
@@ -317,20 +317,21 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
         currentStage: normalizeStage(statusToStageMap, data.frontend_stage || data.status),
         arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
         isActive: data.status !== 'departed',
-        stageHistory: data.events?.map((event, index, array) => ({
-          stage: normalizeStage(statusToStageMap, event.frontend_stage || event.type),
-          startTime: new Date(event.at),
-          endTime: array[index + 1] ? new Date(array[index + 1].at) : null,
-          payload: event.payload
-        })) || [],
+        stageHistory:
+          data.events?.map((event, index, array) => ({
+            stage: normalizeStage(statusToStageMap, event.frontend_stage || event.type),
+            startTime: new Date(event.at),
+            endTime: array[index + 1] ? new Date(array[index + 1].at) : null,
+            payload: event.payload,
+          })) || [],
         chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
-        assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
-        assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
+        assignedDoctor: data.assigned_doctor || null,
+        assignedNurse: data.assigned_nurse || null,
         sex: data.patient.sex,
         dob: data.patient.dob,
         disposition: data.timestamps.dispositioned,
       };
-      
+
       setBackendPatientData(transformedPatient);
       setLastUpdated(new Date());
       setError(null);
@@ -343,87 +344,84 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     }
   };
 
-  // Update timer every minute
+  // Clock tick
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  // Real-time comment system based on current stage
+  // Real-time comments based on stage
   useEffect(() => {
     if (!patient) return;
-    
+
     const getStageComments = (stage) => {
       const comments = {
         kiosk: [
-          { time: new Date(), message: "Thank you for checking in. Please have a seat in the waiting area." },
-          { time: new Date(), message: "Your information has been recorded successfully." }
+          { time: new Date(), message: 'Thank you for checking in. Please have a seat in the waiting area.' },
+          { time: new Date(), message: 'Your information has been recorded successfully.' },
         ],
         waiting_triage: [
-          { time: new Date(), message: "You're in the queue for triage assessment." },
-          { time: new Date(), message: "A triage nurse will call you shortly to assess your condition." }
+          { time: new Date(), message: 'You are in the queue for triage assessment.' },
+          { time: new Date(), message: 'A triage nurse will call you shortly.' },
         ],
         triage: [
-          { time: new Date(), message: "Triage nurse is assessing your vital signs and symptoms." },
-          { time: new Date(), message: "Your priority level is being determined based on your condition." }
+          { time: new Date(), message: 'Triage nurse is assessing your vital signs and symptoms.' },
+          { time: new Date(), message: 'Your priority level is being determined.' },
         ],
         waiting_registration: [
-          { time: new Date(), message: "Please proceed to the registration desk when called." },
-          { time: new Date(), message: "Registration staff will collect your demographic information." }
+          { time: new Date(), message: 'Please proceed to the registration desk when called.' },
+          { time: new Date(), message: 'Registration staff will collect your information.' },
         ],
         registration: [
-          { time: new Date(), message: "Registration staff is processing your information." },
-          { time: new Date(), message: "Your healthcare team is being assigned." }
+          { time: new Date(), message: 'Registration staff is processing your information.' },
+          { time: new Date(), message: 'Your healthcare team is being assigned.' },
         ],
         waiting_doctor: [
-          { time: new Date(), message: "You're in the queue to see the doctor." },
-          { time: new Date(), message: "The doctor will see you based on medical priority." },
-          { time: new Date(), message: "Please remain in the designated area." }
+          { time: new Date(), message: 'You are in the queue to see the doctor.' },
+          { time: new Date(), message: 'You will be seen based on medical priority.' },
         ],
         consultation: [
-          { time: new Date(), message: "The doctor is now seeing you." },
-          { time: new Date(), message: "Your examination and consultation is in progress." }
+          { time: new Date(), message: 'The doctor is now seeing you.' },
+          { time: new Date(), message: 'Your examination and consultation is in progress.' },
         ],
         waiting_admission: [
-          { time: new Date(), message: "Admission arrangements are being made." },
-          { time: new Date(), message: "Hospital bed availability is being checked." }
+          { time: new Date(), message: 'Admission arrangements are being made.' },
+          { time: new Date(), message: 'Hospital bed availability is being checked.' },
         ],
         waiting_observation: [
-          { time: new Date(), message: "Observation unit placement is being arranged." },
-          { time: new Date(), message: "You will be moved to the observation area shortly." }
+          { time: new Date(), message: 'Observation unit placement is being arranged.' },
+          { time: new Date(), message: 'You will be moved to the observation area shortly.' },
         ],
         waiting_discharge: [
-          { time: new Date(), message: "Your discharge paperwork is being prepared." },
-          { time: new Date(), message: "Please wait while we finalize your discharge instructions." }
+          { time: new Date(), message: 'Your discharge paperwork is being prepared.' },
+          { time: new Date(), message: 'Please wait while we finalize your discharge instructions.' },
         ],
         admission_orders: [
-          { time: new Date(), message: "Admission paperwork is being processed." },
-          { time: new Date(), message: "Your hospital room is being prepared." }
+          { time: new Date(), message: 'Admission paperwork is being processed.' },
+          { time: new Date(), message: 'Your hospital room is being prepared.' },
         ],
         awaiting_non_icu: [
-          { time: new Date(), message: "Waiting for transfer to hospital ward." },
-          { time: new Date(), message: "Transport team has been notified." }
+          { time: new Date(), message: 'Waiting for transfer to hospital ward.' },
+          { time: new Date(), message: 'Transport team has been notified.' },
         ],
         awaiting_icu: [
-          { time: new Date(), message: "ICU bed is being prepared for you." },
-          { time: new Date(), message: "Critical care team has been notified." }
+          { time: new Date(), message: 'ICU bed is being prepared for you.' },
+          { time: new Date(), message: 'Critical care team has been notified.' },
         ],
         discharge_documents: [
-          { time: new Date(), message: "Discharge documents are being finalized." },
-          { time: new Date(), message: "Pharmacy is preparing your medications." }
+          { time: new Date(), message: 'Discharge documents are being finalized.' },
+          { time: new Date(), message: 'Pharmacy is preparing your medications.' },
         ],
         awaiting_departure: [
-          { time: new Date(), message: "You're cleared to leave. Please wait for final instructions." },
-          { time: new Date(), message: "Thank you for your patience during your visit." }
+          { time: new Date(), message: "You are cleared to leave. Please wait for final instructions." },
+          { time: new Date(), message: 'Thank you for your patience during your visit.' },
         ],
         departed: [
-          { time: new Date(), message: "Visit completed. We hope you feel better soon!" },
-          { time: new Date(), message: "Thank you for choosing our Emergency Department." }
-        ]
+          { time: new Date(), message: 'Visit completed. We hope you feel better soon!' },
+          { time: new Date(), message: 'Thank you for choosing our Emergency Department.' },
+        ],
       };
-      return comments[stage] || [{ time: new Date(), message: "Your care is in progress." }];
+      return comments[stage] || [{ time: new Date(), message: 'Your care is in progress.' }];
     };
 
     setRealtimeComments(getStageComments(patient.currentStage));
@@ -436,12 +434,12 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            queueNumber: queueNumber,
+            queueNumber,
             rating: commentSatisfaction,
             comment: patientComment,
             stage: patient.currentStage,
-            stageName: getStageDisplayName(patient.currentStage)
-          })
+            stageName: getStageDisplayName(patient.currentStage),
+          }),
         });
 
         if (!response.ok) throw new Error('Failed to submit feedback');
@@ -451,7 +449,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
           message: patientComment,
           rating: commentSatisfaction,
           stage: patient.currentStage,
-          isPatient: true
+          isPatient: true,
         };
         setSubmittedComments([...submittedComments, newComment]);
         setPatientComment('');
@@ -468,7 +466,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     }
   };
 
-  // Loading / error states
+  // Loading / error UI
   if (!queueNumber && isLoading) {
     return (
       <div className="min-h-screen bg-blue-50 p-4 flex items-center justify-center">
@@ -493,13 +491,15 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
             </div>
             <h3 className="text-lg font-medium mb-2 text-red-800">Queue Number Required</h3>
             <p className="text-gray-600 mb-4">Please provide a queue number to view your visit status.</p>
-            <Button onClick={() => window.history.back()} className="w-full">Go Back</Button>
+            <Button onClick={() => window.history.back()} className="w-full">
+              Go Back
+            </Button>
           </CardContent>
         </Card>
       </div>
     );
   }
-  
+
   if (isLoading && !patient) {
     return (
       <div className="min-h-screen bg-blue-50 p-4 flex items-center justify-center">
@@ -555,7 +555,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       triaged: 'You are currently being assessed by the triage nurse',
       waiting_registration: 'Please proceed to registration when called',
       registration: 'Your information is being registered',
-      registered:'You have been registered',
+      registered: 'You have been registered',
       waiting_doctor: 'Please wait in the designated area to see the doctor',
       consultation: 'You are currently with the doctor',
       waiting_admission: 'Admission is being arranged',
@@ -566,7 +566,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       awaiting_icu: 'Waiting for transfer to intensive care',
       discharge_documents: 'Your discharge papers are being prepared',
       awaiting_departure: 'You are ready to leave - please wait for final instructions',
-      departed: 'Visit completed - thank you for choosing our ED'
+      departed: 'Visit completed - thank you for choosing our ED',
     };
     return descriptions[stage] || 'Your care is in progress';
   };
@@ -589,27 +589,29 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
       awaiting_icu: 'Transfer to ICU',
       discharge_documents: 'Discharge Processing',
       awaiting_departure: 'Ready for Departure',
-      departed: 'Visit Completed'
+      departed: 'Visit Completed',
     };
     return displayNames[stage] || `In Process (${stage})`;
   };
 
-  const getStaffDisplayName = (username) => {
-    return staffProfiles[username]?.name || username;
-  };
-
   const getPriorityBadgeColor = (esiLevel) => {
     switch (esiLevel) {
-      case 1: return 'bg-red-100 text-red-800 border-red-200';
-      case 2: return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 3: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 4: return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 5: return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 1:
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 2:
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 3:
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 4:
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 5:
+        return 'bg-green-100 text-green-800 border-green-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  // Compute overall visit progress
+  // Progress % across big stages
   const getProgressPercentage = () => {
     if (!patient) return 0;
 
@@ -649,18 +651,26 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
 
   const getStageIcon = (stage) => {
     switch (stage) {
-      case 'kiosk': return CheckCircle;
+      case 'kiosk':
+        return CheckCircle;
       case 'waiting_triage':
-      case 'triage': return UserCheck;
+      case 'triage':
+        return UserCheck;
       case 'waiting_registration':
-      case 'registration': return Activity;
+      case 'registration':
+        return Activity;
       case 'waiting_doctor':
-      case 'consultation': return Stethoscope;
-      default: return Timer;
+      case 'consultation':
+        return Stethoscope;
+      default:
+        return Timer;
     }
   };
 
   const StageIcon = getStageIcon(patient.currentStage);
+
+  const doctorInfo = getDoctorInfo(patient.assignedDoctor);
+  const nurseInfo = getNurseInfo(patient.assignedNurse);
 
   return (
     <div className="min-h-screen bg-blue-50 p-4">
@@ -669,27 +679,27 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
         <div className="text-center">
           <h1 className="text-4xl font-bold mb-2">Emergency Department</h1>
           <p className="text-xl text-gray-600">Visit Tracker</p>
-          
+
           <div className="flex items-center justify-center gap-4 mt-2">
             <div className="flex items-center gap-2">
               {backendPatientData ? (
                 <>
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                   <span className="text-xs text-green-600">Live updates from ED system</span>
                 </>
               ) : (
                 <>
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full" />
                   <span className="text-xs text-yellow-600">Offline mode - updates may be delayed</span>
                 </>
               )}
             </div>
 
             <div className="flex items-center gap-2">
-              <Button 
+              <Button
                 onClick={handleManualRefresh}
                 disabled={isLoading}
-                size="sm" 
+                size="sm"
                 variant="outline"
                 className="flex items-center gap-1 h-7"
               >
@@ -721,14 +731,17 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
                   {patient.disposition && (
                     <div className="mt-1">
                       <span className="text-sm text-gray-700">Disposition: </span>
-                      <strong className="text-sm text-gray-800">{formatDisposition(patient.disposition)}</strong>
+                      <strong className="text-sm text-gray-800">
+                        {formatDisposition(patient.disposition)}
+                      </strong>
                     </div>
                   )}
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold text-blue-800">
-                  {getTotalTime(patient)}<span className="text-lg">min</span>
+                  {getTotalTime(patient)}
+                  <span className="text-lg">min</span>
                 </div>
                 <p className="text-sm text-gray-600">in current stage</p>
               </div>
@@ -736,7 +749,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
           </CardHeader>
           <CardContent>
             {getProgressPercentage() === 100 ? (
-              <ConsultationCompletionScreen 
+              <ConsultationCompletionScreen
                 onSubmitFeedback={onAddSatisfactionFeedback}
                 patientName={patient.name}
                 queueNumber={queueNumber}
@@ -748,50 +761,57 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
                   <p className="text-blue-700">{getStageDescription(patient.currentStage)}</p>
                 </div>
 
+                {/* Real-time updates + quick feedback */}
                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center gap-2 mb-3">
                     <Bell className="w-4 h-4 text-green-700" />
                     <p className="text-green-800 font-medium">Real-Time Updates & Communication:</p>
                   </div>
-                  
+
                   <div className="space-y-2 mb-4">
                     {realtimeComments.map((comment, index) => (
                       <div key={index} className="flex items-start gap-2 bg-white p-2 rounded">
                         <MessageCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <p className="text-sm text-green-700">{comment.message}</p>
-                          <p className="text-xs text-gray-500">{comment.time.toLocaleTimeString()}</p>
+                          <p className="text-xs text-gray-500">
+                            {comment.time.toLocaleTimeString()}
+                          </p>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  {submittedComments.filter(c => c.stage === patient.currentStage).length > 0 && (
-                    <div className="space-y-2 mb-4">
-                      <p className="text-sm font-medium text-green-800">Your Comments:</p>
-                      {submittedComments.filter(c => c.stage === patient.currentStage).map((comment, index) => (
-                        <div key={index} className="flex items-start gap-2 bg-blue-50 p-2 rounded border border-blue-200">
-                          <MessageCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                          <div className="flex-1">
-                            <p className="text-sm text-blue-700 font-medium">You: {comment.message}</p>
-                            <div className="flex items-center gap-1 mt-1">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <Star
-                                  key={star}
-                                  className={`w-3 h-3 ${
-                                    star <= comment.rating
-                                      ? 'text-yellow-500 fill-yellow-500'
-                                      : 'text-gray-300'
-                                  }`}
-                                />
-                              ))}
-                            </div>
-                            <p className="text-xs text-gray-500">{comment.time.toLocaleTimeString()}</p>
+                  {submittedComments
+                    .filter((c) => c.stage === patient.currentStage)
+                    .map((comment, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start gap-2 bg-blue-50 p-2 rounded border border-blue-200 mb-2"
+                      >
+                        <MessageCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm text-blue-700 font-medium">
+                            You: {comment.message}
+                          </p>
+                          <div className="flex items-center gap-1 mt-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`w-3 h-3 ${
+                                  star <= comment.rating
+                                    ? 'text-yellow-500 fill-yellow-500'
+                                    : 'text-gray-300'
+                                }`}
+                              />
+                            ))}
                           </div>
+                          <p className="text-xs text-gray-500">
+                            {comment.time.toLocaleTimeString()}
+                          </p>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      </div>
+                    ))}
 
                   <div className="mt-4 p-4 border border-green-300 rounded-xl bg-white shadow-sm">
                     <p className="text-center text-green-800 font-semibold mb-4">
@@ -837,7 +857,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
                               </span>
                             </div>
                             {index < arr.length - 1 && (
-                              <div className="h-10 border-l border-gray-600 mx-6"></div>
+                              <div className="h-10 border-l border-gray-600 mx-6" />
                             )}
                           </div>
                         ))}
@@ -865,12 +885,13 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
                         </Button>
                       </div>
                       <p className="text-xs text-green-600">
-                        Your feedback will be sent directly to the ED Manager for immediate attention
+                        Your feedback will be sent directly to the ED Manager for immediate
+                        attention
                       </p>
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-gray-700">Visit Progress</span>
@@ -887,6 +908,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
           </CardContent>
         </Card>
 
+        {/* Overview + Healthcare Team */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Visit Overview */}
           <Card className="shadow-lg">
@@ -907,7 +929,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
                     {getTotalTime(patient)} min
                   </div>
                 </div>
-                
+
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
                     <Timer className="w-4 h-4 text-gray-600" />
@@ -926,10 +948,16 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
                     <span className="text-sm font-medium text-gray-700">Priority Level</span>
                   </div>
                   <Badge className={getPriorityBadgeColor(patient.esiLevel)}>
-                    Level {patient.esiLevel} {patient.esiLevel === 1 ? '(Critical)' : 
-                    patient.esiLevel === 2 ? '(Emergent)' : 
-                    patient.esiLevel === 3 ? '(Urgent)' : 
-                    patient.esiLevel === 4 ? '(Less Urgent)' : '(Non-Urgent)'}
+                    Level {patient.esiLevel}{' '}
+                    {patient.esiLevel === 1
+                      ? '(Critical)'
+                      : patient.esiLevel === 2
+                      ? '(Emergent)'
+                      : patient.esiLevel === 3
+                      ? '(Urgent)'
+                      : patient.esiLevel === 4
+                      ? '(Less Urgent)'
+                      : '(Non-Urgent)'}
                   </Badge>
                 </div>
               )}
@@ -943,8 +971,8 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
             </CardContent>
           </Card>
 
-          {/* Healthcare Team */}
-          {(patient.assignedNurse || patient.assignedDoctor) && (
+          {/* Healthcare Team – shows real doctor name; nurse optional */}
+          {(doctorInfo || nurseInfo) && (
             <Card className="shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -953,69 +981,76 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {patient.assignedNurse && (
+                {nurseInfo && (
                   <div className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
                     <Avatar className="w-12 h-12">
-                      <AvatarImage src={staffProfiles[patient.assignedNurse]?.photo} alt={getStaffDisplayName(patient.assignedNurse)} />
                       <AvatarFallback className="bg-purple-200 text-purple-800">
-                        {getStaffDisplayName(patient.assignedNurse).split(' ').map(n => n[0]).join('')}
+                        {nurseInfo.name
+                          .split(' ')
+                          .map((n) => n[0])
+                          .join('')}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
                       <div className="font-medium text-purple-800">Assigned Nurse</div>
-                      <div className="text-purple-700">{getStaffDisplayName(patient.assignedNurse)}</div>
+                      <div className="text-purple-700">{nurseInfo.name}</div>
                     </div>
                   </div>
                 )}
-                
-                {patient.assignedDoctor && (
+
+                {doctorInfo && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
                       <Avatar className="w-12 h-12">
-                        <AvatarImage src={staffProfiles[patient.assignedDoctor]?.photo} alt={getStaffDisplayName(patient.assignedDoctor)} />
                         <AvatarFallback className="bg-purple-200 text-purple-800">
-                          {getStaffDisplayName(patient.assignedDoctor).split(' ').map(n => n[0]).join('')}
+                          {doctorInfo.name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
                         <div className="font-medium text-purple-800">Assigned Doctor</div>
-                        <div className="text-purple-700">{getStaffDisplayName(patient.assignedDoctor)}</div>
+                        <div className="text-purple-700">{doctorInfo.name}</div>
+                        {doctorInfo.specialty && (
+                          <div className="text-xs text-purple-600">{doctorInfo.specialty}</div>
+                        )}
                       </div>
                     </div>
-                    
-                    {staffProfiles[patient.assignedDoctor]?.room && (
-                      <div className="ml-15 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+
+                    {(doctorInfo.room || doctorInfo.floor) && (
+                      <div className="ml-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
                         <div className="text-sm space-y-1">
                           <div className="flex items-center gap-2">
                             <Building className="w-4 h-4 text-indigo-600" />
                             <span className="font-medium text-indigo-800">Location:</span>
                           </div>
                           <div className="ml-6 text-indigo-700">
-                            <p>🏥 {staffProfiles[patient.assignedDoctor].building}</p>
-                            <p>📍 Room {staffProfiles[patient.assignedDoctor].room}</p>
-                            <p>🔢 {staffProfiles[patient.assignedDoctor].floor}</p>
+                            <p>🏥 {doctorInfo.building}</p>
+                            {doctorInfo.room && <p>📍 Room {doctorInfo.room}</p>}
+                            {doctorInfo.floor && <p>🔢 {doctorInfo.floor}</p>}
                           </div>
                         </div>
                       </div>
                     )}
                   </div>
                 )}
-                
+
                 <div className="text-xs text-purple-600 mt-2">
                   <p>• Your care team has been notified of your visit</p>
-                  <p>• They will see you in order of medical priority</p>
+                  <p>• You will be seen in order of medical priority</p>
                 </div>
               </CardContent>
             </Card>
           )}
         </div>
 
-        {/* Entertainment and Information Tabs */}
+        {/* Tabs: tips, news, trivia, relax, services */}
         <Tabs defaultValue="tips" className="w-full">
-          <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
+          <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-2 bg-transparent border-b">
             <TabsTrigger
               value="tips"
-              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-[1.05]"
+              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
             >
               <Lightbulb className="w-4 h-4" />
               <span className="hidden sm:inline">Health Tips</span>
@@ -1024,7 +1059,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
 
             <TabsTrigger
               value="news"
-              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-[1.05]"
+              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
             >
               <Newspaper className="w-4 h-4" />
               <span className="hidden sm:inline">News</span>
@@ -1032,7 +1067,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
 
             <TabsTrigger
               value="trivia"
-              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-[1.05]"
+              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
             >
               <Brain className="w-4 h-4" />
               <span className="hidden sm:inline">Trivia</span>
@@ -1040,15 +1075,15 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
 
             <TabsTrigger
               value="relax"
-              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-[1.05]"
+              className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
             >
               <Wind className="w-4 h-4" />
-              <span className="hidden sm:inline">Relaxation Exercises</span>
+              <span className="hidden sm:inline">Relaxation</span>
             </TabsTrigger>
 
             <TabsTrigger
               value="services"
-              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-[1.05]"
+              className="flex items-center justify-center gap-2 min-w-[110px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
             >
               <Building className="w-4 h-4" />
               <span className="hidden sm:inline">Services</span>
@@ -1059,26 +1094,22 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
             <TabsContent value="tips" className="mt-0">
               <HealthTips />
             </TabsContent>
-
             <TabsContent value="news" className="mt-0">
               <HospitalAnnouncements />
             </TabsContent>
-
             <TabsContent value="trivia" className="mt-0">
               <MedicalTrivia />
             </TabsContent>
-
             <TabsContent value="relax" className="mt-0">
               <RelaxationExercises />
             </TabsContent>
-
             <TabsContent value="services" className="mt-0">
               <HospitalServices />
             </TabsContent>
           </div>
         </Tabs>
 
-        {/* Important Information */}
+        {/* Info cards */}
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle>Important Information</CardTitle>
@@ -1086,7 +1117,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
-                <h3 className="font-medium text-green-800">What's Happening</h3>
+                <h3 className="font-medium text-green-800">What&apos;s Happening</h3>
                 <ul className="text-sm space-y-2 text-gray-600">
                   <li>• Your status updates automatically as you progress</li>
                   <li>• You will be seen based on medical priority, not arrival time</li>
@@ -1095,7 +1126,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
                   <li>• Refresh this page anytime to see your current status</li>
                 </ul>
               </div>
-              
+
               <div className="space-y-3">
                 <h3 className="font-medium text-blue-800">Need Help?</h3>
                 <ul className="text-sm space-y-2 text-gray-600">
@@ -1110,7 +1141,7 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
           </CardContent>
         </Card>
 
-        {/* Current Time and Data Update Time */}
+        {/* Footer times */}
         <div className="text-center text-sm text-gray-500 space-y-1">
           <p>Current time: {currentTime.toLocaleString()}</p>
           {lastUpdated && <p>Data updated: {lastUpdated.toLocaleString()}</p>}
