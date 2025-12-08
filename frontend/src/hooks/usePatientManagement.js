@@ -45,6 +45,8 @@ export function usePatientManagement() {
         age: row.age,
         sex: row.sex,
         dateOfBirth: row.dateOfBirth ? new Date(row.dateOfBirth) : null,
+        insurance_info: row.insurance_info || null,
+        address: row.address || null,
         
         // ✅ Use currentStage directly from backend (already mapped)
         currentStage: row.currentStage,

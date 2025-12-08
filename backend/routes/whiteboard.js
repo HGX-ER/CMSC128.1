@@ -80,6 +80,8 @@ router.get('/whiteboard', async (_req, res) => {
                 p.full_name,
                 p.dob,
                 p.sex,
+                p.insurance_info,
+                p.address,
                 (
                     SELECT o.value
                     FROM observations o
@@ -122,6 +124,8 @@ router.get('/whiteboard', async (_req, res) => {
             full_name: r.full_name,
             sex: r.sex || null,
             dateOfBirth: r.dob || null,
+            insurance_info: r.insurance_info || null,
+            address: r.address || null,
 
             currentStage: toStageKey(r.status),
             esiLevel: r.priority_esi ?? null,

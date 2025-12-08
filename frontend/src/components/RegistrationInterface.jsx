@@ -556,6 +556,7 @@ const handleRegisterPatient = async () => {
                         onChange={(e) => setRegistrationData(prev => ({ ...prev, insuranceInfo: e.target.value }))}
                         className="text-base md:text-lg"
                       />
+                      <p className="text-sm text-gray-500 italic">Example: PhilHealth - PH123456789</p>
                     </div>
 
                     <div className="space-y-2">
@@ -568,19 +569,22 @@ const handleRegisterPatient = async () => {
                         rows={3}
                         className="text-base md:text-lg"
                       />
+                      <p className="text-sm text-gray-500 italic">Example: 123 Main Street, Barangay 1, Pasay City</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="chief-complaint">Chief Complaint</Label>
+                  <Label htmlFor="chief-complaint" className="text-base md:text-lg font-medium">Chief Complaint</Label>
                   <Textarea
                     id="chief-complaint"
                     placeholder="Describe the main reason for the visit"
                     value={registrationData.chiefComplaint}
                     onChange={(e) => setRegistrationData(prev => ({ ...prev, chiefComplaint: e.target.value }))}
                     rows={4}
+                    className="text-base md:text-lg"
                   />
+                  <p className="text-sm text-gray-500 italic">Example: Severe headache and dizziness for 3 hours</p>
                 </div>
 
                 <div className="flex justify-center pt-4">

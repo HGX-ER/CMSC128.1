@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Button } from "./ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import {
   Dialog,
   DialogTrigger,
@@ -430,28 +431,75 @@ const ageGroupCounts = completedPatients.reduce((acc, patient) => {
 }, {});
 const ageData = Object.entries(ageGroupCounts).map(([name, value]) => ({ name, value }));
 
-// Insurance info distribution
-const insuranceCounts = completedPatients.reduce((acc, patient) => {
-  const ins = (patient.insurance_info || "Unknown / Self-pay").trim();
-  acc[ins] = (acc[ins] || 0) + 1;
-  return acc;
-}, {});
-const insuranceData = Object.entries(insuranceCounts).map(([name, value]) => ({ name, value }));
+// Insurance info - prepare patient records for display in table
+const insurancePatientData = completedPatients.map(patient => ({
+  queue_number: patient.id,
+  name: patient.full_name?.trim() ? patient.full_name : (patient.name || "Unknown"),
+  insurance_info: patient.insurance_info?.trim() ? patient.insurance_info.trim() : "Not provided or unknown"
+}));
 
-// City distribution from address (last comma-separated token)
+// City distribution from address (extracts city intelligently, case-insensitive)
 const cityCounts = completedPatients.reduce((acc, patient) => {
   const raw = (patient.address || "").trim();
   let city = "Unknown city";
   if (raw) {
-    const parts = raw.split(",");
-    city = parts[parts.length - 1].trim() || "Unknown city";
+    let lastPart = raw;
+    
+    // First, check if there's a comma (proper format: "address, city")
+    if (raw.includes(",")) {
+      const parts = raw.split(",");
+      lastPart = parts[parts.length - 1].trim();
+    } else {
+      // No comma found, try to extract the last 1-2 words as city
+      // This handles cases like "123 Main Street Pasay City" without comma
+      const words = raw.split(/\s+/);
+      if (words.length > 2) {
+        // If address has multiple words, assume last 2 might be the city
+        lastPart = words.slice(-2).join(" ");
+      }
+    }
+    
+    if (lastPart) {
+      // Extract the first word from the city part
+      const firstWord = lastPart.split(/\s+/)[0];
+      // Normalize to title case for consistency
+      city = firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
+    }
   }
   acc[city] = (acc[city] || 0) + 1;
   return acc;
 }, {});
 const cityData = Object.entries(cityCounts).map(([name, value]) => ({ name, value }));
 
-
+// City patient data - prepare patient records with their addresses for display in table
+const cityPatientData = completedPatients.map(patient => {
+  const raw = (patient.address || "").trim();
+  let city = "Unknown city";
+  if (raw) {
+    let lastPart = raw;
+    
+    if (raw.includes(",")) {
+      const parts = raw.split(",");
+      lastPart = parts[parts.length - 1].trim();
+    } else {
+      const words = raw.split(/\s+/);
+      if (words.length > 2) {
+        lastPart = words.slice(-2).join(" ");
+      }
+    }
+    
+    if (lastPart) {
+      const firstWord = lastPart.split(/\s+/)[0];
+      city = firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
+    }
+  }
+  return {
+    queue_number: patient.id,
+    name: patient.full_name?.trim() ? patient.full_name : (patient.name || "Unknown"),
+    city: city,
+    address: raw || "Not provided"
+  };
+});
 
 // Count top ICD‑10 diagnoses (codes/descriptions only)
 const diagnosisCount = completedPatients.reduce((acc, patient) => {
@@ -484,7 +532,8 @@ const top10Diagnoses = Object.entries(diagnosisCount)
       ageSexPyramidData,  // ✅ add this
       sexData,          // ✅ new
       ageData,          // ✅ new
-      insuranceData,    // ✅ new
+      insurancePatientData,    // ✅ new - patient records for table
+      cityPatientData,         // ✅ new - city patient records for table
        cityData,
       // CHANGED: use basePatients so admitted_non_icu / admitted_icu count
       totalAdmissions: basePatients.filter(
@@ -949,36 +998,35 @@ const top10Diagnoses = Object.entries(diagnosisCount)
             </CardContent>
           </Card>
 
-          {/* Patient disposition full width */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Patient Disposition</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={analytics.dispositionData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {analytics.dispositionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Demographics and pyramid side-by-side */}
+          {/* Disposition and Demographics side-by-side */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Patient Disposition</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={analytics.dispositionData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {analytics.dispositionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Demographics Breakdown</CardTitle>
@@ -993,15 +1041,10 @@ const top10Diagnoses = Object.entries(diagnosisCount)
                       cx="50%"
                       cy="50%"
                       outerRadius={80}
-                      label={({ name, percent }) =>
-                        `${name}: ${(percent * 100).toFixed(0)}%`
-                      }
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                     >
                       {analytics.demographicsData.map((entry, index) => (
-                        <Cell
-                          key={`demo-cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
+                        <Cell key={`demo-cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip />
@@ -1009,44 +1052,26 @@ const top10Diagnoses = Object.entries(diagnosisCount)
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Age–Sex Population Pyramid</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart
-                    data={analytics.ageSexPyramidData}
-                    layout="vertical"
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      type="number"
-                      tickFormatter={(value) => Math.abs(value)}
-                    />
-                    <YAxis type="category" dataKey="ageBand" />
-                    <Tooltip
-                      formatter={(value, name) => [
-                        Math.abs(value),
-                        name === "Male" ? "Male" : "Female",
-                      ]}
-                    />
-                    <Bar
-                      dataKey="male"
-                      name="Male"
-                      fill="#3B82F6"
-                    />
-                    <Bar
-                      dataKey="female"
-                      name="Female"
-                      fill="#EC4899"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
           </div>
+
+          {/* Age–Sex Population Distribution on its own row */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Age–Sex Population Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analytics.ageSexPyramidData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis type="category" dataKey="ageBand" width={80} />
+                  <Tooltip />
+                  <Bar dataKey="male" name="Male" fill="#3B82F6" stackId="a" />
+                  <Bar dataKey="female" name="Female" fill="#EC4899" stackId="a" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
   <Card>
@@ -1054,32 +1079,70 @@ const top10Diagnoses = Object.entries(diagnosisCount)
       <CardTitle>Insurance Info</CardTitle>
     </CardHeader>
     <CardContent>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={analytics.insuranceData} layout="vertical">
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis type="number" allowDecimals={false} />
-          <YAxis type="category" dataKey="name" width={110} />
-          <Tooltip />
-          <Bar dataKey="value" fill="#FFBB28" />
-        </BarChart>
-      </ResponsiveContainer>
+      <div className="w-full overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Queue Number</TableHead>
+              <TableHead>Patient Name</TableHead>
+              <TableHead>Insurance Info & Policy Number</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {analytics.insurancePatientData && analytics.insurancePatientData.length > 0 ? (
+              analytics.insurancePatientData.map((record, index) => (
+                <TableRow key={index}>
+                  <TableCell className="font-mono font-medium">{record.queue_number}</TableCell>
+                  <TableCell>{record.name}</TableCell>
+                  <TableCell>{record.insurance_info}</TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center py-8 text-gray-500">
+                  No completed patients to display
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </CardContent>
   </Card>
 
   <Card>
     <CardHeader>
-      <CardTitle>City (from Address)</CardTitle>
+      <CardTitle>Address</CardTitle>
     </CardHeader>
     <CardContent>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={analytics.cityData} layout="vertical">
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis type="number" allowDecimals={false} />
-          <YAxis type="category" dataKey="name" width={110} />
-          <Tooltip />
-          <Bar dataKey="value" fill="#82CA9D" />
-        </BarChart>
-      </ResponsiveContainer>
+      <div className="w-full overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Queue Number</TableHead>
+              <TableHead>Patient Name</TableHead>
+              <TableHead>Full Address</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {analytics.cityPatientData && analytics.cityPatientData.length > 0 ? (
+              analytics.cityPatientData.map((record, index) => (
+                <TableRow key={index}>
+                  <TableCell className="font-mono font-medium">{record.queue_number}</TableCell>
+                  <TableCell>{record.name}</TableCell>
+                  <TableCell>{record.address}</TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center py-8 text-gray-500">
+                  No completed patients to display
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </CardContent>
   </Card>
 </div>
