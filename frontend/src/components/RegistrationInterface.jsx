@@ -104,9 +104,7 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
     }
   };
 
-
-
-  const handleRegisterPatient = async () => {
+const handleRegisterPatient = async () => {
   try {
     const patient = patients.find(p => p.id === registrationQueueNumber);
     if (!patient) {
@@ -131,7 +129,6 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
       }
     }
 
-    // ✅ Send the update to backend
     const payload = {
       name: registrationData.name,
       dateOfBirth: registrationData.dateOfBirth,
@@ -139,7 +136,8 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
       contactNumber: registrationData.contactNumber,
       emergencyContact: registrationData.emergencyContact,
       insuranceInfo: registrationData.insuranceInfo,
-      address: registrationData.address
+      address: registrationData.address,
+      chiefComplaint: registrationData.chiefComplaint
     };
 
     const response = await fetch(`https://node-mysql-api-zsam.onrender.com/api/registration/patient/${registrationQueueNumber}`, {
@@ -155,17 +153,19 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
 
     console.log("✅ Registration saved to backend:", payload);
 
-    // ✅ Update frontend state
-    onUpdatePatient(patient.id, {
-      ...payload,
-      age: calculatedAge,
-      isRegistered: true
+    // ✅ Update frontend - backend status='registered' maps to 'waiting_doctor'
+    onUpdatePatient(patient.id, { 
+      ...payload, 
+      age: calculatedAge, 
+      isRegistered: true 
     });
-    onMoveToStage(patient.id, "waiting_doctor");
 
-    alert("✅ Registration completed and saved to backend!");
+    // ✅ This is correct now! Backend sets status='registered' → maps to 'waiting_doctor'
+    // Don't manually call onMoveToStage, let the data reload handle it
 
-    // Reset registration form
+    alert("✅ Registration completed! Patient ready for doctor assignment.");
+
+    // Reset form
     setRegistrationQueueNumber('');
     setRegistrationData({
       name: '',
@@ -185,22 +185,17 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
 };
 
 
+
   const findPatientByQueueNumber = (queueNumber) => {
     return patients.find(p => p.id === queueNumber);
   };
 
+  // Control active tab programmatically for reliable navigation
+  const [activeTab, setActiveTab] = useState('pending-logins');
+
   return (
     <div className="p-6 space-y-6">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <Badge variant="outline" className="text-lg px-4 py-2" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Users style={{ width: '1rem', height: '1rem' }} />
-            Waiting: {waitingPatients.length}
-          </Badge>
-        </div>
-      </div>
-
-      <Tabs defaultValue="pending-logins" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
           <TabsTrigger
             value="pending-logins"
@@ -334,8 +329,11 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
                                   sex: patient.sex || '',
                                   chiefComplaint: patient.chiefComplaint || ''
                                 }));
-                                // 🔹 Automatically switch to the registration tab
-                                document.querySelector('[value="patient-registration"]')?.click();
+                                // 🔹 Switch to the registration tab and focus first input
+                                setActiveTab('patient-registration');
+                                setTimeout(() => {
+                                  document.getElementById('patient-name')?.focus();
+                                }, 120);
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -378,8 +376,11 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
                                         sex: patient.sex || '',
                                         chiefComplaint: patient.chiefComplaint || ''
                                       }));
-                                      // Auto-switch to registration tab
-                                      document.querySelector('[value="patient-registration"]')?.click();
+                                      // Auto-switch to registration tab and focus the form
+                                      setActiveTab('patient-registration');
+                                      setTimeout(() => {
+                                        document.getElementById('patient-name')?.focus();
+                                      }, 120);
                                     }}
                                     className="bg-blue-600 hover:bg-blue-700 text-white"
                                   >
@@ -403,7 +404,7 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
         <TabsContent value="patient-registration" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <CardTitle style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }} className="text-lg md:text-xl">
                 <ClipboardList style={{ width: '1.25rem', height: '1.25rem', flexShrink: 0 }} />
                 Complete Patient Registration
               </CardTitle>
@@ -412,7 +413,7 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
               <div className="space-y-6">
                 {/* Queue Number Input */}
                 <div className="space-y-2">
-                  <Label htmlFor="queue-number">Queue Number</Label>
+                  <Label htmlFor="queue-number" className="text-base md:text-lg font-medium">Queue Number</Label>
                   <div className="flex gap-2">
                     <Input
                       id="queue-number"
@@ -420,7 +421,7 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
                       placeholder="Enter queue number (e.g., ED20241223140001)"
                       value={registrationQueueNumber}
                       onChange={(e) => setRegistrationQueueNumber(e.target.value.toUpperCase())}
-                      className="font-mono"
+                      className="font-mono text-base md:text-lg"
                     />
                     <Button 
                       variant="outline"
@@ -445,7 +446,7 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
                     <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                       <div className="flex items-center gap-2">
                         <CheckCircle className="w-4 h-4 text-green-600" />
-                        <span className="text-green-800">Patient found: {findPatientByQueueNumber(registrationQueueNumber)?.currentStage}</span>
+                        <span className="text-green-800 text-base">Patient found</span>
                       </div>
                     </div>
                   )}
@@ -455,7 +456,7 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="patient-name">Full Name *</Label>
+                      <Label htmlFor="patient-name" className="text-base md:text-lg font-medium">Full Name *</Label>
                       <Input
                         id="patient-name"
                         type="text"
@@ -463,40 +464,45 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
                         value={registrationData.name}
                         onChange={(e) => setRegistrationData(prev => ({ ...prev, name: e.target.value }))}
                         required
+                        className="text-base md:text-lg"
                       />
+                      <p className="text-xs text-gray-500">Format: First Name, Middle Name, Last Name</p>
+                      <p className="text-xs text-gray-500 italic">Example: Juan Aguilar Dela Cruz</p>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="dob">Date of Birth *</Label>
+                      <Label htmlFor="dob" className="text-base md:text-lg font-medium">Date of Birth *</Label>
                       <Input
                         id="dob"
                         type="date"
                         value={registrationData.dateOfBirth}
                         onChange={(e) => setRegistrationData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
                         required
+                        className="text-base md:text-lg"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="age">Age</Label>
+                      <Label htmlFor="age" className="text-base md:text-lg font-medium">Age</Label>
                       <Input
                         id="age"
                         type="number"
                         placeholder="Age (will be calculated from DOB if empty)"
                         value={registrationData.age}
                         onChange={(e) => setRegistrationData(prev => ({ ...prev, age: e.target.value }))}
+                        className="text-base md:text-lg"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="sex">Sex *</Label>
+                      <Label htmlFor="sex" className="text-base md:text-lg font-medium">Sex *</Label>
                       <Select
                         value={registrationData.sex}
                         onValueChange={(value) =>
                           setRegistrationData((prev) => ({ ...prev, sex: value }))
                         }
                       >
-                        <SelectTrigger id="sex" className="w-full">
+                        <SelectTrigger id="sex" className="w-full text-base md:text-lg">
                           <SelectValue placeholder="Select Sex" />
                         </SelectTrigger>
                         <SelectContent>
@@ -510,60 +516,75 @@ export function RegistrationInterface({ patients, onUpdatePatient, onMoveToStage
 
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="contact">Contact Number</Label>
+                      <Label htmlFor="contact" className="text-base md:text-lg font-medium">Contact Number</Label>
                       <Input
                         id="contact"
                         type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         placeholder="Phone number"
                         value={registrationData.contactNumber}
-                        onChange={(e) => setRegistrationData(prev => ({ ...prev, contactNumber: e.target.value }))}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, '');
+                          setRegistrationData(prev => ({ ...prev, contactNumber: digits }));
+                        }}
+                        className="text-base md:text-lg"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="emergency-contact">Emergency Contact</Label>
+                      <Label htmlFor="emergency-contact" className="text-base md:text-lg font-medium">Emergency Contact</Label>
                       <Input
                         id="emergency-contact"
                         type="text"
                         placeholder="Emergency contact name and number"
                         value={registrationData.emergencyContact}
                         onChange={(e) => setRegistrationData(prev => ({ ...prev, emergencyContact: e.target.value }))}
+                        className="text-base md:text-lg"
                       />
+                      <p className="text-sm text-gray-500 italic">Format: Full Name - Contact Number</p>
+                      <p className="text-sm text-gray-500 italic">Example: Juan Aguilar Dela Cruz - 09XX XXX XXXX</p>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="insurance">Insurance Information</Label>
+                      <Label htmlFor="insurance" className="text-base md:text-lg font-medium">Insurance Information</Label>
                       <Input
                         id="insurance"
                         type="text"
                         placeholder="Insurance provider and policy number"
                         value={registrationData.insuranceInfo}
                         onChange={(e) => setRegistrationData(prev => ({ ...prev, insuranceInfo: e.target.value }))}
+                        className="text-base md:text-lg"
                       />
+                      <p className="text-sm text-gray-500 italic">Example: PhilHealth - PH123456789</p>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="address">Address</Label>
+                      <Label htmlFor="address" className="text-base md:text-lg font-medium">Address</Label>
                       <Textarea
                         id="address"
                         placeholder="Home address"
                         value={registrationData.address}
                         onChange={(e) => setRegistrationData(prev => ({ ...prev, address: e.target.value }))}
                         rows={3}
+                        className="text-base md:text-lg"
                       />
+                      <p className="text-sm text-gray-500 italic">Example: 123 Main Street, Barangay 1, Pasay City</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="chief-complaint">Chief Complaint</Label>
+                  <Label htmlFor="chief-complaint" className="text-base md:text-lg font-medium">Chief Complaint</Label>
                   <Textarea
                     id="chief-complaint"
                     placeholder="Describe the main reason for the visit"
                     value={registrationData.chiefComplaint}
                     onChange={(e) => setRegistrationData(prev => ({ ...prev, chiefComplaint: e.target.value }))}
                     rows={4}
+                    className="text-base md:text-lg"
                   />
+                  <p className="text-sm text-gray-500 italic">Example: Severe headache and dizziness for 3 hours</p>
                 </div>
 
                 <div className="flex justify-center pt-4">

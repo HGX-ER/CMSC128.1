@@ -28,6 +28,28 @@ export const DISPOSITION_OPTIONS = [
   'Discharge'
 ];
 
+// Format machine disposition codes to human-friendly labels
+export const formatDisposition = (disp) => {
+  if (!disp) return '';
+  const map = {
+    in_observation: 'In Observation',
+    observation: 'Observation',
+    admitted_non_icu: 'Admitted (Non-ICU)',
+    admitted_icu: 'Admitted (ICU)',
+    discharge: 'Discharge',
+    discharged: 'Discharged',
+    admission: 'Admission'
+  };
+  if (map[disp]) return map[disp];
+  // fallback: replace underscores and capitalize words
+  return disp
+    .toString()
+    .replace(/_/g, ' ')
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+};
+
 // Valid ESI levels
 export const ESI_LEVELS = [1, 2, 3, 4, 5];
 

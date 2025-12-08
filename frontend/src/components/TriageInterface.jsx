@@ -7,7 +7,7 @@ import { FaUserInjured, FaExclamationTriangle } from "react-icons/fa";
 const ESI_COLORS = {
   1: "bg-red-600 text-white",
   2: "bg-orange-500 text-white",
-  3: "bg-yellow-400 text-black",
+  3: "bg-yellow-500 text-black",
   4: "bg-green-500 text-white",
   5: "bg-blue-500 text-white",
 };
@@ -26,7 +26,16 @@ export function TriageInterface({ onBack }) {
         const res = await fetch("https://node-mysql-api-zsam.onrender.com/api/triage");
         if (!res.ok) throw new Error("Failed to fetch triage patients");
         const data = await res.json();
-        setWaitingPatients(data);
+        // exclude locally canceled queue numbers so canceled numbers won't appear in triage UI
+        let canceled = [];
+        try {
+          const raw = localStorage.getItem("canceledQueueNumbers");
+          canceled = raw ? JSON.parse(raw) : [];
+        } catch (e) {
+          console.error("Failed to read canceledQueueNumbers from localStorage", e);
+        }
+        const filtered = data.filter((p) => !canceled.includes(p.queue_number));
+        setWaitingPatients(filtered);
       } catch (err) {
         console.error(err);
         setError("Failed to load triage patients");
@@ -57,19 +66,48 @@ export function TriageInterface({ onBack }) {
         {/* ESI Reference Guide */}
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="font-bold text-lg">ESI REFERENCE GUIDE</CardTitle>
+            <CardTitle className="font-bold text-lg">ESI Reference Guide</CardTitle>
           </CardHeader>
-          <CardContent className="flex justify-center flex-wrap gap-4 text-sm">
-            <Badge className="bg-red-600 text-white">ESI 1</Badge>
-            <span>Resuscitation - Life threatening</span>
-            <Badge className="bg-orange-500 text-white">ESI 2</Badge>
-            <span>Emergent - High risk</span>
-            <Badge className="bg-yellow-400 text-black">ESI 3</Badge>
-            <span>Urgent - Moderate risk</span>
-            <Badge className="bg-green-500 text-white">ESI 4</Badge>
-            <span>Less Urgent - Low risk</span>
-            <Badge className="bg-blue-500 text-white">ESI 5</Badge>
-            <span>Non-urgent - Very low risk</span>
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div className="flex items-start gap-3">
+              <Badge className="bg-red-600 text-white">ESI 1</Badge>
+              <div>
+                <div className="font-semibold text-base">Resuscitation</div>
+                <div className="text-sm text-gray-600">Immediate, life‑threatening problem requiring resuscitation.</div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <Badge className="bg-orange-500 text-white">ESI 2</Badge>
+              <div>
+                <div className="font-semibold text-base">Emergent</div>
+                <div className="text-sm text-gray-600">High risk situation; needs rapid evaluation/intervention.</div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <Badge className="bg-yellow-500 text-black">ESI 3</Badge>
+              <div>
+                <div className="font-semibold text-base">Urgent</div>
+                <div className="text-sm text-gray-600">Requires many resources but can wait short while; moderate risk.</div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <Badge className="bg-green-500 text-white">ESI 4</Badge>
+              <div>
+                <div className="font-semibold text-base">Less Urgent</div>
+                <div className="text-sm text-gray-600">One resource needed; low risk and stable.</div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 col-span-1 sm:col-span-2">
+              <Badge className="bg-blue-500 text-white">ESI 5</Badge>
+              <div>
+                <div className="font-semibold text-base">Non‑Urgent</div>
+                <div className="text-sm text-gray-600">Minimal resources; non-urgent problems.</div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -124,31 +162,32 @@ export function TriageInterface({ onBack }) {
                 <p className="text-gray-700">
                   <strong>Selected:</strong> {selectedPatient.full_name} ({selectedPatient.queue_number})
                 </p>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex gap-3 overflow-x-auto no-scrollbar">
                   {[1, 2, 3, 4, 5].map((level) => (
-                    <Button
-                      key={level}
-                      className={`${ESI_COLORS[level]} font-semibold`}
-                      onClick={async () => {
-                        try {
-                          await fetch(
-                            `https://node-mysql-api-zsam.onrender.com/api/triage/encounters/${selectedPatient.encounter_id}/triage`,
-                            {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ esi: level }),
-                            }
-                          );
-                          alert(`ESI ${level} assigned to ${selectedPatient.full_name}`);
-                          setSelectedPatient(null);
-                        } catch (err) {
-                          console.error(err);
-                          alert("Failed to assign ESI");
-                        }
-                      }}
-                    >
-                      ESI {level}
-                    </Button>
+                    <div key={level} className="flex-1 min-w-[140px]">
+                      <Button
+                        className={`${ESI_COLORS[level]} font-semibold py-6 text-xl rounded-lg w-full flex items-center justify-center`}
+                        onClick={async () => {
+                          try {
+                            await fetch(
+                              `https://node-mysql-api-zsam.onrender.com/api/triage/encounters/${selectedPatient.encounter_id}/triage`,
+                              {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ esi: level }),
+                              }
+                            );
+                            alert(`ESI ${level} assigned to ${selectedPatient.full_name}`);
+                            setSelectedPatient(null);
+                          } catch (err) {
+                            console.error(err);
+                            alert("Failed to assign ESI");
+                          }
+                        }}
+                      >
+                        <span className="text-2xl">ESI {level}</span>
+                      </Button>
+                    </div>
                   ))}
                 </div>
               </div>

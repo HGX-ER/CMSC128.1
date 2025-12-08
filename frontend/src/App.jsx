@@ -10,6 +10,7 @@ import { NurseInterface } from './components/NurseInterface';
 import { DoctorInterface } from './components/DoctorInterface';
 import { ManagerInterface } from './components/ManagerInterface';
 import { DashboardInterface } from './components/DashboardInterface';
+import { AdminInterface } from './components/AdminInterface';
 import { Button } from './components/ui/button';
 import { Card, CardContent } from './components/ui/card';
 import { Badge } from './components/ui/badge';
@@ -25,6 +26,7 @@ import {
   LogOut,
   User
 } from 'lucide-react';
+import { ShieldCheck } from "lucide-react";
 
 const ROLE_CONFIGS = {
   triage: {
@@ -62,6 +64,12 @@ const ROLE_CONFIGS = {
     icon: BarChart3,
     color: 'bg-indigo-600 hover:bg-indigo-700',
     description: 'View ED analytics and reports'
+  },
+  admin: {
+    title: 'Admin Panel',
+    icon: ShieldCheck,
+    color: 'bg-red-700 hover:bg-red-800',
+    description: 'Manage user accounts and system settings'
   }
 };
 
@@ -102,7 +110,8 @@ export default function App() {
       patient: [], // Patients no longer need kiosk access
       nurse: ['triage', 'registration', 'nurse'],
       doctor: ['doctor'],
-      ed_manager: ['manager', 'dashboard']
+      ed_manager: ['manager', 'dashboard'],
+      admin: ['admin']
     };
     
     return roleAccess[auth.user.role] || [];
@@ -128,9 +137,6 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-4">
-              <Badge variant="outline" className="px-3 py-1">
-                Welcome, {auth.user.name}
-              </Badge>
               <Button
                 variant="outline"
                 onClick={auth.logout}
@@ -229,16 +235,6 @@ export default function App() {
             </div>
 
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-between text-sm text-gray-600 gap-4">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  <span>
-                    Active Patients:{" "}
-                    {patientManagement.patients.filter((p) => p.isActive).length}
-                  </span>
-                </div>
-                <Badge variant="outline">{new Date().toLocaleString()}</Badge>
-              </div>
 
               <Button
                 variant="outline"
@@ -323,6 +319,11 @@ export default function App() {
           />
         );
       
+      case 'admin':
+        return (
+          <AdminInterface/>
+        );
+      
       default:
         return <div>Invalid role</div>;
     }
@@ -334,7 +335,7 @@ export default function App() {
       <div className="bg-white shadow-sm border-b">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
-            {currentRole !== 'doctor' && (
+            {currentRole !== 'doctor' && currentRole !== 'admin' && (
               <Button
                 variant="outline"
                 onClick={() => setCurrentRole(null)}
@@ -358,15 +359,6 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-4">
-            <Badge variant="outline" className="px-3 py-1">
-              {auth.user?.name} ({auth.user?.role.replace('_', ' ')})
-            </Badge>
-            <Badge variant="outline" className="px-3 py-1">
-              Active Patients: {patientManagement.patients.filter(p => p.isActive).length}
-            </Badge>
-            <Badge variant="outline" className="px-3 py-1">
-              {new Date().toLocaleTimeString()}
-            </Badge>
             <Button
               variant="outline"
               onClick={auth.logout}
