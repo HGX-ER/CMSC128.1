@@ -31,6 +31,8 @@ router.get("/patient/status/:queueNumber", async (req, res) => {
                     e.provider_start_time,
                     e.disposition,
                     e.depart_time,
+                    e.assigned_doctor,   -- NEW
+                    e.assigned_nurse,    -- NEW
                     p.id AS patient_id,
                     p.full_name,
                     p.dob,
@@ -77,38 +79,38 @@ router.get("/patient/status/:queueNumber", async (req, res) => {
 
         // Map backend status to frontend stage names
         const statusToStageMap = {
-            'arrived': 'kiosk',
-            'waiting_for_triage': 'waiting_triage',
-            'in_triage': 'triage',
-            'waiting_for_registration': 'waiting_registration',
-            'in_registration': 'registration',
-            'waiting_for_provider': 'waiting_doctor',
-            'with_provider': 'consultation',
-            'waiting_for_admission': 'waiting_admission',
-            'waiting_for_observation': 'waiting_observation',
-            'waiting_for_discharge': 'waiting_discharge',
-            'admission_in_progress': 'admission_orders',
-            'awaiting_bed': 'awaiting_non_icu',
-            'awaiting_icu_bed': 'awaiting_icu',
-            'discharge_in_progress': 'discharge_documents',
-            'ready_to_depart': 'awaiting_departure',
-            'departed': 'departed'
+            arrived: "kiosk",
+            waiting_for_triage: "waiting_triage",
+            in_triage: "triage",
+            waiting_for_registration: "waiting_registration",
+            in_registration: "registration",
+            waiting_for_provider: "waiting_doctor",
+            with_provider: "consultation",
+            waiting_for_admission: "waiting_admission",
+            waiting_for_observation: "waiting_observation",
+            waiting_for_discharge: "waiting_discharge",
+            admission_in_progress: "admission_orders",
+            awaiting_bed: "awaiting_non_icu",
+            awaiting_icu_bed: "awaiting_icu",
+            discharge_in_progress: "discharge_documents",
+            ready_to_depart: "awaiting_departure",
+            departed: "departed"
         };
 
         // Map event types to frontend stages for the timeline
         const eventTypeToStageMap = {
-            'arrived': 'kiosk',
-            'registered': 'registration',
-            'triaged': 'triage',
-            'roomed': 'consultation',
-            'provider_started': 'consultation',
-            'results_ready': 'consultation',
-            'dispositioned': 'waiting_discharge',
-            'departed': 'departed'
+            arrived: "kiosk",
+            registered: "registration",
+            triaged: "triage",
+            roomed: "consultation",
+            provider_started: "consultation",
+            results_ready: "consultation",
+            dispositioned: "waiting_discharge",
+            departed: "departed"
         };
 
         // Transform events to include frontend stage mapping
-        const mappedEvents = events.map(event => ({
+        const mappedEvents = events.map((event) => ({
             ...event,
             frontend_stage: eventTypeToStageMap[event.type] || event.type
         }));
@@ -127,15 +129,25 @@ router.get("/patient/status/:queueNumber", async (req, res) => {
                 insurance_info: encounter.insurance_info,
                 address: encounter.address
             },
-            timestamps: timestamps,
+            timestamps,
             events: mappedEvents,
             encounter_id: encounter.encounter_id,
-            patient_id: encounter.patient_id
+            patient_id: encounter.patient_id,
+            assigned_doctor: encounter.assigned_doctor || null, // NEW
+            assigned_nurse: encounter.assigned_nurse || null   // NEW
         };
 
-        console.log("✅ Patient status found:", response.queue_number, "- Status:", response.status);
+        console.log(
+            "✅ Patient status found:",
+            response.queue_number,
+            "- Status:",
+            response.status,
+            "- Doctor:",
+            response.assigned_doctor,
+            "- Nurse:",
+            response.assigned_nurse
+        );
         res.json(response);
-
     } catch (err) {
         console.error("❌ GET /patient/status error:", err);
         return res.status(500).json({
