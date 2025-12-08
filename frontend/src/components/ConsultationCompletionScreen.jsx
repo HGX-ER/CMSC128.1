@@ -10,54 +10,61 @@ export function ConsultationCompletionScreen({ onSubmitFeedback, patientName, qu
   const [submitted, setSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async () => {
-    if (satisfaction === 0) return;
+ const handleSubmit = async () => {
+  if (satisfaction === 0) return;
 
-    setIsLoading(true);
-    try {
-      // Send feedback to backend
-      const response = await fetch('http://localhost:5000/api/feedback', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          queueNumber: queueNumber,
-          rating: satisfaction,
-          comment: comment,
-          stage: 'departed',
-          stageName: 'Overall Visit Satisfaction',
-          type: 'overall_satisfaction'
-        })
-      });
+  console.log('🔍 Queue Number:', queueNumber);
 
-      if (!response.ok) {
-        throw new Error('Failed to submit feedback');
-      }
-
-      const result = await response.json();
-      
-      // Also call the callback if provided
-      const feedback = {
+  setIsLoading(true);
+  try {
+    // Send feedback to backend
+    const response = await fetch('http://localhost:5000/api/feedback', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        queueNumber: queueNumber,
         rating: satisfaction,
         comment: comment,
-        submittedAt: new Date(),
+        stage: 'departed',
+        stageName: 'Overall Visit Satisfaction',
         type: 'overall_satisfaction'
-      };
-      
-      if (onSubmitFeedback) {
-        onSubmitFeedback(feedback);
-      }
+      })
+    });
 
-      toast.success('Thank you! Your feedback has been recorded.');
-      setSubmitted(true);
-    } catch (error) {
-      console.error('Error submitting feedback:', error);
-      toast.error('Failed to submit feedback. Please try again.');
-    } finally {
-      setIsLoading(false);
+    console.log('📡 Response status:', response.status); // ← Add this
+
+    if (!response.ok) {
+      const errorData = await response.json(); // ← Add this
+      console.error('❌ Backend error:', errorData); // ← Add this
+      throw new Error('Failed to submit feedback');
     }
-  };
+
+    const result = await response.json();
+    
+    // Also call the callback if provided
+    const feedback = {
+      rating: satisfaction,
+      comment: comment,
+      submittedAt: new Date(),
+      type: 'overall_satisfaction'
+    };
+    
+    if (onSubmitFeedback) {
+      onSubmitFeedback(feedback);
+    }
+
+    toast.success('Thank you! Your feedback has been recorded.');
+    setSubmitted(true);
+  } catch (error) {
+    console.error('Error submitting feedback:', error);
+    toast.error('Failed to submit feedback. Please try again.');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   if (submitted) {
     return (

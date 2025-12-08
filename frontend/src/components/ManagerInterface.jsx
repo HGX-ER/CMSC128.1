@@ -965,8 +965,15 @@ filteredActivePatients.map((patient) => {
                         new Date(b.submitted_at) - new Date(a.submitted_at)
                       )[0];
                       const hasNewFeedback = newFeedbackPatients.has(queueNumber);
-                      const avgRating = (patientFeedback.reduce((sum, f) => sum + f.rating, 0) / patientFeedback.length).toFixed(1);
+                      // Separate stage feedback from overall satisfaction
+                      const stageFeedback = patientFeedback.filter(f => f.stage !== 'departed');
+                      const overallFeedback = patientFeedback.filter(f => f.stage === 'departed');
+
+                      const avgRating = stageFeedback.length > 0 
+                        ? (stageFeedback.reduce((sum, f) => sum + f.rating, 0) / stageFeedback.length).toFixed(1)
+                        : '0.0';
                       const avgEmoji = getSatisfactionEmoji(Math.round(avgRating));
+
 
                       return (
                         <Card 
@@ -977,48 +984,61 @@ filteredActivePatients.map((patient) => {
                               : 'border-l-blue-500'
                           }`}
                         >
-                          <CardHeader className="pb-3">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <Badge variant="outline" className="font-mono text-lg px-4 py-1">
-                                    {queueNumber}
-                                  </Badge>
-                                  {latestFeedback.patient_name && (
-                                    <span className="font-semibold text-lg">{latestFeedback.patient_name}</span>
-                                  )}
-                                  {hasNewFeedback && (
-                                    <Badge className="bg-green-500 text-white animate-bounce">
-                                      <Bell className="w-3 h-3 mr-1" />
-                                      NEW MESSAGE
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-3xl">{avgEmoji.emoji}</span>
-                                    <div>
-                                      <p className="text-sm text-gray-600">Average Rating</p>
-                                      <p className="text-xl font-bold">{avgRating} / 5</p>
-                                    </div>
-                                  </div>
-                                  <div className="border-l pl-3 ml-3">
-                                    <p className="text-sm text-gray-600">Total Feedback</p>
-                                    <p className="text-xl font-bold">{patientFeedback.length}</p>
-                                  </div>
-                                  {latestFeedback.priority_esi && (
-                                    <Badge className={ESI_COLORS[latestFeedback.priority_esi]}>
-                                      ESI {latestFeedback.priority_esi}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                <p>Latest feedback:</p>
-                                <p className="font-medium">{new Date(latestFeedback.submitted_at).toLocaleString()}</p>
-                              </div>
-                            </div>
-                          </CardHeader>
+<CardHeader className="pb-3">
+  <div className="flex items-start justify-between">
+    <div className="flex-1">
+      <div className="flex items-center gap-3 mb-2">
+        <Badge variant="outline" className="font-mono text-lg px-4 py-1">
+          {queueNumber}
+        </Badge>
+        {latestFeedback.patient_name && (
+          <span className="font-semibold text-lg">{latestFeedback.patient_name}</span>
+        )}
+        {hasNewFeedback && (
+          <Badge className="bg-green-500 text-white animate-bounce">
+            <Bell className="w-3 h-3 mr-1" />
+            NEW MESSAGE
+          </Badge>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        {/* Stage Feedback Average */}
+        {stageFeedback.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-3xl">{avgEmoji.emoji}</span>
+            <div>
+              <p className="text-sm text-gray-600">Stage Average</p>
+              <p className="text-xl font-bold">{avgRating} / 5</p>
+              <p className="text-xs text-gray-500">{stageFeedback.length} {stageFeedback.length === 1 ? 'review' : 'reviews'}</p>
+            </div>
+          </div>
+        )}
+        
+        {/* Overall Visit */}
+        {overallFeedback.length > 0 && (
+          <div className={`flex items-center gap-2 ${stageFeedback.length > 0 ? 'border-l pl-3 ml-3' : ''}`}>
+            <span className="text-3xl">{getSatisfactionEmoji(Math.round(overallFeedback[0].rating)).emoji}</span>
+            <div>
+              <p className="text-sm text-gray-600">Overall Visit</p>
+              <p className="text-xl font-bold">{overallFeedback[0].rating} / 5</p>
+            </div>
+          </div>
+        )}
+        
+        {latestFeedback.priority_esi && (
+          <Badge className={ESI_COLORS[latestFeedback.priority_esi]}>
+            ESI {latestFeedback.priority_esi}
+          </Badge>
+        )}
+      </div>
+    </div>
+    <div className="text-sm text-gray-500">
+      <p>Latest feedback:</p>
+      <p className="font-medium">{new Date(latestFeedback.submitted_at).toLocaleString()}</p>
+    </div>
+  </div>
+</CardHeader>
+
                           <CardContent>
                             <div className="space-y-3">
                               {patientFeedback
@@ -1161,45 +1181,76 @@ filteredActivePatients.map((patient) => {
                   })}
                 </div>
 
-                {/* Average by Stage */}
-                <div className="mt-6">
-                  <h3 className="font-semibold mb-3">Average Rating by Stage</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {Object.entries(
-                      backendFeedback.reduce((acc, f) => {
-                        const stage = f.stage_display_name || f.stage;
-                        if (!acc[stage]) {
-                          acc[stage] = { sum: 0, count: 0 };
-                        }
-                        acc[stage].sum += f.rating;
-                        acc[stage].count += 1;
-                        return acc;
-                      }, {})
-                    )
-                      .sort(([, a], [, b]) => (b.sum / b.count) - (a.sum / a.count))
-                      .map(([stage, data]) => {
-                        const avg = (data.sum / data.count).toFixed(1);
-                        const avgRating = Math.round(avg);
-                        const emojiData = getSatisfactionEmoji(avgRating);
-                        const color = avg < 2 ? 'text-red-600' : avg < 3 ? 'text-orange-600' : 'text-green-600';
+{/* Average by Stage */}
+<div className="mt-6">
+  <h3 className="font-semibold mb-3">Average Rating by Stage</h3>
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+    {Object.entries(
+      backendFeedback
+        .filter(f => f.stage !== 'departed') // ← Exclude overall satisfaction
+        .reduce((acc, f) => {
+          const stage = f.stage_display_name || f.stage;
+          if (!acc[stage]) acc[stage] = { sum: 0, count: 0 };
+          acc[stage].sum += f.rating;
+          acc[stage].count += 1;
+          return acc;
+        }, {})
+    )
+    .sort(([, a], [, b]) => (b.sum / b.count) - (a.sum / a.count))
+    .map(([stage, data]) => {
+      const avg = (data.sum / data.count).toFixed(1);
+      const avgRating = Math.round(avg);
+      const emojiData = getSatisfactionEmoji(avgRating);
+      const color = avg < 2 ? 'text-red-600' : avg < 3 ? 'text-orange-600' : 'text-green-600';
+      
+      return (
+        <div key={stage} className="flex justify-between items-center p-3 bg-white rounded border">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{emojiData.emoji}</span>
+            <span className="text-sm font-medium truncate">{stage}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-lg font-bold ${color}`}>{avg}</span>
+            <Badge variant="outline" className="text-xs">
+              {data.count} {data.count === 1 ? 'review' : 'reviews'}
+            </Badge>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
 
-                        return (
-                          <div key={stage} className="flex justify-between items-center p-3 bg-white rounded border">
-                            <div className="flex items-center gap-2">
-                              <span className="text-2xl">{emojiData.emoji}</span>
-                              <span className="text-sm font-medium truncate">{stage}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className={`text-lg font-bold ${color}`}>{avg}</span>
-                              <Badge variant="outline" className="text-xs">
-                                {data.count} {data.count === 1 ? 'review' : 'reviews'}
-                              </Badge>
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
+{/* Overall Visit Satisfaction (separate from stages) */}
+{backendFeedback.filter(f => f.stage === 'departed').length > 0 && (
+  <div className="mt-6">
+    <h3 className="font-semibold mb-3">Overall Visit Satisfaction</h3>
+    <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+      {(() => {
+        const overallFeedback = backendFeedback.filter(f => f.stage === 'departed');
+        const avgRating = (overallFeedback.reduce((sum, f) => sum + f.rating, 0) / overallFeedback.length).toFixed(1);
+        const emojiData = getSatisfactionEmoji(Math.round(avgRating));
+        
+        return (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-5xl">{emojiData.emoji}</span>
+              <div>
+                <p className="text-2xl font-bold">{avgRating} / 5.0</p>
+                <p className="text-sm text-gray-600">
+                  {overallFeedback.length} {overallFeedback.length === 1 ? 'response' : 'responses'}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  </div>
+)}
+
+
+
 
                 {/* Satisfaction Trend */}
                 <div className="mt-6">

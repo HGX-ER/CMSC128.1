@@ -31,17 +31,12 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
   
   // Get queue number from URL or props
   const getQueueNumber = () => {
-    // Try to get from URL first
     const urlParams = new URLSearchParams(window.location.search);
     const queueFromUrl = urlParams.get('queue');
-    
-    // Then try from props
     return queueFromUrl || currentPatientId;
   };
 
   const queueNumber = getQueueNumber();
-  
-  // Try to get patient from backend first, fallback to local state
   const patient = backendPatientData || patients.find(p => p.id === queueNumber);
 
   // Staff profile pictures and information
@@ -96,6 +91,12 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     }
   };
 
+  // Helper to normalize stage through map
+  const normalizeStage = (statusToStageMap, rawStage) => {
+    if (!rawStage) return 'kiosk';
+    return statusToStageMap[rawStage] || rawStage;
+  };
+
   // Real-time polling for patient status
   useEffect(() => {
     if (!queueNumber) {
@@ -104,266 +105,263 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     }
 
     const pollPatientStatus = async () => {
-  try {
-    console.log("🔄 Polling patient status for:", queueNumber);
-    
-    const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
-    
-    if (!response.ok) {
-      if (response.status === 404) {
-        console.log('Queue number not found yet, will retry...');
-        return;
+      try {
+        console.log("🔄 Polling patient status for:", queueNumber);
+        
+        const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            console.log('Queue number not found yet, will retry...');
+            return;
+          }
+          throw new Error(`Failed to fetch patient status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Map backend status to frontend currentStage
+        const statusToStageMap = {
+          'arrived': 'kiosk',
+          'waiting_for_triage': 'waiting_triage',
+          'in_triage': 'triage',
+          'triaged': 'waiting_registration',
+          'waiting_for_registration': 'waiting_registration',
+          'in_registration': 'registration',
+          'waiting_for_provider': 'waiting_doctor',
+          'with_provider': 'consultation',
+          'waiting_for_admission': 'waiting_admission',
+          'waiting_for_observation': 'waiting_observation',
+          'waiting_for_discharge': 'waiting_discharge',
+          'admission_in_progress': 'admission_orders',
+          'awaiting_bed': 'awaiting_non_icu',
+          'awaiting_icu_bed': 'awaiting_icu',
+          'discharge_in_progress': 'discharge_documents',
+          'ready_to_depart': 'awaiting_departure',
+          'departed': 'departed',
+          
+          // Observation is still in-process
+          'in_observation': 'waiting_observation',
+          
+          // Non-ICU behaves like ICU (both completed)
+          'admitted_non_icu': 'awaiting_non_icu', 
+          'admitted_icu': 'awaiting_icu'     
+        };
+
+        // Transform backend data to match frontend format
+        const transformedPatient = {
+          id: data.queue_number,
+          name: data.patient.full_name,
+          queueNumber: data.queue_number,
+          esiLevel: data.priority_esi ? parseInt(data.priority_esi) : null,
+          currentStage: normalizeStage(statusToStageMap, data.frontend_stage || data.status),
+          arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
+          isActive: data.status !== 'departed',
+          stageHistory: data.events?.map((event, index, array) => ({
+            stage: normalizeStage(statusToStageMap, event.frontend_stage || event.type),
+            startTime: new Date(event.at),
+            endTime: array[index + 1] ? new Date(array[index + 1].at) : null,
+            payload: event.payload
+          })) || [],
+          chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
+          assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
+          assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
+          sex: data.patient.sex,
+          dob: data.patient.dob,
+          disposition: data.timestamps.dispositioned,
+        };
+        
+        setBackendPatientData(transformedPatient);
+        setLastUpdated(new Date());
+        setError(null);
+      } catch (err) {
+        console.error('Error polling patient status:', err);
       }
-      throw new Error(`Failed to fetch patient status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    // Map backend status to frontend currentStage
-    const statusToStageMap = {
-      'arrived': 'kiosk',
-      'waiting_for_triage': 'waiting_triage',
-      'in_triage': 'triage',
-      'triaged': 'waiting_registration',
-      'waiting_for_registration': 'waiting_registration',
-      'in_registration': 'registration',
-      'waiting_for_provider': 'waiting_doctor',
-      'with_provider': 'consultation',
-      'waiting_for_admission': 'waiting_admission',
-      'waiting_for_observation': 'waiting_observation',
-      'waiting_for_discharge': 'waiting_discharge',
-      'admission_in_progress': 'admission_orders',
-      'awaiting_bed': 'awaiting_non_icu',
-      'awaiting_icu_bed': 'awaiting_icu',
-      'discharge_in_progress': 'discharge_documents',
-      'ready_to_depart': 'awaiting_departure',
-      'departed': 'departed',
-      
-      // ✅ NEW: Final statuses when doctor completes consultation
-      'in_observation': 'departed',        // Observation complete
-      'admitted_non_icu': 'departed',      // Admitted to ward complete
-      'admitted_icu': 'departed'           // Admitted to ICU complete
     };
 
-
-    
-    // Transform backend data to match frontend format
-    const transformedPatient = {
-      id: data.queue_number,
-      name: data.patient.full_name,
-      queueNumber: data.queue_number,
-      esiLevel: data.priority_esi ? parseInt(data.priority_esi) : null,
-      currentStage: data.frontend_stage || statusToStageMap[data.status] || data.status,
-      arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
-      isActive: data.status !== 'departed',
-      stageHistory: data.events?.map((event, index, array) => ({
-        stage: event.frontend_stage || statusToStageMap[event.type] || event.type,
-        startTime: new Date(event.at),
-        endTime: array[index + 1] ? new Date(array[index + 1].at) : null,  // ✅ This fixes the completion status
-        payload: event.payload
-      })) || [],
-      chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
-      assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
-      assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
-      sex: data.patient.sex,
-      dob: data.patient.dob,
-      disposition: data.timestamps.dispositioned,
-    };
-    
-    setBackendPatientData(transformedPatient);
-    setLastUpdated(new Date());
-    setError(null);
-  } catch (err) {
-    console.error('Error polling patient status:', err);
-    // Don't set error here to avoid disrupting the UI during polling
-  }
-};
-
-    // Poll immediately and then every 5 seconds
     pollPatientStatus();
     const intervalId = setInterval(pollPatientStatus, 5000);
-
     return () => clearInterval(intervalId);
   }, [queueNumber]);
 
   // Initial patient data fetch
   useEffect(() => {
     const fetchPatientStatus = async () => {
-  if (!queueNumber) {
-    setError('No queue number provided');
-    setIsLoading(false);
-    return;
-  }
-  
-  try {
-    setIsLoading(true);
-    console.log("📋 Fetching patient status for:", queueNumber);
-    
-    const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
-    
-    if (!response.ok) {
-      if (response.status === 404) {
-        setError(`Queue number "${queueNumber}" not found in the system`);
+      if (!queueNumber) {
+        setError('No queue number provided');
         setIsLoading(false);
         return;
       }
-      throw new Error(`Failed to fetch patient status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    // Map backend status to frontend currentStage
-    const statusToStageMap = {
-      'arrived': 'kiosk',
-      'waiting_for_triage': 'waiting_triage',
-      'in_triage': 'triage',
-      'triaged': 'waiting_registration',
-      'waiting_for_registration': 'waiting_registration',
-      'in_registration': 'registration',
-      'waiting_for_provider': 'waiting_doctor',
-      'with_provider': 'consultation',
-      'waiting_for_admission': 'waiting_admission',
-      'waiting_for_observation': 'waiting_observation',
-      'waiting_for_discharge': 'waiting_discharge',
-      'admission_in_progress': 'admission_orders',
-      'awaiting_bed': 'awaiting_non_icu',
-      'awaiting_icu_bed': 'awaiting_icu',
-      'discharge_in_progress': 'discharge_documents',
-      'ready_to_depart': 'awaiting_departure',
-      'departed': 'departed',
       
-      // ✅ NEW: Final statuses when doctor completes consultation
-      'in_observation': 'departed',        // Observation complete
-      'admitted_non_icu': 'departed',      // Admitted to ward complete
-      'admitted_icu': 'departed'           // Admitted to ICU complete
+      try {
+        setIsLoading(true);
+        console.log("📋 Fetching patient status for:", queueNumber);
+        
+        const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            setError(`Queue number "${queueNumber}" not found in the system`);
+            setIsLoading(false);
+            return;
+          }
+          throw new Error(`Failed to fetch patient status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Map backend status to frontend currentStage
+        const statusToStageMap = {
+          'arrived': 'kiosk',
+          'waiting_for_triage': 'waiting_triage',
+          'in_triage': 'triage',
+          'triaged': 'waiting_registration',
+          'waiting_for_registration': 'waiting_registration',
+          'in_registration': 'registration',
+          'waiting_for_provider': 'waiting_doctor',
+          'with_provider': 'consultation',
+          'waiting_for_admission': 'waiting_admission',
+          'waiting_for_observation': 'waiting_observation',
+          'waiting_for_discharge': 'waiting_discharge',
+          'admission_in_progress': 'admission_orders',
+          'awaiting_bed': 'awaiting_non_icu',
+          'awaiting_icu_bed': 'awaiting_icu',
+          'discharge_in_progress': 'discharge_documents',
+          'ready_to_depart': 'awaiting_departure',
+          'departed': 'departed',
+          
+          // Observation is still in-process
+          'in_observation': 'waiting_observation',
+          
+          // Non-ICU behaves like ICU (both completed)
+          'admitted_non_icu': 'awaiting_non_icu', 
+          'admitted_icu': 'awaiting_icu'     
+        };
+        
+        // Transform backend data to match frontend format
+        const transformedPatient = {
+          id: data.queue_number,
+          name: data.patient.full_name,
+          queueNumber: data.queue_number,
+          esiLevel: data.priority_esi ? parseInt(data.priority_esi) : null,
+          currentStage: normalizeStage(statusToStageMap, data.frontend_stage || data.status),
+          arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
+          isActive: data.status !== 'departed',
+          stageHistory: data.events?.map((event, index, array) => ({
+            stage: normalizeStage(statusToStageMap, event.frontend_stage || event.type),
+            startTime: new Date(event.at),
+            endTime: array[index + 1] ? new Date(array[index + 1].at) : null,
+            payload: event.payload
+          })) || [],
+          chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
+          assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
+          assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
+          sex: data.patient.sex,
+          dob: data.patient.dob,
+          disposition: data.timestamps.dispositioned,
+        };
+        
+        setBackendPatientData(transformedPatient);
+        setLastUpdated(new Date());
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching patient status:', err);
+        setError('Using offline data - updates may be delayed');
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    
-    // Transform backend data to match frontend format
-    const transformedPatient = {
-      id: data.queue_number,
-      name: data.patient.full_name,
-      queueNumber: data.queue_number,
-      esiLevel: data.priority_esi ? parseInt(data.priority_esi) : null,
-      currentStage: data.frontend_stage || statusToStageMap[data.status] || data.status,
-      arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
-      isActive: data.status !== 'departed',
-      stageHistory: data.events?.map((event, index, array) => ({
-        stage: event.frontend_stage || statusToStageMap[event.type] || event.type,
-        startTime: new Date(event.at),
-        endTime: array[index + 1] ? new Date(array[index + 1].at) : null,  // ✅ This fixes the completion status
-        payload: event.payload
-      })) || [],
-      chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
-      assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
-      assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
-      sex: data.patient.sex,
-      dob: data.patient.dob,
-      disposition: data.timestamps.dispositioned,
-    };
-    
-    setBackendPatientData(transformedPatient);
-    setLastUpdated(new Date());
-    setError(null);
-  } catch (err) {
-    console.error('Error fetching patient status:', err);
-    setError('Using offline data - updates may be delayed');
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-    // Initial fetch only - polling will handle updates
     fetchPatientStatus();
   }, [queueNumber]);
 
   // Manual refresh function
   const handleManualRefresh = async () => {
-  if (!queueNumber) {
-    toast.error('No queue number available');
-    return;
-  }
-
-  setIsLoading(true);
-  try {
-    console.log("🔄 Manual refresh for:", queueNumber);
-    
-    const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to refresh patient status: ${response.status}`);
+    if (!queueNumber) {
+      toast.error('No queue number available');
+      return;
     }
-    
-    const data = await response.json();
-    
-    // Map backend status to frontend currentStage
-    const statusToStageMap = {
-      'arrived': 'kiosk',
-      'waiting_for_triage': 'waiting_triage',
-      'in_triage': 'triage',
-      'triaged': 'waiting_registration',
-      'waiting_for_registration': 'waiting_registration',
-      'in_registration': 'registration',
-      'waiting_for_provider': 'waiting_doctor',
-      'with_provider': 'consultation',
-      'waiting_for_admission': 'waiting_admission',
-      'waiting_for_observation': 'waiting_observation',
-      'waiting_for_discharge': 'waiting_discharge',
-      'admission_in_progress': 'admission_orders',
-      'awaiting_bed': 'awaiting_non_icu',
-      'awaiting_icu_bed': 'awaiting_icu',
-      'discharge_in_progress': 'discharge_documents',
-      'ready_to_depart': 'awaiting_departure',
-      'departed': 'departed',
-      
-      // ✅ NEW: Final statuses when doctor completes consultation
-      'in_observation': 'departed',        // Observation complete
-      'admitted_non_icu': 'departed',      // Admitted to ward complete
-      'admitted_icu': 'departed'           // Admitted to ICU complete
-    };
 
-    
-    // Transform backend data to match frontend format
-    const transformedPatient = {
-      id: data.queue_number,
-      name: data.patient.full_name,
-      queueNumber: data.queue_number,
-      esiLevel: data.priority_esi ? parseInt(data.priority_esi) : null,
-      currentStage: data.frontend_stage || statusToStageMap[data.status] || data.status,
-      arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
-      isActive: data.status !== 'departed',
-      stageHistory: data.events?.map((event, index, array) => ({
-        stage: event.frontend_stage || statusToStageMap[event.type] || event.type,
-        startTime: new Date(event.at),
-        endTime: array[index + 1] ? new Date(array[index + 1].at) : null,  // ✅ This fixes the completion status
-        payload: event.payload
-      })) || [],
-      chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
-      assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
-      assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
-      sex: data.patient.sex,
-      dob: data.patient.dob,
-      disposition: data.timestamps.dispositioned,
-    };
-    
-    setBackendPatientData(transformedPatient);
-    setLastUpdated(new Date());
-    setError(null);
-    toast.success('Status updated!');
-  } catch (err) {
-    console.error('Error refreshing patient status:', err);
-    toast.error('Failed to refresh status');
-  } finally {
-    setIsLoading(false);
-  }
-};
+    setIsLoading(true);
+    try {
+      console.log("🔄 Manual refresh for:", queueNumber);
+      
+      const response = await fetch(`http://localhost:5000/api/patient/status/${queueNumber}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to refresh patient status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Map backend status to frontend currentStage
+      const statusToStageMap = {
+        'arrived': 'kiosk',
+        'waiting_for_triage': 'waiting_triage',
+        'in_triage': 'triage',
+        'triaged': 'waiting_registration',
+        'waiting_for_registration': 'waiting_registration',
+        'in_registration': 'registration',
+        'waiting_for_provider': 'waiting_doctor',
+        'with_provider': 'consultation',
+        'waiting_for_admission': 'waiting_admission',
+        'waiting_for_observation': 'waiting_observation',
+        'waiting_for_discharge': 'waiting_discharge',
+        'admission_in_progress': 'admission_orders',
+        'awaiting_bed': 'awaiting_non_icu',
+        'awaiting_icu_bed': 'awaiting_icu',
+        'discharge_in_progress': 'discharge_documents',
+        'ready_to_depart': 'awaiting_departure',
+        'departed': 'departed',
+        
+        // Observation is still in-process
+        'in_observation': 'waiting_observation',
+        
+        // Non-ICU behaves like ICU (both completed)
+        'admitted_non_icu': 'awaiting_non_icu', 
+        'admitted_icu': 'awaiting_icu'     
+      };
+      
+      // Transform backend data to match frontend format
+      const transformedPatient = {
+        id: data.queue_number,
+        name: data.patient.full_name,
+        queueNumber: data.queue_number,
+        esiLevel: data.priority_esi ? parseInt(data.priority_esi) : null,
+        currentStage: normalizeStage(statusToStageMap, data.frontend_stage || data.status),
+        arrivalTime: data.timestamps.arrived ? new Date(data.timestamps.arrived) : new Date(),
+        isActive: data.status !== 'departed',
+        stageHistory: data.events?.map((event, index, array) => ({
+          stage: normalizeStage(statusToStageMap, event.frontend_stage || event.type),
+          startTime: new Date(event.at),
+          endTime: array[index + 1] ? new Date(array[index + 1].at) : null,
+          payload: event.payload
+        })) || [],
+        chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
+        assignedDoctor: data.timestamps?.provider_started ? 'dr.smith' : null,
+        assignedNurse: data.timestamps?.triaged ? 'nurse.williams' : null,
+        sex: data.patient.sex,
+        dob: data.patient.dob,
+        disposition: data.timestamps.dispositioned,
+      };
+      
+      setBackendPatientData(transformedPatient);
+      setLastUpdated(new Date());
+      setError(null);
+      toast.success('Status updated!');
+    } catch (err) {
+      console.error('Error refreshing patient status:', err);
+      toast.error('Failed to refresh status');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Update timer every minute
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 60000);
-
     return () => clearInterval(timer);
   }, []);
 
@@ -445,58 +443,46 @@ export function PatientInterface({ patients, currentPatientId, getTotalTime, get
     setRealtimeComments(getStageComments(patient.currentStage));
   }, [patient?.currentStage]);
 
-const handleSubmitComment = async () => {
-  if (patientComment.trim() && commentSatisfaction > 0) {
-    try {
-      // Send feedback to backend
-      const response = await fetch('http://localhost:5000/api/feedback', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          queueNumber: queueNumber,
+  const handleSubmitComment = async () => {
+    if (patientComment.trim() && commentSatisfaction > 0) {
+      try {
+        const response = await fetch('http://localhost:5000/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            queueNumber: queueNumber,
+            rating: commentSatisfaction,
+            comment: patientComment,
+            stage: patient.currentStage,
+            stageName: getStageDisplayName(patient.currentStage)
+          })
+        });
+
+        if (!response.ok) throw new Error('Failed to submit feedback');
+
+        const newComment = {
+          time: new Date(),
+          message: patientComment,
           rating: commentSatisfaction,
-          comment: patientComment,
           stage: patient.currentStage,
-          stageName: getStageDisplayName(patient.currentStage)
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to submit feedback');
+          isPatient: true
+        };
+        setSubmittedComments([...submittedComments, newComment]);
+        setPatientComment('');
+        setCommentSatisfaction(0);
+        toast.success('Your feedback has been sent to the ED Manager!');
+      } catch (error) {
+        console.error('Error submitting feedback:', error);
+        toast.error('Failed to send feedback. Please try again.');
       }
-
-      const result = await response.json();
-      
-      // Add to local state for immediate display
-      const newComment = {
-        time: new Date(),
-        message: patientComment,
-        rating: commentSatisfaction,
-        stage: patient.currentStage,
-        isPatient: true
-      };
-      setSubmittedComments([...submittedComments, newComment]);
-      
-      // Clear form
-      setPatientComment('');
-      setCommentSatisfaction(0);
-      
-      toast.success('Your feedback has been sent to the ED Manager!');
-      
-    } catch (error) {
-      console.error('Error submitting feedback:', error);
-      toast.error('Failed to send feedback. Please try again.');
+    } else if (commentSatisfaction === 0) {
+      toast.error('Please select a rating before submitting');
+    } else {
+      toast.error('Please add a comment before submitting');
     }
-  } else if (commentSatisfaction === 0) {
-    toast.error('Please select a rating before submitting');
-  } else {
-    toast.error('Please add a comment before submitting');
-  }
-};
+  };
 
-  // Show loading if no queue number and still loading
+  // Loading / error states
   if (!queueNumber && isLoading) {
     return (
       <div className="min-h-screen bg-blue-50 p-4 flex items-center justify-center">
@@ -511,7 +497,6 @@ const handleSubmitComment = async () => {
     );
   }
 
-  // Show error if no queue number
   if (!queueNumber) {
     return (
       <div className="min-h-screen bg-blue-50 p-4 flex items-center justify-center">
@@ -522,12 +507,7 @@ const handleSubmitComment = async () => {
             </div>
             <h3 className="text-lg font-medium mb-2 text-red-800">Queue Number Required</h3>
             <p className="text-gray-600 mb-4">Please provide a queue number to view your visit status.</p>
-            <Button 
-              onClick={() => window.history.back()}
-              className="w-full"
-            >
-              Go Back
-            </Button>
+            <Button onClick={() => window.history.back()} className="w-full">Go Back</Button>
           </CardContent>
         </Card>
       </div>
@@ -559,9 +539,7 @@ const handleSubmitComment = async () => {
             </div>
             <h3 className="text-lg font-medium mb-2 text-red-800">Unable to Load Visit Information</h3>
             <p className="text-gray-600 mb-4">{error}</p>
-            <p className="text-sm text-gray-500">
-              Please check with the registration desk or try logging in again.
-            </p>
+            <p className="text-sm text-gray-500">Please check with the registration desk or try logging in again.</p>
             <p className="text-sm text-gray-500 mt-2">Queue: {queueNumber}</p>
           </CardContent>
         </Card>
@@ -614,7 +592,7 @@ const handleSubmitComment = async () => {
       triaged: 'Triage Assessment',
       waiting_registration: 'Registration Waiting Area',
       registration: 'Registration',
-      registered: 'Registration (Registered)',  // ✅ ADD THIS LINE (as fallback)
+      registered: 'Registration (Registered)',
       waiting_doctor: 'Doctor Waiting Area',
       consultation: 'Doctor Consultation',
       waiting_admission: 'Admission Waiting',
@@ -629,7 +607,6 @@ const handleSubmitComment = async () => {
     };
     return displayNames[stage] || `In Process (${stage})`;
   };
-
 
   const getStaffDisplayName = (username) => {
     return staffProfiles[username]?.name || username;
@@ -646,63 +623,43 @@ const handleSubmitComment = async () => {
     }
   };
 
+  // Compute overall visit progress
   const getProgressPercentage = () => {
-    // Expand to 6 steps to properly track discharge completion
-    const flow = [
-      "checkin",
-      "triage",
-      "registration",
-      "doctor",
-      "consultation",
-      "departed"
-    ];
+    if (!patient) return 0;
 
-    // Map ALL backend stages
+    const flow = ['checkin', 'triage', 'registration', 'doctor', 'consultation', 'departed'];
+
     const stageMap = {
-      kiosk: "checkin",
-      arrived: "checkin",
-      waiting_triage: "triage",
-      in_triage: "triage",
-      triaged: "triage",
-
-      waiting_registration: "registration",
-      in_registration: "registration",
-      registration: "registration",
-      registered: "registration",
-
-      waiting_doctor: "doctor",
-      with_provider: "doctor",
-
-      consultation: "consultation",
-
-      // Discharge stages - NOT departed yet (83%)
-      waiting_discharge: "consultation",
-      discharge_documents: "consultation",
-      awaiting_departure: "consultation",
-      
-      // Admission stages - also 83%
-      waiting_admission: "consultation",
-      admission_orders: "consultation",
-      awaiting_non_icu: "consultation",
-      awaiting_icu: "consultation",
-
-      // Only 100% when ACTUALLY completed
-      departed: "departed",
-      in_observation: "departed",
-      admitted_non_icu: "departed",
-      admitted_icu: "departed"
+      kiosk: 'checkin',
+      arrived: 'checkin',
+      waiting_triage: 'triage',
+      in_triage: 'triage',
+      triaged: 'triage',
+      waiting_registration: 'registration',
+      in_registration: 'registration',
+      registration: 'registration',
+      registered: 'registration',
+      waiting_doctor: 'doctor',
+      with_provider: 'doctor',
+      consultation: 'consultation',
+      waiting_discharge: 'consultation',
+      discharge_documents: 'consultation',
+      awaiting_departure: 'consultation',
+      waiting_admission: 'consultation',
+      admission_orders: 'consultation',
+      awaiting_non_icu: 'consultation',
+      awaiting_icu: 'consultation',
+      waiting_observation: 'consultation',
+      departed: 'departed',
     };
 
-    // Normalize stage
-    const stage = stageMap[patient.currentStage] || "checkin";
-
-    const index = flow.indexOf(stage);
+    const normalizedStage = stageMap[patient.currentStage] || 'checkin';
+    const index = flow.indexOf(normalizedStage);
+    const clampedIndex = index === -1 ? 0 : index;
     const maxIndex = flow.length - 1;
 
-    return Math.round((index / maxIndex) * 100);
+    return Math.round((clampedIndex / maxIndex) * 100);
   };
-
-
 
   const getStageIcon = (stage) => {
     switch (stage) {
@@ -727,7 +684,6 @@ const handleSubmitComment = async () => {
           <h1 className="text-4xl font-bold mb-2">Emergency Department</h1>
           <p className="text-xl text-gray-600">Visit Tracker</p>
           
-          {/* Connection Status Indicator */}
           <div className="flex items-center justify-center gap-4 mt-2">
             <div className="flex items-center gap-2">
               {backendPatientData ? (
@@ -743,7 +699,6 @@ const handleSubmitComment = async () => {
               )}
             </div>
 
-            {/* Refresh Button and Last Updated */}
             <div className="flex items-center gap-2">
               <Button 
                 onClick={handleManualRefresh}
@@ -794,7 +749,6 @@ const handleSubmitComment = async () => {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Show Completion Screen when progress is 100% */}
             {getProgressPercentage() === 100 ? (
               <ConsultationCompletionScreen 
                 onSubmitFeedback={onAddSatisfactionFeedback}
@@ -808,14 +762,12 @@ const handleSubmitComment = async () => {
                   <p className="text-blue-700">{getStageDescription(patient.currentStage)}</p>
                 </div>
 
-                {/* Real-Time Updates & Patient Comments */}
                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center gap-2 mb-3">
                     <Bell className="w-4 h-4 text-green-700" />
                     <p className="text-green-800 font-medium">Real-Time Updates & Communication:</p>
                   </div>
                   
-                  {/* System Updates */}
                   <div className="space-y-2 mb-4">
                     {realtimeComments.map((comment, index) => (
                       <div key={index} className="flex items-start gap-2 bg-white p-2 rounded">
@@ -828,7 +780,6 @@ const handleSubmitComment = async () => {
                     ))}
                   </div>
 
-                  {/* Patient Submitted Comments */}
                   {submittedComments.filter(c => c.stage === patient.currentStage).length > 0 && (
                     <div className="space-y-2 mb-4">
                       <p className="text-sm font-medium text-green-800">Your Comments:</p>
@@ -856,13 +807,11 @@ const handleSubmitComment = async () => {
                     </div>
                   )}
 
-                  {/* Real-time Feedback Section */}
                   <div className="mt-4 p-4 border border-green-300 rounded-xl bg-white shadow-sm">
                     <p className="text-center text-green-800 font-semibold mb-4">
                       How are you feeling right now? Share your experience with the ED Manager
                     </p>
 
-                    {/* Satisfaction Rating */}
                     <div className="text-center">
                       <p className="text-base text-green-800 font-semibold mb-6">
                         How satisfied are you with this stage?
@@ -901,8 +850,6 @@ const handleSubmitComment = async () => {
                                 {smile.label}
                               </span>
                             </div>
-
-                            {/* Divider - skip after last emoji */}
                             {index < arr.length - 1 && (
                               <div className="h-10 border-l border-gray-600 mx-6"></div>
                             )}
@@ -911,7 +858,6 @@ const handleSubmitComment = async () => {
                       </div>
                     </div>
 
-                    {/* Comment Input */}
                     <div className="space-y-2">
                       <p className="text-sm font-bold text-green-800">
                         Additional Comments or Concerns:
@@ -939,7 +885,6 @@ const handleSubmitComment = async () => {
                   </div>
                 </div>
                 
-                {/* Progress Bar */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-gray-700">Visit Progress</span>
@@ -948,7 +893,6 @@ const handleSubmitComment = async () => {
                   <Progress value={getProgressPercentage()} className="h-3" />
                 </div>
 
-                {/* History Button */}
                 <div className="flex justify-center pt-2">
                   <StageHistory patient={patient} />
                 </div>
@@ -1053,7 +997,6 @@ const handleSubmitComment = async () => {
                       </div>
                     </div>
                     
-                    {/* Doctor Location Info */}
                     {staffProfiles[patient.assignedDoctor]?.room && (
                       <div className="ml-15 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
                         <div className="text-sm space-y-1">
@@ -1086,42 +1029,16 @@ const handleSubmitComment = async () => {
           <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-1 bg-transparent border-b pb-2">
             <TabsTrigger
               value="tips"
-              className="
-                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-                hover:bg-blue-50 hover:text-blue-700
-                dark:hover:bg-gray-800 
-                data-[state=active]:!bg-blue-100
-                dark:data-[state=active]:!bg-blue-100 
-                data-[state=active]:!text-blue-800
-                dark:data-[state=active]:!text-blue-800
-                data-[state=active]:!border-blue-300
-                dark:data-[state=active]:!border-blue-300
-                data-[state=active]:shadow-lg
-                data-[state=active]:scale-[1.05]
-              "
+              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-[1.05]"
             >
               <Lightbulb className="w-4 h-4" />
               <span className="hidden sm:inline">Health Tips</span>
-              <span className="sm:hidden"></span>
+              <span className="sm:hidden">💡</span>
             </TabsTrigger>
 
             <TabsTrigger
               value="news"
-              className="
-                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-                hover:bg-blue-50 hover:text-blue-700
-                dark:hover:bg-gray-800 
-                data-[state=active]:!bg-blue-100
-                dark:data-[state=active]:!bg-blue-100 
-                data-[state=active]:!text-blue-800
-                dark:data-[state=active]:!text-blue-800
-                data-[state=active]:!border-blue-300
-                dark:data-[state=active]:!border-blue-300
-                data-[state=active]:shadow-lg
-                data-[state=active]:scale-[1.05]
-              "
+              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-[1.05]"
             >
               <Newspaper className="w-4 h-4" />
               <span className="hidden sm:inline">News</span>
@@ -1129,20 +1046,7 @@ const handleSubmitComment = async () => {
 
             <TabsTrigger
               value="trivia"
-              className="
-                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-                hover:bg-blue-50 hover:text-blue-700
-                dark:hover:bg-gray-800 
-                data-[state=active]:!bg-blue-100
-                dark:data-[state=active]:!bg-blue-100 
-                data-[state=active]:!text-blue-800
-                dark:data-[state=active]:!text-blue-800
-                data-[state=active]:!border-blue-300
-                dark:data-[state=active]:!border-blue-300
-                data-[state=active]:shadow-lg
-                data-[state=active]:scale-[1.05]
-              "
+              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-[1.05]"
             >
               <Brain className="w-4 h-4" />
               <span className="hidden sm:inline">Trivia</span>
@@ -1150,20 +1054,7 @@ const handleSubmitComment = async () => {
 
             <TabsTrigger
               value="relax"
-              className="
-                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-                hover:bg-blue-50 hover:text-blue-700
-                dark:hover:bg-gray-800 
-                data-[state=active]:!bg-blue-100
-                dark:data-[state=active]:!bg-blue-100 
-                data-[state=active]:!text-blue-800
-                dark:data-[state=active]:!text-blue-800
-                data-[state=active]:!border-blue-300
-                dark:data-[state=active]:!border-blue-300
-                data-[state=active]:shadow-lg
-                data-[state=active]:scale-[1.05]
-              "
+              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-[1.05]"
             >
               <Wind className="w-4 h-4" />
               <span className="hidden sm:inline">Relaxation Exercises</span>
@@ -1171,20 +1062,7 @@ const handleSubmitComment = async () => {
 
             <TabsTrigger
               value="services"
-              className="
-                flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium
-                text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200
-                hover:bg-blue-50 hover:text-blue-700
-                dark:hover:bg-gray-800 
-                data-[state=active]:!bg-blue-100
-                dark:data-[state=active]:!bg-blue-100 
-                data-[state=active]:!text-blue-800
-                dark:data-[state=active]:!text-blue-800
-                data-[state=active]:!border-blue-300
-                dark:data-[state=active]:!border-blue-300
-                data-[state=active]:shadow-lg
-                data-[state=active]:scale-[1.05]
-              "
+              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all duration-200 hover:bg-blue-50 hover:text-blue-700 data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800 data-[state=active]:!border-blue-300 data-[state=active]:shadow-lg data-[state=active]:scale-[1.05]"
             >
               <Building className="w-4 h-4" />
               <span className="hidden sm:inline">Services</span>
@@ -1213,7 +1091,6 @@ const handleSubmitComment = async () => {
             </TabsContent>
           </div>
         </Tabs>
-
 
         {/* Important Information */}
         <Card className="shadow-lg">
