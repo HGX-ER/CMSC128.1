@@ -5,7 +5,10 @@ const db = require('../db');
 // POST: Submit patient feedback
 router.post('/feedback', async (req, res) => {
     try {
-        const { queueNumber, rating, comment, stage, stageName } = req.body;
+        let { queueNumber, rating, comment, stage, stageName } = req.body;
+
+        // Trim whitespace from queueNumber
+        queueNumber = queueNumber ? queueNumber.trim() : queueNumber;
 
         if (!queueNumber || !rating || !stage) {
             return res.status(400).json({
@@ -95,7 +98,8 @@ router.get('/feedback', async (req, res) => {
 // GET: Fetch feedback for specific patient
 router.get('/feedback/:queueNumber', async (req, res) => {
     try {
-        const { queueNumber } = req.params;
+        let { queueNumber } = req.params;
+        queueNumber = queueNumber ? queueNumber.trim() : queueNumber;
 
         const [feedback] = await db.query(
             `SELECT * FROM patient_feedback
@@ -117,7 +121,7 @@ router.post('/feedback/read/:feedbackId', async (req, res) => {
         const { feedbackId } = req.params;
 
         const [result] = await db.query(
-            `UPDATE patient_feedback 
+            `UPDATE patient_feedback
              SET is_read = TRUE, read_at = NOW()
              WHERE id = ?`,
             [feedbackId]
@@ -143,7 +147,7 @@ router.post('/feedback/unread/:feedbackId', async (req, res) => {
         const { feedbackId } = req.params;
 
         const [result] = await db.query(
-            `UPDATE patient_feedback 
+            `UPDATE patient_feedback
              SET is_read = FALSE, read_at = NULL
              WHERE id = ?`,
             [feedbackId]
