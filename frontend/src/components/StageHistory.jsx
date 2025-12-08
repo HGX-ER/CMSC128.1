@@ -25,7 +25,9 @@ const flow = [
   "triage",
   "registration",
   "doctor",
-  "consultation"
+  "consultation",
+  "transfer",
+  "departed"
 ];
 
 // Correct timeline order (same as PatientInterface)
@@ -56,32 +58,35 @@ const orderedTimelineFlow = [
 const stageMap = {
   kiosk: "checkin",
   arrived: "checkin",
-
   waiting_triage: "triage",
   in_triage: "triage",
   triaged: "triage",
-
   waiting_registration: "registration",
   in_registration: "registration",
   registration: "registration",
   registered: "registration",
-
   waiting_doctor: "doctor",
   with_provider: "doctor",
-
   consultation: "consultation",
-
-  // After consultation = remain 100% (do not regress)
-  waiting_discharge: "consultation",
-  discharge_documents: "consultation",
-  awaiting_departure: "consultation",
-  departed: "consultation",
-  waiting_admission: "consultation",
-  admission_orders: "consultation",
-  awaiting_non_icu: "consultation",
-  awaiting_icu: "consultation",
-  waiting_observation: "consultation"
+  resumed_from_observation: "consultation",
+  
+  // Observation stays at consultation (100%)
+  waiting_observation: "consultation",
+  
+  // Transfer stages = 83%
+  awaiting_non_icu: "transfer",
+  awaiting_icu: "transfer",
+  
+  // Discharge/departure stages = 100%
+  waiting_discharge: "departed",
+  discharge_documents: "departed",
+  awaiting_departure: "departed",
+  departed: "departed",
+  waiting_admission: "departed",
+  admission_orders: "departed"
 };
+
+
 
 const getHistoryProgressPercentage = (stage) => {
   const mapped = stageMap[stage] || "checkin";
@@ -93,7 +98,22 @@ const getHistoryProgressPercentage = (stage) => {
    UI Helpers
 ----------------------------------------- */
 
-const getStageDisplayName = (stage) => {
+const getStageDisplayName = (stage, payload) => {
+  // If stage is "transferred", check payload for disposition
+  if (stage === 'transferred' && payload?.disposition) {
+    const disposition = payload.disposition.toLowerCase();
+    if (disposition.includes('observation')) {
+      return 'In Observation';
+    } else if (disposition.includes('admission') || disposition.includes('admit')) {
+      if (disposition.includes('icu')) {
+        return 'Transfer to ICU';
+      }
+      return 'Transfer to Ward';
+    } else if (disposition.includes('discharge')) {
+      return 'Discharge Preparation';
+    }
+  }
+  
   const displayNames = {
     kiosk: 'Check-in Area',
     waiting_triage: 'Triage Waiting Area',
@@ -103,18 +123,23 @@ const getStageDisplayName = (stage) => {
     registered: 'Registration (Registered)',
     waiting_doctor: 'Doctor Waiting Area',
     consultation: 'Doctor Consultation',
+    resumed_from_observation: 'Doctor Consultation',  // ← Add this line
     waiting_admission: 'Admission Waiting',
-    waiting_observation: 'Observation Waiting',
+    waiting_observation: 'In Observation',
     waiting_discharge: 'Discharge Preparation',
     admission_orders: 'Admission Processing',
     awaiting_non_icu: 'Transfer to Ward',
     awaiting_icu: 'Transfer to ICU',
     discharge_documents: 'Discharge Processing',
     awaiting_departure: 'Ready for Departure',
-    departed: 'Visit Completed'
+    departed: 'Visit Completed',
+    transferred: 'Transferred'
   };
+  
   return displayNames[stage] || stage;
 };
+
+
 
 const getStageColor = (stage, isCompleted) => {
   if (!isCompleted) return 'bg-blue-100 text-blue-800 border-blue-200';
@@ -127,6 +152,7 @@ const getStageColor = (stage, isCompleted) => {
     registration: 'bg-indigo-100 text-indigo-800 border-indigo-200',
     waiting_doctor: 'bg-red-100 text-red-800 border-red-200',
     consultation: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    resumed_from_observation: 'bg-emerald-100 text-emerald-800 border-emerald-200',
     waiting_admission: 'bg-cyan-100 text-cyan-800 border-cyan-200',
     waiting_observation: 'bg-teal-100 text-teal-800 border-teal-200',
     waiting_discharge: 'bg-lime-100 text-lime-800 border-lime-200',
@@ -279,7 +305,7 @@ export function StageHistory({ patient }) {
 
                         <div className="flex items-center justify-between">
                           <div>
-                            <h3 className="font-medium">{getStageDisplayName(stage.stage)}</h3>
+                            <h3 className="font-medium">{getStageDisplayName(stage.stage, stage.payload)}</h3>
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                               <Calendar className="w-3 h-3" />
                               <span>{formatTime(stage.startTime)}</span>
@@ -371,7 +397,7 @@ export function StageHistory({ patient }) {
                     .map((stage, index) => (
                       <div key={index} className="p-3 bg-gray-50 rounded-lg">
                         <div className="font-medium text-sm mb-1">
-                          {getStageDisplayName(stage.stage)}
+                          {getStageDisplayName(stage.stage, stage.payload)}
                         </div>
 
                         <div className="flex items-center gap-2">

@@ -19,13 +19,13 @@ export const DEMO_USERS = {
       department: 'Emergency Medicine'
     }
   },
-  'dr.johnson': {
+  'dr.jones': {
     password: 'doctor123',
     user: {
       id: '5',
-      username: 'dr.johnson',
+      username: 'dr.jones',
       role: 'doctor',
-      name: 'Dr. Robert Johnson',
+      name: 'Dr. Becky Jones',
       department: 'Emergency Medicine'
     }
   },
@@ -48,5 +48,15 @@ export const DEMO_USERS = {
       name: 'Lisa Wilson',
       department: 'ED Management'
     }
+  },
+  'admin.admin': {
+    password: 'admin123',
+    user: {
+      id: '6',
+      username: 'admin.admin',
+      role: 'admin',
+      name: 'Admin User'
+    }
   }
-};
+}
+

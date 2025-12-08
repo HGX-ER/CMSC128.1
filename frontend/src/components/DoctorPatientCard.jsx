@@ -56,6 +56,8 @@ export function DoctorPatientCard({ patient, isSelected, onSelect, getTotalTime,
         <div className="text-sm">
           <strong>Chief Complaint:</strong> {patient.chiefComplaint}
         </div>
+
+        
         
         {doctorRoom && doctorFloor && (
           <div className="flex items-center gap-2 text-xs text-purple-700 bg-purple-50 p-2 rounded">
