@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Textarea } from './ui/textarea';
-import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
+import { Avatar, AvatarFallback } from './ui/avatar';
 import { StageHistory } from './StageHistory';
 import { HospitalAnnouncements } from './HospitalAnnouncements';
 import { MedicalTrivia } from './MedicalTrivia';
@@ -55,50 +55,9 @@ export function PatientInterface({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [staffDirectory, setStaffDirectory] = useState({ doctors: [], nurses: [] });
+  const [doctors, setDoctors] = useState([]);
 
-  // Load staff directory (doctors + nurses) once
-useEffect(() => {
-  const loadStaff = async () => {
-    try {
-      const [docRes] = await Promise.all([
-        fetch('http://localhost:5000/api/doctors'),
-        // you can drop nurses for now since there is no /registration/nurses route
-      ]);
-
-      const doctors = docRes.ok ? await docRes.json() : [];
-      setStaffDirectory({ doctors, nurses: [] });
-    } catch (e) {
-      console.error('Failed to load staff directory', e);
-    }
-  };
-  loadStaff();
-}, []);
-
-  // Helpers to get doctor / nurse info by username
-  const getDoctorInfo = (username) => {
-    if (!username) return null;
-    const d = staffDirectory.doctors.find((doc) => doc.username === username);
-    if (!d) return null;
-    return {
-      name: d.full_name || d.name || username,
-      specialty: d.specialty || d.department || '',
-      room: d.room || '',
-      floor: d.floor || '',
-      building: 'Main Hospital Building',
-    };
-  };
-
-  const getNurseInfo = (username) => {
-    if (!username) return null;
-    const n = staffDirectory.nurses.find((nurse) => nurse.username === username);
-    if (!n) return null;
-    return {
-      name: n.full_name || n.name || username,
-    };
-  };
-
-  // Queue number from URL or prop
+  // Get queue number from URL or props
   const getQueueNumber = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const queueFromUrl = urlParams.get('queue');
@@ -108,13 +67,41 @@ useEffect(() => {
   const queueNumber = getQueueNumber();
   const patient = backendPatientData || patients.find((p) => p.id === queueNumber);
 
-  // Stage normalization helper
+  // Load doctors once so we can map username -> full name
+  useEffect(() => {
+    const loadDoctors = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/doctors');
+        if (!res.ok) return;
+        const data = await res.json();
+        setDoctors(data);
+      } catch (e) {
+        console.error('Failed to load doctors', e);
+      }
+    };
+    loadDoctors();
+  }, []);
+
+  const getDoctorInfo = (username) => {
+    if (!username) return null;
+    const d = doctors.find((doc) => doc.username === username);
+    if (!d) return null;
+    return {
+      name: d.full_name || d.username,
+      specialty: d.specialty || '',
+      room: d.room || '',
+      floor: d.floor || '',
+      building: 'Main Hospital Building',
+    };
+  };
+
+  // Stage normalization
   const normalizeStage = (statusToStageMap, rawStage) => {
     if (!rawStage) return 'kiosk';
     return statusToStageMap[rawStage] || rawStage;
   };
 
-  // Polling for patient status every 5s
+  // Polling for patient status
   useEffect(() => {
     if (!queueNumber) return;
 
@@ -168,7 +155,6 @@ useEffect(() => {
             })) || [],
           chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
           assignedDoctor: data.assigned_doctor || null,
-          assignedNurse: data.assigned_nurse || null,
           sex: data.patient.sex,
           dob: data.patient.dob,
           disposition: data.timestamps.dispositioned,
@@ -187,7 +173,7 @@ useEffect(() => {
     return () => clearInterval(intervalId);
   }, [queueNumber]);
 
-  // Initial load (same endpoint)
+  // Initial status load
   useEffect(() => {
     const fetchPatientStatus = async () => {
       if (!queueNumber) {
@@ -250,7 +236,6 @@ useEffect(() => {
             })) || [],
           chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
           assignedDoctor: data.assigned_doctor || null,
-          assignedNurse: data.assigned_nurse || null,
           sex: data.patient.sex,
           dob: data.patient.dob,
           disposition: data.timestamps.dispositioned,
@@ -326,7 +311,6 @@ useEffect(() => {
           })) || [],
         chiefComplaint: data.timestamps?.roomed ? 'Registered' : null,
         assignedDoctor: data.assigned_doctor || null,
-        assignedNurse: data.assigned_nurse || null,
         sex: data.patient.sex,
         dob: data.patient.dob,
         disposition: data.timestamps.dispositioned,
@@ -344,7 +328,7 @@ useEffect(() => {
     }
   };
 
-  // Clock tick
+  // Clock
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
@@ -466,7 +450,7 @@ useEffect(() => {
     }
   };
 
-  // Loading / error UI
+  // Loading / error UIs
   if (!queueNumber && isLoading) {
     return (
       <div className="min-h-screen bg-blue-50 p-4 flex items-center justify-center">
@@ -611,7 +595,6 @@ useEffect(() => {
     }
   };
 
-  // Progress % across big stages
   const getProgressPercentage = () => {
     if (!patient) return 0;
 
@@ -668,9 +651,7 @@ useEffect(() => {
   };
 
   const StageIcon = getStageIcon(patient.currentStage);
-
   const doctorInfo = getDoctorInfo(patient.assignedDoctor);
-  const nurseInfo = getNurseInfo(patient.assignedNurse);
 
   return (
     <div className="min-h-screen bg-blue-50 p-4">
@@ -761,7 +742,7 @@ useEffect(() => {
                   <p className="text-blue-700">{getStageDescription(patient.currentStage)}</p>
                 </div>
 
-                {/* Real-time updates + quick feedback */}
+                {/* Real-time updates + feedback */}
                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center gap-2 mb-3">
                     <Bell className="w-4 h-4 text-green-700" />
@@ -908,7 +889,7 @@ useEffect(() => {
           </CardContent>
         </Card>
 
-        {/* Overview + Healthcare Team */}
+        {/* Overview + Assigned Doctor */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Visit Overview */}
           <Card className="shadow-lg">
@@ -971,73 +952,53 @@ useEffect(() => {
             </CardContent>
           </Card>
 
-          {/* Healthcare Team – shows real doctor name; nurse optional */}
-          {(doctorInfo || nurseInfo) && (
+          {/* Assigned Doctor card (no nurses) */}
+          {doctorInfo && (
             <Card className="shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-purple-600" />
-                  Your Healthcare Team
+                  <Stethoscope className="w-5 h-5 text-purple-600" />
+                  Your Doctor
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {nurseInfo && (
-                  <div className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                    <Avatar className="w-12 h-12">
-                      <AvatarFallback className="bg-purple-200 text-purple-800">
-                        {nurseInfo.name
-                          .split(' ')
-                          .map((n) => n[0])
-                          .join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="font-medium text-purple-800">Assigned Nurse</div>
-                      <div className="text-purple-700">{nurseInfo.name}</div>
-                    </div>
-                  </div>
-                )}
-
-                {doctorInfo && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                      <Avatar className="w-12 h-12">
-                        <AvatarFallback className="bg-purple-200 text-purple-800">
-                          {doctorInfo.name
-                            .split(' ')
-                            .map((n) => n[0])
-                            .join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="font-medium text-purple-800">Assigned Doctor</div>
-                        <div className="text-purple-700">{doctorInfo.name}</div>
-                        {doctorInfo.specialty && (
-                          <div className="text-xs text-purple-600">{doctorInfo.specialty}</div>
-                        )}
-                      </div>
-                    </div>
-
-                    {(doctorInfo.room || doctorInfo.floor) && (
-                      <div className="ml-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-                        <div className="text-sm space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Building className="w-4 h-4 text-indigo-600" />
-                            <span className="font-medium text-indigo-800">Location:</span>
-                          </div>
-                          <div className="ml-6 text-indigo-700">
-                            <p>🏥 {doctorInfo.building}</p>
-                            {doctorInfo.room && <p>📍 Room {doctorInfo.room}</p>}
-                            {doctorInfo.floor && <p>🔢 {doctorInfo.floor}</p>}
-                          </div>
-                        </div>
-                      </div>
+                <div className="flex items-center gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                  <Avatar className="w-12 h-12">
+                    <AvatarFallback className="bg-purple-200 text-purple-800">
+                      {doctorInfo.name
+                        .split(' ')
+                        .filter(Boolean)
+                        .map((n) => n[0].toUpperCase())
+                        .join('')}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="font-medium text-purple-800">Assigned Doctor</div>
+                    <div className="text-purple-700">{doctorInfo.name}</div>
+                    {doctorInfo.specialty && (
+                      <div className="text-xs text-purple-600">{doctorInfo.specialty}</div>
                     )}
+                  </div>
+                </div>
+
+                {(doctorInfo.room || doctorInfo.floor) && (
+                  <div className="ml-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <div className="text-sm space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Building className="w-4 h-4 text-indigo-600" />
+                        <span className="font-medium text-indigo-800">Location:</span>
+                      </div>
+                      <div className="ml-6 text-indigo-700">
+                        <p>🏥 {doctorInfo.building}</p>
+                        {doctorInfo.room && <p>📍 Room {doctorInfo.room}</p>}
+                        {doctorInfo.floor && <p>🔢 {doctorInfo.floor}</p>}
+                      </div>
+                    </div>
                   </div>
                 )}
 
                 <div className="text-xs text-purple-600 mt-2">
-                  <p>• Your care team has been notified of your visit</p>
+                  <p>• Your doctor has been notified of your visit</p>
                   <p>• You will be seen in order of medical priority</p>
                 </div>
               </CardContent>
@@ -1045,12 +1006,12 @@ useEffect(() => {
           )}
         </div>
 
-        {/* Tabs: tips, news, trivia, relax, services */}
+        {/* Tabs for tips, news, trivia, relax, services */}
         <Tabs defaultValue="tips" className="w-full">
           <TabsList className="flex justify-between w-full space-x-3 overflow-x-auto pb-2 bg-transparent border-b">
             <TabsTrigger
               value="tips"
-              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
+              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
             >
               <Lightbulb className="w-4 h-4" />
               <span className="hidden sm:inline">Health Tips</span>
@@ -1059,7 +1020,7 @@ useEffect(() => {
 
             <TabsTrigger
               value="news"
-              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
+              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
             >
               <Newspaper className="w-4 h-4" />
               <span className="hidden sm:inline">News</span>
@@ -1067,7 +1028,7 @@ useEffect(() => {
 
             <TabsTrigger
               value="trivia"
-              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
+              className="flex items-center justify-center gap-2 min-w-[100px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
             >
               <Brain className="w-4 h-4" />
               <span className="hidden sm:inline">Trivia</span>
@@ -1075,7 +1036,7 @@ useEffect(() => {
 
             <TabsTrigger
               value="relax"
-              className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
+              className="flex items-center justify-center gap-2 min-w-[120px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
             >
               <Wind className="w-4 h-4" />
               <span className="hidden sm:inline">Relaxation</span>
@@ -1083,7 +1044,7 @@ useEffect(() => {
 
             <TabsTrigger
               value="services"
-              className="flex items-center justify-center gap-2 min-w-[110px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm transition-all data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
+              className="flex items-center justify-center gap-2 min-w-[110px] px-6 py-3 rounded-xl text-sm sm:text-base font-medium text-blue-700 border border-blue-200 bg-white shadow-sm data-[state=active]:!bg-blue-100 data-[state=active]:!text-blue-800"
             >
               <Building className="w-4 h-4" />
               <span className="hidden sm:inline">Services</span>
@@ -1109,7 +1070,7 @@ useEffect(() => {
           </div>
         </Tabs>
 
-        {/* Info cards */}
+        {/* Info */}
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle>Important Information</CardTitle>
@@ -1141,7 +1102,7 @@ useEffect(() => {
           </CardContent>
         </Card>
 
-        {/* Footer times */}
+        {/* Times */}
         <div className="text-center text-sm text-gray-500 space-y-1">
           <p>Current time: {currentTime.toLocaleString()}</p>
           {lastUpdated && <p>Data updated: {lastUpdated.toLocaleString()}</p>}
