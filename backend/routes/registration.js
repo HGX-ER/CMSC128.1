@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require("../db");
 
 // ============================================================
-// ✅ GET /api/registration
+// GET /api/registration
 // Fetch only patients waiting for registration (status = 'arrived')
 // ============================================================
 router.get("/registration", async (_req, res) => {
@@ -99,7 +99,7 @@ router.put("/registration/patient/:queueNumber", async (req, res) => {
             emergencyContact,
             insuranceInfo,
             address,
-            chiefComplaint, // ✅ ADDED: Get chief complaint from request
+            chiefComplaint,
         } = req.body;
 
         console.log(`📝 Registering patient ${queueNumber}:`, { name, chiefComplaint });
@@ -141,7 +141,6 @@ router.put("/registration/patient/:queueNumber", async (req, res) => {
             ]
         );
 
-        // ✅ ADDED: Save chief complaint to observations table
         if (chiefComplaint && chiefComplaint.trim() !== '') {
             await db.query(
                 `INSERT INTO observations (encounter_id, type, value, recorded_at)
@@ -180,7 +179,7 @@ router.put("/registration/patient/:queueNumber", async (req, res) => {
                 emergencyContact,
                 insuranceInfo,
                 address,
-                chiefComplaint || null, // ✅ ADDED
+                chiefComplaint || null,
                 queueNumber,
             ]
         );

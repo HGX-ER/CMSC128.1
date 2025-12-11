@@ -24,8 +24,8 @@ const toEncounter = (r) => ({
     esiLevel: r.priority_esi ?? null,
     assignedDoctor: r.assigned_doctor || null,
     assignedNurse: r.assigned_nurse || null,
-    arrivalTime: r.arrival_time || null,  // ✅ FIXED
-    triageTime: r.triage_time || null,     // ✅ FIXED
+    arrivalTime: r.arrival_time || null,
+    triageTime: r.triage_time || null,
     disposition: r.disposition || null,
     diagnosis: r.diagnosis || null,
 });

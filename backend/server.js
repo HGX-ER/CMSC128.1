@@ -92,7 +92,6 @@ app.use("/api/*", (req, res) => {
     res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
 });
 
-// ✅ REPLACE THE OLD app.listen() WITH THIS:
 loadICD10()
     .then(() => {
         app.listen(PORT, () => {

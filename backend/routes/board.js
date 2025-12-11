@@ -46,7 +46,6 @@ async function getAllowedEventTypes(connOrPool = db) {
     if (!rows.length) return null;
     if (rows[0].DATA_TYPE !== "enum") return null;
 
-    // COLUMN_TYPE looks like: enum('doctor_assigned','nurse_assigned',...)
     const raw = rows[0].COLUMN_TYPE;
     const list = [];
     raw.replace(/'([^']*)'/g, (_, val) => {
@@ -86,7 +85,6 @@ async function safeInsertEvent(conn, encounterId, preferred, payloadObj) {
         );
         return true;
     } catch (e) {
-        // We never want event logging to abort the real update.
         console.warn("safeInsertEvent warning:", e && e.sqlMessage ? e.sqlMessage : e);
         return false;
     }
@@ -202,7 +200,6 @@ router.post("/board/assign-doctor", async (req, res) => {
             [doctor_username, numericId]
         );
 
-        // Try to log with enum-safe type; do not fail transaction if it doesn't fit.
         await safeInsertEvent(conn, numericId, ["doctor_assigned", "provider_assigned", "assignment"], { doctor: doctor_username });
 
         await conn.commit();

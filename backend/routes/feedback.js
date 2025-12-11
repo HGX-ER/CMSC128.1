@@ -44,7 +44,6 @@ router.post('/feedback', async (req, res) => {
             [encounterId, queueNumber, patientName, rating, comment || null, stage, stageName || stage]
         );
 
-        // Optional SSE event, but keep snake_case if you use it on frontend
         const publishEvent = req.app.get('publishEvent');
         if (publishEvent) {
             publishEvent({

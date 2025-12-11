@@ -4,18 +4,10 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// ✅ FIXED: Correct flow - Triage BEFORE Registration
 const statusToStageMap = {
-    // Step 1: Just arrived → needs TRIAGE first
     'arrived': 'waiting_triage',
-
-    // Step 2: After triage → needs REGISTRATION
     'triaged': 'waiting_registration',
-
-    // Step 3: After registration → ready for DOCTOR
     'registered': 'waiting_doctor',
-
-    // Other stages
     'waiting_triage': 'waiting_triage',
     'in_triage': 'triage',
     'waiting_registration': 'waiting_registration',
@@ -27,7 +19,6 @@ const statusToStageMap = {
     'roomed': 'consultation',
     'provider_started': 'consultation',
 
-    // *** ADDED: normalize observation/admission statuses from doctor backend ***
     'waiting_observation': 'waiting_observation',
     'in_observation': 'waiting_observation',   // doctor sets this → show as For Observation
     'observation': 'waiting_observation',      // safety alias
@@ -91,7 +82,7 @@ router.get('/whiteboard', async (_req, res) => {
                 ) AS chief_complaint
             FROM encounters e
                 JOIN patients p ON p.id = e.patient_id
-            -- ✅ REMOVED: Don't filter out departed patients
+            -- REMOVED: Don't filter out departed patients
             -- WHERE e.status IS NULL OR e.status <> 'departed'
             ORDER BY
                 CASE e.status
@@ -142,7 +133,6 @@ router.get('/whiteboard', async (_req, res) => {
             diagnosis: r.diagnosis || null,
             disposition: r.disposition || null,
 
-            // ✅ UPDATED: Mark departed as inactive
             isActive: (r.status || '') !== 'departed',
         }));
 

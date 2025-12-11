@@ -81,7 +81,6 @@ CREATE TABLE observations (
 CREATE INDEX idx_obs_encounter ON observations(encounter_id);
 
 -- ENCOUNTER EVENTS
--- ✅ FIXED: Changed type from ENUM to VARCHAR(50)
 CREATE TABLE encounter_events (
                                   id INT AUTO_INCREMENT PRIMARY KEY,
                                   encounter_id INT NOT NULL,

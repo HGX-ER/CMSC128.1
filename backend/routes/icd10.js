@@ -6,7 +6,6 @@ const { searchICD10, getByCode, getAllCodes } = require('../services/icd10Servic
 const { getCommonEDCodes, clearCache } = require('../services/commonCodesService');
 const { getCommonCodesWithStats } = require('../services/diagnosisStatsService');
 
-// ✅ Search ICD-10 codes (for doctors)
 router.get('/search', (req, res) => {
     const { q } = req.query;
     if (!q || q.length < 2) {
@@ -15,7 +14,6 @@ router.get('/search', (req, res) => {
     res.json(searchICD10(q));
 });
 
-// ✅ HYBRID: Get common codes - BOTH database stats AND online research
 router.get('/common', async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 100;
@@ -26,16 +24,13 @@ router.get('/common', async (req, res) => {
             console.log('🗑️ Cleared common ED ICD-10 cache');
         }
 
-        // Get BOTH database stats AND online research codes
         const result = await getCommonCodesWithStats(limit);
 
-        // ✅ Return result directly - don't wrap it again
         res.json(result);
 
     } catch (error) {
         console.error('Error fetching common codes:', error);
 
-        // Fallback: return just online codes if everything fails
         try {
             const onlineCodes = await getCommonEDCodes(limit);
             res.json({
@@ -60,7 +55,6 @@ router.get('/common', async (req, res) => {
     }
 });
 
-// ✅ Get ONLY database statistics
 router.get('/database-stats', async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 100;
@@ -80,7 +74,6 @@ router.get('/database-stats', async (req, res) => {
     }
 });
 
-// ✅ Get ONLY online research codes
 router.get('/research', async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 100;
@@ -103,7 +96,6 @@ router.get('/research', async (req, res) => {
     }
 });
 
-// ✅ Get single code by ID (for doctors)
 router.get('/:code', (req, res) => {
     const result = getByCode(req.params.code);
     if (!result) return res.status(404).json({ error: 'Code not found' });
