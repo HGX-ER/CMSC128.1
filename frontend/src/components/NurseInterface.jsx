@@ -49,7 +49,6 @@ export function NurseInterface({
   const [adjustTimeDialogOpen, setAdjustTimeDialogOpen] = useState(false);
   const [timeAdjustment, setTimeAdjustment] = useState({ hours: 0, minutes: 0 });
 
-  // ✅ Helper function to get patient age
   const getPatientAge = (patient) => {
     if (patient.age) return `${patient.age}y`;
     

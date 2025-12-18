@@ -16,10 +16,6 @@ import {
   MapPin
 } from 'lucide-react';
 
-/* -----------------------------------------
-   5-STEP PROGRESS MODEL (Unified Logic)
------------------------------------------ */
-
 const flow = [
   "checkin",
   "triage",
@@ -94,9 +90,6 @@ const getHistoryProgressPercentage = (stage) => {
   return Math.round((index / (flow.length - 1)) * 100);
 };
 
-/* -----------------------------------------
-   UI Helpers
------------------------------------------ */
 
 const getStageDisplayName = (stage, payload) => {
   // If stage is "transferred", check payload for disposition
@@ -123,7 +116,7 @@ const getStageDisplayName = (stage, payload) => {
     registered: 'Registration (Registered)',
     waiting_doctor: 'Doctor Waiting Area',
     consultation: 'Doctor Consultation',
-    resumed_from_observation: 'Doctor Consultation',  // ← Add this line
+    resumed_from_observation: 'Doctor Consultation',  
     waiting_admission: 'Admission Waiting',
     waiting_observation: 'In Observation',
     waiting_discharge: 'Discharge Preparation',
@@ -191,10 +184,6 @@ const getSatisfactionDisplay = (rating) => {
   };
   return displays[rating] || { label: 'N/A', color: 'text-gray-600' };
 };
-
-/* -----------------------------------------
-   MAIN COMPONENT
------------------------------------------ */
 
 export function StageHistory({ patient }) {
   const completedStages = patient.stageHistory.filter(s => s.endTime);

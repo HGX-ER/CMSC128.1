@@ -153,15 +153,12 @@ const handleRegisterPatient = async () => {
 
     console.log("✅ Registration saved to backend:", payload);
 
-    // ✅ Update frontend - backend status='registered' maps to 'waiting_doctor'
+    //Update frontend - backend status='registered' maps to 'waiting_doctor'
     onUpdatePatient(patient.id, { 
       ...payload, 
       age: calculatedAge, 
       isRegistered: true 
     });
-
-    // ✅ This is correct now! Backend sets status='registered' → maps to 'waiting_doctor'
-    // Don't manually call onMoveToStage, let the data reload handle it
 
     alert("✅ Registration completed! Patient ready for doctor assignment.");
 

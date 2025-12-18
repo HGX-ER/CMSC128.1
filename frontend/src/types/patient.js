@@ -1,5 +1,3 @@
-// Patient-related constants and helper functions
-
 // Valid patient stages
 export const PATIENT_STAGES = [
   'kiosk',
@@ -28,7 +26,6 @@ export const DISPOSITION_OPTIONS = [
   'Discharge'
 ];
 
-// Format machine disposition codes to human-friendly labels
 export const formatDisposition = (disp) => {
   if (!disp) return '';
   const map = {
@@ -69,13 +66,11 @@ export const createNewPatient = (id, arrivalTime = new Date()) => ({
   isRegistered: false
 });
 
-// Helper function to create stage history entry
 export const createStageHistoryEntry = (stage, startTime = new Date()) => ({
   stage,
   startTime
 });
 
-// Helper function to create satisfaction feedback
 export const createSatisfactionFeedback = (rating, comment = '', submittedAt = new Date()) => ({
   rating,
   comment,

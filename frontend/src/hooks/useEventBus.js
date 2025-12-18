@@ -8,7 +8,6 @@ export function useEventBus(onEvent) {
   const handlerRef = useRef(onEvent);
   handlerRef.current = onEvent;
 
-  // ✅ Guard against React 18 StrictMode double-mount in development
   const startedRef = useRef(false);
 
   useEffect(() => {

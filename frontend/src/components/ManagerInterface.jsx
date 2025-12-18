@@ -74,7 +74,6 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
   const [timeOrder, setTimeOrder] = useState('none');
   const [viewedFeedbackCount, setViewedFeedbackCount] = useState(0);
   
-  // ✅ ADDED: Toggle for showing departed patients
   const [showDeparted, setShowDeparted] = useState(false);
 
   // Backend feedback state
@@ -109,13 +108,13 @@ export function ManagerInterface({ patients, onUpdatePatient, onMoveToStage, onR
     };
   });
 
-// ✅ CORRECT: Show ALL patients when showDeparted is true
+//Show ALL patients when showDeparted is true
 const activePatients = showDeparted 
   ? patients  // Show ALL patients including departed
   : patients.filter(p => p.currentStage !== 'departed'); // Hide departed only
 
   
-  // ✅ ADDED: Separate list for departed patients
+  //Separate list for departed patients
   const departedPatients = patients.filter(p => p.currentStage === 'departed' || !p.isActive);
 
   // Fetch feedback from backend
@@ -250,14 +249,14 @@ const activePatients = showDeparted
   }, [patients, esiFilter, timeOrder, showDeparted]);
 
   const getPatientsByStage = (stage) => {
-    // ✅ UPDATED: Include departed in count if showing departed
+    
     if (stage === 'departed') {
       return departedPatients;
     }
     return activePatients.filter(p => p.currentStage === stage);
   };
 
-  // NEW helper: total patients in the admission pipeline
+  
 const getForAdmissionTotal = () => {
   const admissionStages = [
     "waitingadmission",   // For Admission
@@ -293,7 +292,7 @@ const splitDiagnosis = (full) => {
   const idx = full.indexOf(marker);
 
   if (idx === -1) {
-    // No marker → treat whole thing as free-text note
+    
     return { note: full.trim(), icd: "" };
   }
 
@@ -313,7 +312,6 @@ const splitDiagnosis = (full) => {
 const getStageAlerts = () => {
   const alerts = [];
 
-  // 🔒 Only monitor non‑departed, active patients for alerts
   const monitoredPatients = activePatients.filter(
     (patient) => patient.currentStage !== 'departed' && patient.isActive !== false
   );
@@ -502,7 +500,7 @@ const getStageAlerts = () => {
             {Object.entries(STAGE_LABELS).map(([stage, label]) => {
               const count = getPatientsByStage(stage).length;
               
-              // ✅ UPDATED: Always show departed count
+              //  show departed count
               if (count === 0 && stage !== 'departed' && !['waiting_triage', 'waiting_registration', 'waiting_doctor', 'waiting_admission', 'waiting_observation', 'waiting_discharge'].includes(stage)) {
                 return null;
               }
@@ -617,7 +615,7 @@ const getStageAlerts = () => {
               <div className="flex items-center justify-between">
                 <CardTitle>Patient Whiteboard</CardTitle>
                 <div className="flex items-center gap-3">
-                  {/* ✅ ADDED: Toggle for departed patients */}
+                  {/* departed patients */}
                   <Button
                     variant={showDeparted ? "default" : "outline"}
                     size="sm"
@@ -733,10 +731,8 @@ filteredActivePatients.map((patient) => {
     (f) => f.queue_number === patient.id
   ).length;
 
-  // ✅ ADDED: Gray out departed patients
   const isDeparted = patient.currentStage === "departed";
 
-  // ✅ NEW: split diagnosis into doctor's note vs ICD-10 codes
   const { note: diagnosisNote, icd: icdCodes } = splitDiagnosis(
     patient.diagnosis
   );
@@ -775,12 +771,12 @@ filteredActivePatients.map((patient) => {
         {patient.chiefComplaint || "-"}
       </TableCell>
 
-      {/* ✅ NEW: doctor's diagnosis narrative */}
+      {/*  */}
       <TableCell className="max-w-xs truncate">
         {diagnosisNote || "-"}
       </TableCell>
 
-      {/* ✅ NEW: ICD-10 codes only */}
+      {/* ICD-10 codes only */}
       <TableCell className="max-w-xs truncate font-mono text-xs">
         {icdCodes || "-"}
       </TableCell>

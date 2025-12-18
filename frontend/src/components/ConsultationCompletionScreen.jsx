@@ -33,11 +33,11 @@ export function ConsultationCompletionScreen({ onSubmitFeedback, patientName, qu
       })
     });
 
-    console.log('📡 Response status:', response.status); // ← Add this
+    console.log('📡 Response status:', response.status); 
 
     if (!response.ok) {
-      const errorData = await response.json(); // ← Add this
-      console.error('❌ Backend error:', errorData); // ← Add this
+      const errorData = await response.json(); 
+      console.error('❌ Backend error:', errorData); 
       throw new Error('Failed to submit feedback');
     }
 

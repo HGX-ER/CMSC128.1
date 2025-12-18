@@ -129,13 +129,11 @@ useEffect(() => {
       
       console.log('🔍 Raw API Response:', data);
       
-      // Extract database codes (Your ED Data)
       const dbCodes = (data.database?.codes || []).map(c => ({
         ...c,
         source: 'database'
       }));
       
-      // Extract online codes (National Research)
       const onlineCodes = (data.online?.codes || []).map(c => ({
         ...c,
         source: 'online'
@@ -144,18 +142,15 @@ useEffect(() => {
       console.log('📊 Database codes:', dbCodes);
       console.log('🌐 Online codes BEFORE filter:', onlineCodes);
       
-      // ✅ Create a Set of database code IDs to filter out duplicates
       const dbCodeSet = new Set(dbCodes.map(c => c.code));
       console.log('🔑 Database code set:', Array.from(dbCodeSet));
       
-      // ✅ Filter online codes - remove any that exist in database
       const filteredOnlineCodes = onlineCodes.filter(c => !dbCodeSet.has(c.code));
       console.log('🌐 Online codes AFTER filter:', filteredOnlineCodes);
       
-      // Combine both arrays (database codes stay separate from online)
       const allCodes = [...dbCodes, ...filteredOnlineCodes];
       
-      console.log('✅ Final processed codes:', {
+      console.log(' Final processed codes:', {
         database: dbCodes.length,
         online: filteredOnlineCodes.length,
         total: allCodes.length,
@@ -309,12 +304,12 @@ const dispositions = completedPatients.reduce((acc, patient) => {
 
 const dispositionData = Object.entries(dispositions).map(([name, value]) => ({ name, value }));
 
-// 1) Keep your existing demographics reducer
+
 const demographics = completedPatients.reduce((acc, patient) => {
-  // 1) Try explicit age if present
+
   let age = patient.age;
 
-  // 2) Derive age from dateOfBirth / dob if age missing
+  
   if ((age === undefined || age === null) && patient.dateOfBirth) {
     const dob = new Date(patient.dateOfBirth);
     if (!Number.isNaN(dob.getTime())) {
@@ -327,7 +322,7 @@ const demographics = completedPatients.reduce((acc, patient) => {
     }
   }
 
-  // 3) Bucket by age group
+  //Bucket by age group
   let ageGroup;
   if (typeof age === "number" && !Number.isNaN(age)) {
     ageGroup = age < 18 ? "Pediatric" : "Adult";
@@ -335,7 +330,7 @@ const demographics = completedPatients.reduce((acc, patient) => {
     ageGroup = "Unknown age";
   }
 
-  // 4) Use sex from patients table, with fallback
+  // Use sex from patients table, with fallback
   const sex = (patient.sex || "Unknown sex").trim();
 
   const key = `${ageGroup} • ${sex}`;
@@ -343,7 +338,7 @@ const demographics = completedPatients.reduce((acc, patient) => {
   return acc;
 }, {});
 
-// 2) Add THIS for the population pyramid (new code)
+// the population pyramid (new code)
 const makeAgeBand = (age) => {
   if (typeof age !== "number" || Number.isNaN(age)) return "Unknown";
   if (age < 18) return "0–17";
@@ -352,7 +347,6 @@ const makeAgeBand = (age) => {
   return "65+";
 };
 
-// ----- Generation–sex population pyramid data -----
 const generationSexCounts = completedPatients.reduce((acc, patient) => {
   // Derive birthYear from dateOfBirth or from age
   let birthYear = null;
@@ -373,12 +367,11 @@ const generationSexCounts = completedPatients.reduce((acc, patient) => {
   const sex = (patient.sex || "").toLowerCase();
   if (sex === "male") acc[gen].male += 1;
   else if (sex === "female") acc[gen].female += 1;
-  else acc[gen].female += 1; // put unknown/other on positive side
+  else acc[gen].female += 1; 
 
   return acc;
 }, {});
 
-// Convert to array; male negative so it appears on the left
 const ageSexPyramidData = Object.entries(generationSexCounts)
   .map(([generation, { male, female }]) => ({
     ageBand: generation,  // reuse ageBand field name for the Y axis
@@ -389,8 +382,6 @@ const ageSexPyramidData = Object.entries(generationSexCounts)
     const order = ["Gen Alpha", "Gen Z", "Millennial", "Gen X", "Baby Boomer", "Silent+", "Unknown"];
     return order.indexOf(a.ageBand) - order.indexOf(b.ageBand);
   });
-
-
 
 // Turn demographics object into array for charts
 const demographicsData = Object.entries(demographics).map(
@@ -445,24 +436,18 @@ const cityCounts = completedPatients.reduce((acc, patient) => {
   if (raw) {
     let lastPart = raw;
     
-    // First, check if there's a comma (proper format: "address, city")
     if (raw.includes(",")) {
       const parts = raw.split(",");
       lastPart = parts[parts.length - 1].trim();
     } else {
-      // No comma found, try to extract the last 1-2 words as city
-      // This handles cases like "123 Main Street Pasay City" without comma
       const words = raw.split(/\s+/);
       if (words.length > 2) {
-        // If address has multiple words, assume last 2 might be the city
         lastPart = words.slice(-2).join(" ");
       }
     }
     
     if (lastPart) {
-      // Extract the first word from the city part
       const firstWord = lastPart.split(/\s+/)[0];
-      // Normalize to title case for consistency
       city = firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
     }
   }
@@ -471,7 +456,7 @@ const cityCounts = completedPatients.reduce((acc, patient) => {
 }, {});
 const cityData = Object.entries(cityCounts).map(([name, value]) => ({ name, value }));
 
-// City patient data - prepare patient records with their addresses for display in table
+// City patient data
 const cityPatientData = completedPatients.map(patient => {
   const raw = (patient.address || "").trim();
   let city = "Unknown city";
@@ -501,7 +486,7 @@ const cityPatientData = completedPatients.map(patient => {
   };
 });
 
-// Count top ICD‑10 diagnoses (codes/descriptions only)
+// Count top ICD‑10 diagnoses 
 const diagnosisCount = completedPatients.reduce((acc, patient) => {
   if (patient.diagnosis) {
     const { icd } = splitDiagnosis(patient.diagnosis);
@@ -529,20 +514,20 @@ const top10Diagnoses = Object.entries(diagnosisCount)
       dispositionData,
       demographics,
       demographicsData, 
-      ageSexPyramidData,  // ✅ add this
-      sexData,          // ✅ new
-      ageData,          // ✅ new
-      insurancePatientData,    // ✅ new - patient records for table
-      cityPatientData,         // ✅ new - city patient records for table
+      ageSexPyramidData,  
+      sexData,         
+      ageData,          
+      insurancePatientData,    
+      cityPatientData,        
        cityData,
-      // CHANGED: use basePatients so admitted_non_icu / admitted_icu count
+      
       totalAdmissions: basePatients.filter(
         p => p.disposition && p.disposition.includes('Admission')
       ).length,
       totalDischarges: completedPatients.filter(
         p => p.disposition === 'Discharge'
       ).length,
-      // CHANGED: observations can be active or departed
+      
       totalObservations: basePatients.filter(
         p => p.disposition === 'Observation'
       ).length,
@@ -1340,7 +1325,7 @@ const top10Diagnoses = Object.entries(diagnosisCount)
       <div className="flex-1 min-w-0">
         <p className="text-sm text-gray-700 font-medium mb-2">{icd.description}</p>
         
-        {/* ✅ PROGRESS BAR - FULL WORKING VERSION */}
+        {/*PROGRESS BAR */}
 {icd.percentage && (
   <div className="space-y-1">
     <div className="flex items-center justify-between text-xs">

@@ -16,7 +16,7 @@ export function usePatientManagement() {
     for (const p of list) byId.current.set(p.id, p);
   };
 
-  // ✅ Load from /whiteboard endpoint with complete patient data
+  // Load from /whiteboard endpoint with complete patient data
   const loadBoard = useCallback(async () => {
     try {
       const { data } = await api.get('/api/whiteboard');
@@ -48,7 +48,7 @@ export function usePatientManagement() {
         insurance_info: row.insurance_info || null,
         address: row.address || null,
         
-        // ✅ Use currentStage directly from backend (already mapped)
+        //Use currentStage directly from backend
         currentStage: row.currentStage,
         
         // ESI and assignments
@@ -85,7 +85,7 @@ export function usePatientManagement() {
     }
   }, []);
 
-  // ✅ ADDED: Initial load + auto-refresh every 5 seconds
+  //  Initial load + auto-refresh every 5 seconds
   useEffect(() => { 
     loadBoard();
     
@@ -97,7 +97,7 @@ export function usePatientManagement() {
     return () => clearInterval(interval);
   }, [loadBoard]);
 
-  // ✅ UPDATED: Refresh when the server fires SSE events
+  // Refresh when the server fires SSE events
   useEventBus((evt) => {
     console.log('🔔 SSE Event received:', evt?.type);
     
@@ -168,7 +168,7 @@ export function usePatientManagement() {
       return next;
     });
     
-    // ✅ ADDED: Reload after update to sync with backend
+    // Reload after update to sync with backend
     setTimeout(loadBoard, 300);
   }, [loadBoard]);
 
@@ -189,7 +189,7 @@ export function usePatientManagement() {
       return next;
     });
     
-    // ✅ ADDED: Reload after stage change
+    // Reload after stage change
     setTimeout(loadBoard, 300);
   }, [loadBoard]);
 
@@ -250,7 +250,7 @@ export function usePatientManagement() {
     });
   }, []);
 
-  // ✅ UPDATED: Reload after backend operations
+  // Reload after backend operations
   const completeRegistration = useCallback(async (queue_number, registrationData) => {
     await api.put(`/api/registration/patient/${queue_number}`, registrationData);
     setTimeout(loadBoard, 300);

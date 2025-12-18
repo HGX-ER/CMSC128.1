@@ -568,7 +568,7 @@ const completedPatients = useMemo(() =>
           </Card>
         </TabsContent>
 
-        {/* Status Tab - ✅ FIXED SECTION */}
+        {/* Status Tab */}
         <TabsContent value="status" className="mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Active Consultations */}
